@@ -1,0 +1,35 @@
+(This file is the basis of the `filesdump.txt` in which it is included, i.e. the document you are reading right now.
+The files in this manifest are the relevant files for understanding how the project hangs together.
+Files which are commented out are not included in the `filesdump.txt`.)
+
+### --- Context & Meta ---
+# ⚠️ NON-NEGOTIABLE collaboration rules - READ FIRST
+CRITICAL_RULES.md
+
+LLM-instructions.md
+manifest.lst
+tmp/project-tree.txt
+
+README.md
+Goals.md
+TODO.md
+
+### --- Build & Configuration ---
+Makefile
+tools/requirements.txt
+
+### --- Swift ---
+Anima/AnimaPDFView.swift
+Anima/FitzBridge.swift
+Anima/AppDelegate.swift
+Anima/main.swift
+
+### --- Tools ---
+tools/anima_helper.py
+tools/concat_files.py
+
+### --- Testing Infrastructure ---
+# TBD
+
+### --- Data ---
+# data/input_original.pdf

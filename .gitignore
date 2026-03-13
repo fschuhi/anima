@@ -1,0 +1,52 @@
+# Debug logs
+*.log
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Swift build output (swiftc command-line builds)
+anima
+
+# Xcode
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+DerivedData/
+build/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Xcode — keep project and scheme files, ignore user state
+# (xcuserdata/ above handles per-user layout, breakpoints, etc.)
+
+# Swift Package Manager (if used later)
+.build/
+Package.resolved
+Packages/
+
+# Temporary files
+tmp/
+*.tmp
+filesdump.txt
+project-tree.txt
+
+# Test PDFs (keep originals in data/, ignore working copies)
+input.pdf
