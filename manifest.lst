@@ -11,6 +11,7 @@ manifest.lst
 tmp/project-tree.txt
 
 README.md
+SIDEBAR_DESIGN.md
 TODO.md
 
 ### --- Build & Configuration ---
