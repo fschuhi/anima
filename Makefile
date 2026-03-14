@@ -10,16 +10,15 @@ ACTIVATE = . $(VENV_ACTIVATE)
 PIP = $(ACTIVATE) && pip
 SETUP_STAMP = $(VENV_DIR)/.setup_stamp
 
-# Swift source files
-SWIFT_SRC = Anima/main.swift Anima/AppDelegate.swift Anima/AnimaPDFView.swift Anima/FitzBridge.swift
-SWIFT_OUT = anima
+# Swift source files (for swiftc command-line builds)
+SWIFT_SRC = Anima/Anima/AppDelegate.swift Anima/Anima/AnimaPDFView.swift Anima/Anima/FitzBridge.swift
 SWIFT_FRAMEWORKS = -framework Cocoa -framework Quartz
 
 # --- Phony targets ---
-.PHONY: all setup build run clean showtree gentree filesdump help
+.PHONY: all setup build run clean format showtree gentree filesdump help test test-verbose
 
 # Default target
-all: setup build
+all: setup
 
 # --- Python Virtual Environment ---
 
@@ -34,15 +33,9 @@ $(SETUP_STAMP): $(VENV_ACTIVATE) tools/requirements.txt
 
 setup: $(SETUP_STAMP) ## Create venv and install Python dependencies
 
-# --- Swift Build ---
-
-build: $(SWIFT_SRC) ## Compile Swift sources into ./anima binary
-	@echo "--- Building Anima ---"
-	swiftc -o $(SWIFT_OUT) $(SWIFT_FRAMEWORKS) $(SWIFT_SRC)
-	@echo "--- Build complete: ./$(SWIFT_OUT) ---"
-
-run: build setup ## Build and run Anima (PDF must be at ./data/input.pdf)
-	./$(SWIFT_OUT)
+# --- Swift Build (command-line, without Xcode) ---
+# Note: swiftc builds won't work with @main AppDelegate (needs Xcode).
+# These targets are kept for reference but Xcode (Cmd+R) is the normal build path.
 
 # --- Testing ---
 
@@ -52,19 +45,26 @@ test: $(SETUP_STAMP) ## Run Python tests (quiet mode)
 test-verbose: $(SETUP_STAMP) ## Run Python tests with verbose output
 	$(ACTIVATE) && pytest -v -s
 
+# --- Code Formatting ---
+
+format: ## Format Swift (SwiftFormat) and Python (black) files
+	@echo "--- Formatting Swift ---"
+	swiftformat Anima/Anima/ --swiftversion 6.0
+	@echo "--- Formatting Python ---"
+	$(ACTIVATE) && black tools/
+
 # --- Utility Targets ---
 
-clean: ## Remove build output, venv, cache, and tmp files
-	rm -f $(SWIFT_OUT)
+clean: ## Remove venv, cache, and tmp files
 	rm -rf $(VENV_DIR) .pytest_cache tmp
 	find . -name "__pycache__" -type d -prune -exec rm -rf {} +
 
 showtree: ## Show project directory structure
-	@tree -I "node_modules|dist|build|.git|.idea|.vscode|.venv|__pycache__|tmp|cache|*egg-info" -L 3
+	@tree -I "node_modules|dist|build|.git|.idea|.vscode|.venv|__pycache__|tmp|cache|*egg-info|DerivedData|xcuserdata" -L 3
 
 gentree: ## Save tree structure to tmp/project-tree.txt
 	@mkdir -p tmp
-	@tree -I "node_modules|dist|build|.git|.idea|.vscode|.venv|__pycache__|tmp|cache|*egg-info" > tmp/project-tree.txt
+	@tree -I "node_modules|dist|build|.git|.idea|.vscode|.venv|__pycache__|tmp|cache|*egg-info|DerivedData|xcuserdata" > tmp/project-tree.txt
 	@echo "Project tree saved to tmp/project-tree.txt"
 
 filesdump: gentree ## Create context dump for LLMs

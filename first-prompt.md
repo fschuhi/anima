@@ -34,7 +34,7 @@ The filesdump contains the complete project enclosed in `<document>` tags.
 - **`README.md`** - Bird's eye view of the project architecture
 - **`Goals.md`** - Strategic priorities for this conversation
 - **`HANDOVER.md`** - Detailed implementation guidance for next LLM conversation
-- **`TODO.md`** - Scratchpad for ideas and quick wins
+- **`TODO.md`** - Priorities for this conversation (including quick wins) and long-term directions
 - **`Makefile`** - Build, test, and run commands
 
 ---
@@ -45,15 +45,15 @@ The filesdump contains the complete project enclosed in `<document>` tags.
 
 **Step 2:** Review the filesdump structure via `manifest.lst`.
 
-**Step 3:** Check `Goals.md` for current priorities. The first goal listed is typically where I want to start.
+**Step 3:** Check `TODO.md` for current priorities. The first TODO listed is typically where I want to start.
 
 **Step 4:** Acknowledge that you understand:
 
-- The project's current state (from README.md)
-- The strategic direction (from Goals.md)
+- The project's vision and current state (from README.md)
+- The strategic and tactical direction (from TODO.md)
 - The collaboration rules (from CRITICAL_RULES.md)
 
-**Step 5:** Propose how to tackle the first goal from `Goals.md`. Remember:
+**Step 5:** Propose how to tackle the first work package from `TODO.md`. Remember:
 
 - Discuss approach options first
 - Get explicit approval before creating files

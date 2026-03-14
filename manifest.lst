@@ -11,25 +11,27 @@ manifest.lst
 tmp/project-tree.txt
 
 README.md
-Goals.md
 TODO.md
 
 ### --- Build & Configuration ---
 Makefile
 tools/requirements.txt
+.editorconfig
 
 ### --- Swift ---
-Anima/AnimaPDFView.swift
-Anima/FitzBridge.swift
-Anima/AppDelegate.swift
-Anima/main.swift
+Anima/Anima/AnimaPDFView.swift
+Anima/Anima/FitzBridge.swift
+Anima/Anima/AppDelegate.swift
 
 ### --- Tools ---
 tools/anima_helper.py
 tools/concat_files.py
 
 ### --- Testing Infrastructure ---
-# TBD
+# only stubs
+# Anima/AnimaTests/AnimaTests.swift
+# Anima/AnimaUITests/AnimaUITests.swift
+# Anima/AnimaUITests/AnimaUITestsLaunchTests.swift
 
 ### --- Data ---
 # data/input_original.pdf

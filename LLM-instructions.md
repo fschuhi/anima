@@ -102,14 +102,12 @@ I frequently switch between different AI models (Gemini, Claude, ChatGPT).
 5. **[`README.md`](README.md)**: Explains how everything hangs together.
 6. **[`TODO.md`](TODO.md)**: Captures and shelves topics for later. Feel free to
    suggest additions or changes at any time.
-7. **[`Goals.md`](Goals.md)**: Shows the direction we are working towards.
 
 ---
 
 ## How to Start This Session / Conversation
 
-- The first entries in [`Goals.md`](Goals.md) indicate where I want to go.
-- [`TODO.md`](TODO.md) collects topics and ideas as a scratchpad.
+- [`TODO.md`](TODO.md) collects topics and ideas and indicates where I want to go.
 - [`README.md`](README.md) describes the current state (may lag behind the code).
 
 I'm always interested in quick wins. If you identify inconsistencies (like README

@@ -40,6 +40,7 @@ class AnimaPDFView: PDFView {
     // --- Keyboard handling ---
 
     private var lastHandledEvent: NSEvent?
+    private var isShowingDialog = false
 
     override func keyDown(with event: NSEvent) {
         if handleKeyEvent(event) {
@@ -51,6 +52,12 @@ class AnimaPDFView: PDFView {
     func handleKeyEvent(_ event: NSEvent) -> Bool {
         if event === lastHandledEvent {
             return true
+        }
+
+        // Don't handle keys while a dialog is open — the Enter that
+        // dismisses the dialog would otherwise trigger a new highlight
+        if isShowingDialog {
+            return false
         }
 
         // ENTER = create highlight from current selection
@@ -259,7 +266,9 @@ class AnimaPDFView: PDFView {
         alert.accessoryView = textField
         alert.window.initialFirstResponder = textField
 
+        isShowingDialog = true
         let response = alert.runModal()
+        isShowingDialog = true
 
         if response == .alertFirstButtonReturn {
             return textField.stringValue
@@ -395,7 +404,7 @@ class AnimaPDFView: PDFView {
         // Set color and opacity to match anima_helper.py constants
         annot.color = AnimaPDFView.highlightColor
         annot.setValue(AnimaPDFView.highlightOpacity, forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
-        
+
         // Set comment
         if !comment.isEmpty {
             annot.contents = comment
