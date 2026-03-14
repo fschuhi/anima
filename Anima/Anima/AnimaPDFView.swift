@@ -8,6 +8,7 @@
 //    - ENTER with selection → create highlight (dual-write: fitz + in-memory)
 //    - Double-click on highlight → edit its comment
 //    - Single-click highlight + Delete → remove highlight
+//    - H key → toggle persistent highlight mode (mouseUp creates highlight)
 //
 //  Dual-write pattern:
 //    On highlight creation, we persist via fitz (anima_helper.py) AND add a
@@ -31,6 +32,11 @@ class AnimaPDFView: PDFView {
     // Track which highlight is currently "selected" (for Delete key)
     var selectedAnnotation: PDFAnnotation?
     var selectedAnnotationPage: PDFPage?
+
+    // --- Persistent Highlight Mode ---
+    // When active, releasing the mouse after a text selection immediately
+    // creates a highlight (no ENTER needed). Toggle with H key.
+    var isHighlightMode = false
 
     // --- Highlight color/opacity constants (must match anima_helper.py) ---
     // anima_helper.py: HIGHLIGHT_COLOR = [1.0, 0.75, 0.80], HIGHLIGHT_OPACITY = 0.4
@@ -60,6 +66,13 @@ class AnimaPDFView: PDFView {
             return false
         }
 
+        // H = toggle persistent highlight mode
+        if event.keyCode == 4 {  // keyCode 4 = H
+            toggleHighlightMode()
+            lastHandledEvent = event
+            return true
+        }
+
         // ENTER = create highlight from current selection
         if event.keyCode == 36 || event.keyCode == 76 {
             if createHighlightFromSelection() {
@@ -80,6 +93,23 @@ class AnimaPDFView: PDFView {
         return false
     }
 
+    // --- Persistent Highlight Mode ---
+
+    func toggleHighlightMode() {
+        isHighlightMode.toggle()
+        updateWindowTitle()
+        Swift.print(isHighlightMode ? "🟡 Highlight mode ON" : "⚪ Highlight mode OFF")
+    }
+
+    func updateWindowTitle() {
+        let base = "Anima"
+        if isHighlightMode {
+            self.window?.title = "\(base) — [H] Highlight Mode"
+        } else {
+            self.window?.title = base
+        }
+    }
+
     // --- Mouse handling ---
 
     override func mouseDown(with event: NSEvent) {
@@ -97,6 +127,19 @@ class AnimaPDFView: PDFView {
         }
 
         super.mouseDown(with: event)
+    }
+
+    // --- Step 2: Persistent highlight mode — mouseUp auto-highlight ---
+    // Uncomment this override once Step 1 (H toggle + title) is verified.
+    //
+    override func mouseUp(with event: NSEvent) {
+        super.mouseUp(with: event)
+
+        // In highlight mode, automatically create a highlight from the
+        // current selection when the mouse is released after a drag.
+        if isHighlightMode && currentSelection != nil {
+            _ = createHighlightFromSelection()
+        }
     }
 
     // --- Hit-testing ---
@@ -268,7 +311,7 @@ class AnimaPDFView: PDFView {
 
         isShowingDialog = true
         let response = alert.runModal()
-        isShowingDialog = true
+        isShowingDialog = false  // was incorrectly `true` before — bugfix
 
         if response == .alertFirstButtonReturn {
             return textField.stringValue
