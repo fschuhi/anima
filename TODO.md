@@ -175,3 +175,4 @@ High value, protects the annotation contract that the whole app depends on.
 - [x] Add `make format` target (SwiftFormat + black)
 - [x] Update manifest.lst for Anima/Anima/ path nesting
 - [ ] Review and clean up MainMenu.xib (remove unused Font/Format/Text menus)
+- [ ] Delete HANDOVER.md (superseded by README.md)
