@@ -6,9 +6,9 @@
 //
 //  Current capabilities:
 //    - ENTER with selection → create highlight (dual-write: fitz + in-memory)
+//    - H key → toggle persistent highlight mode (mouseUp creates highlight)
 //    - Double-click on highlight → edit its comment
 //    - Single-click highlight + Delete → remove highlight
-//    - H key → toggle persistent highlight mode (mouseUp creates highlight)
 //
 //  Dual-write pattern:
 //    On highlight creation, we persist via fitz (anima_helper.py) AND add a
@@ -129,9 +129,6 @@ class AnimaPDFView: PDFView {
         super.mouseDown(with: event)
     }
 
-    // --- Step 2: Persistent highlight mode — mouseUp auto-highlight ---
-    // Uncomment this override once Step 1 (H toggle + title) is verified.
-    //
     override func mouseUp(with event: NSEvent) {
         super.mouseUp(with: event)
 
@@ -311,7 +308,7 @@ class AnimaPDFView: PDFView {
 
         isShowingDialog = true
         let response = alert.runModal()
-        isShowingDialog = false  // was incorrectly `true` before — bugfix
+        isShowingDialog = false
 
         if response == .alertFirstButtonReturn {
             return textField.stringValue
@@ -370,10 +367,9 @@ class AnimaPDFView: PDFView {
             return false
         }
 
-        guard let comment = askForComment() else {
-            Swift.print("⚠️  Highlight cancelled by user")
-            return false
-        }
+        // Highlights are created without a comment. To add or edit a comment
+        // later, double-click the highlight (matches PDF-XChange Viewer workflow).
+        let comment = ""
 
         let uuid = UUID().uuidString.lowercased()
 
@@ -410,9 +406,6 @@ class AnimaPDFView: PDFView {
             )
             clearSelection()
             Swift.print("✅ Highlight created (dual-write): \(uuid)")
-            if !comment.isEmpty {
-                Swift.print("   Comment: \(comment)")
-            }
         }
 
         return success

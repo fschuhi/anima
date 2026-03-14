@@ -32,7 +32,6 @@ The filesdump contains the complete project enclosed in `<document>` tags.
 - **`manifest.lst`** - Start here: lists relevant files with explanations
 - **`LLM-instructions.md`** - Full collaboration guidelines (references CRITICAL_RULES.md)
 - **`README.md`** - Bird's eye view of the project architecture
-- **`Goals.md`** - Strategic priorities for this conversation
 - **`HANDOVER.md`** - Detailed implementation guidance for next LLM conversation
 - **`TODO.md`** - Priorities for this conversation (including quick wins) and long-term directions
 - **`Makefile`** - Build, test, and run commands
@@ -85,7 +84,7 @@ Please acknowledge that you've:
 
 1. ✅ Read CRITICAL_RULES.md
 2. ✅ Understood the project structure (manifest.lst)
-3. ✅ Reviewed current priorities (Goals.md)
+3. ✅ Reviewed current priorities (TODO.md)
 4. ✅ Confirmed you'll follow the Discuss → Approve → Implement workflow
 
 Then let's discuss how to tackle the next goal!
