@@ -16,7 +16,10 @@ TODO.md
 ### --- Build & Configuration ---
 Makefile
 tools/requirements.txt
-.editorconfig
+#.gitignore
+#.gitattributes
+#.pre-commit-config.yaml
+#.editorconfig
 
 ### --- Swift ---
 Anima/Anima/AnimaPDFView.swift
