@@ -23,6 +23,20 @@
 
 ---
 
+## Persistent Highlight Mode (DONE)
+
+- [x] Toggle with H key
+- [x] Status indicator shows current mode (window title suffix)
+- [x] In highlight mode: mouseUp after drag → immediate highlight creation
+- [x] No ENTER needed — select text and release mouse to highlight
+- [x] Highlight-only: no comment dialog on creation (double-click to add later)
+- [x] ENTER without highlight mode still creates a highlight (legacy path)
+- [x] Coexists with PDFKit's native text selection handling
+- [x] Prerequisite satisfied: dual-write eliminates reload, canvas is stable
+- [x] Bugfix: isShowingDialog was not reset to false after dialog dismissed
+
+---
+
 ## Known Issues
 
 - [!] **Highlight color/opacity mismatch between viewers**
@@ -56,18 +70,12 @@
 
 ---
 
-## Next: Persistent Highlight Mode
+## Cosmetic / UX Improvements
 
-This is the key usability feature that makes Anima faster than PDF-XChange
-Viewer for the highlight+comment workflow.
-
-- [ ] Toggle with H key
-- [ ] Status indicator shows current mode (highlight on/off)
-- [ ] In highlight mode: mouseUp after drag → immediate highlight creation
-- [ ] No ENTER needed — select text and release mouse to highlight
-- [ ] Comment dialog still appears (for now — may become optional later)
-- [ ] Must coexist with PDFKit's native text selection handling
-- [ ] Prerequisite satisfied: dual-write eliminates reload, canvas is stable
+- [ ] **Status bar indicator** — Replace window title suffix with a proper
+      bottom status bar (thin NSTextField below the PDF view). Shows
+      "Highlight Mode" when active, hidden/empty when not. The window title
+      suffix works but a status bar is the conventional macOS location.
 
 ---
 
@@ -167,4 +175,3 @@ High value, protects the annotation contract that the whole app depends on.
 - [x] Add `make format` target (SwiftFormat + black)
 - [x] Update manifest.lst for Anima/Anima/ path nesting
 - [ ] Review and clean up MainMenu.xib (remove unused Font/Format/Text menus)
-- [ ] Delete HANDOVER.md (superseded by README.md)

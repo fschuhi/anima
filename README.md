@@ -109,16 +109,23 @@ identification. The helper sets `/NM` via fitz's xref API (`doc.xref_set_key`).
 | **Continuous Scroll**    | ✅ Complete  | Native trackpad scrolling                          |
 | **Text Selection**       | ✅ Complete  | Drag to select, per-line quad extraction           |
 | **Highlight Creation**   | ✅ Complete  | ENTER with selection, dual-write, no reload        |
-| **Comment Dialog**       | ✅ Complete  | Add/edit comments via NSAlert                      |
-| **Comment Editing**      | ✅ Complete  | Double-click highlight, dual-write update          |
+| **Persistent Highlight** | ✅ Complete  | H key toggles mode; mouseUp = instant highlight    |
+| **Comment Dialog**       | ✅ Complete  | Double-click highlight to add/edit comment         |
 | **Highlight Deletion**   | ✅ Complete  | Click + Delete key, dual-write removal             |
 | **Incremental Save**     | ✅ Complete  | fitz preserves all existing annotations            |
 | **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
 | **Xcode Project**        | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
-| **Persistent Highlight** | 🔜 Next     | mouseUp → immediate highlight (no ENTER needed)    |
 | **Sidebar**              | 🚧 Planned  | Comment cards panel (Milestone 1)                  |
 | **Tabs**                 | 🚧 Planned  | Multi-PDF in single window (Milestone 1)           |
 | **pdf:// URL Handler**   | 🚧 Planned  | Open PDFs from Obsidian links (Milestone 2)        |
+
+### Highlight Workflow
+
+Highlights are created **without a comment**. This keeps the flow fast —
+especially in persistent highlight mode where mouseUp instantly highlights.
+To add or edit a comment after the fact, double-click the highlight. This matches
+the PDF-XChange Viewer workflow where highlighting and commenting are separate
+actions.
 
 ---
 
@@ -187,9 +194,10 @@ anima/
 ### Module Overview
 
 **`AnimaPDFView.swift`** — The core of the app. Subclasses `PDFView` to intercept
-keyboard and mouse events. Handles highlight creation (with dual-write), comment
-editing, highlight deletion, hit-testing, and coordinate conversion from PDFKit
-space to fitz space.
+keyboard and mouse events. Handles highlight creation (with dual-write), persistent
+highlight mode (H key toggle, mouseUp auto-highlight), comment editing via
+double-click, highlight deletion, hit-testing, and coordinate conversion from
+PDFKit space to fitz space.
 
 **`AppDelegate.swift`** — Creates the window, loads the PDF, sets up the NSEvent
 monitor as a fallback for keyboard events (PDFKit's internal `PDFDocumentView`
@@ -249,8 +257,8 @@ make format   # Format Swift (SwiftFormat) and Python (black) files
 ```bash
 make showtree     # Display project structure
 make filesdump    # Generate context dump for LLM sessions
-make clean        # Remove build output, venv, cache
 make help         # Show all targets
+make clean        # Remove build output, venv, cache
 ```
 
 ---
