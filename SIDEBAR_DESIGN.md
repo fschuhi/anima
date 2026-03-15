@@ -1,5 +1,3 @@
-# 3. SIDEBAR_DESIGN.md
-
 # Anima — Sidebar Design Document
 
 **Status:** Phase 1 Implemented (Read-only view), Phase 2 Pending

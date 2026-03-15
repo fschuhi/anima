@@ -1,5 +1,3 @@
-# Anima — TODO
-
 ## Status Key
 - `[x]` Done (verified)
 - `[ ]` To do

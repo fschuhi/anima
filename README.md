@@ -1,5 +1,3 @@
-# 1. README.md
-
 # Anima
 
 **A minimal, no-frills PDF reader for annotation work.**
