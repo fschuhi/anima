@@ -156,9 +156,9 @@ Layout does **not** recompute on every scroll frame.
 ### Command Comments (Pipeline Instructions)
 
 Comments whose text is a pipeline instruction for `pdf-annotations`
-("link", "H1", "H2", etc.) are displayed in **light gray** text. This
-applies to all command comments uniformly — they are metadata for the
-extraction pipeline, not for reading comprehension.
+("link", and "H1", "H2", ... "H9") are displayed in **light gray** text.
+This applies to all command comments uniformly — they are metadata for
+the extraction pipeline, not for reading comprehension.
 
 Rationale: After entering these commands, they do not enhance
 intelligibility during reading. The eye picks up headers from the PDF
@@ -295,9 +295,6 @@ on earlier ones. A phase can be split into sub-steps during implementation.
 
 ## Open Questions
 
-- **Command comment detection:** How to identify command comments? Exact
-  string match ("link", "H1", "H2", "H3", etc.)? Or a prefix/pattern?
-  Need the complete list of recognized commands from `pdf-annotations`.
 - **Leader line style:** Thin straight line? Curved? Color? Needs visual
   experimentation during implementation.
 - **Card visual style:** Border? Shadow? Background tint? Rounded corners?
