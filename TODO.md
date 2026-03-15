@@ -101,16 +101,17 @@ High value, protects the annotation contract that the whole app depends on.
 ## Milestone 1: Usable Daily Driver
 
 ### Sidebar (comment cards)
-- [ ] Right-side fixed-width panel showing annotation cards
-- [ ] Each card: truncated highlight excerpt as header + comment text below
-- [ ] Cards sorted by vertical position on visible page(s)
-- [ ] Rough vertical alignment with corresponding highlight
-- [ ] Scrolls in sync with PDF (approximately)
+- [x] Right-side fixed-width panel showing annotation cards
+- [x] Each card: title bar + comment text below
+- [x] Cards sorted by vertical position on visible page(s)
+- [x] Perfect vertical alignment with corresponding highlight (`PageSidebarView`)
+- [x] Scrolls in sync with PDF
+- [x] Cards shown for all highlights with non-empty comments
+- [x] Empty-comment highlights: no card (or minimal indicator)
+- [ ] Implement Collision Avoidance (greedy algorithm to prevent overlapping cards)
 - [ ] Double-click highlight → focus jumps to card, comment becomes editable
 - [ ] Edit happens in sidebar only (no tooltips, no in-place editing)
 - [ ] Clear comment text = remove comment (keep highlight)
-- [ ] Cards shown for all highlights with non-empty comments
-- [ ] Empty-comment highlights: no card (or minimal indicator)
 
 ### Tabs
 - [ ] Browser-style tabs in single window

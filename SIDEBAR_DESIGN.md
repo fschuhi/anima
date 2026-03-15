@@ -1,6 +1,8 @@
+# 3. SIDEBAR_DESIGN.md
+
 # Anima — Sidebar Design Document
 
-**Status:** Design draft (no implementation yet)
+**Status:** Phase 1 Implemented (Read-only view), Phase 2 Pending
 **Date:** 2026-03-14
 **Context:** This document captures design decisions for Anima's annotation
 sidebar. It is intended as a reference for future LLM conversations and for
@@ -25,12 +27,12 @@ makes Anima a viable replacement for PDF-XChange Viewer.
 
 | Term              | Meaning                                                    |
 |-------------------|------------------------------------------------------------|
-| **Sidebar**       | The right-side panel containing all cards                  |
-| **Card**          | A single comment entry in the sidebar                      |
-| **Page-sidebar**  | The vertical zone within the sidebar that corresponds to   |
+| **Sidebar** | The right-side panel containing all cards                  |
+| **Card** | A single comment entry in the sidebar                      |
+| **Page-sidebar** | The vertical zone within the sidebar that corresponds to   |
 |                   | one PDF page. Its top/bottom align with the page's         |
 |                   | top/bottom in the scroll view.                             |
-| **Anchor**        | The vertical center of gravity of a highlight's quads      |
+| **Anchor** | The vertical center of gravity of a highlight's quads      |
 |                   | (in page coordinates). Determines where a card "wants"     |
 |                   | to be positioned.                                          |
 | **Command comment** | A comment whose text is a pipeline instruction ("link",  |
@@ -246,7 +248,7 @@ be removed.
 Each phase is self-contained and useful on its own. Later phases build
 on earlier ones. A phase can be split into sub-steps during implementation.
 
-### Phase 0: Split View Foundation
+### Phase 0: Split View Foundation (DONE)
 
 - Replace the current single `AnimaPDFView` layout with an `NSSplitView`
   containing the PDF view (left) and a sidebar scroll view (right).
@@ -255,12 +257,12 @@ on earlier ones. A phase can be split into sub-steps during implementation.
 - Verify: resizing works, PDF rendering is unaffected, all existing
   keyboard/mouse handling still works.
 
-### Phase 1: Read-Only Cards
+### Phase 1: Read-Only Cards (DONE)
 
 - Scan the document's annotations on load; build card data for every
   highlight with a non-empty comment.
 - Render cards in page-sidebars aligned to their PDF pages.
-- Implement anchor-based layout with collision avoidance.
+- Implement anchor-based layout with collision avoidance. *(Collision avoidance pending)*
 - Card auto-sizing (height fits content, internal scroll on overflow).
 - Page-sidebar scrollbars when cards exceed page height.
 - Command comments ("link", "H1", "H2") rendered in light gray.

@@ -1,3 +1,5 @@
+# 1. README.md
+
 # Anima
 
 **A minimal, no-frills PDF reader for annotation work.**
@@ -105,19 +107,19 @@ identification. The helper sets `/NM` via fitz's xref API (`doc.xref_set_key`).
 
 | Feature                  | Status      | Notes                                              |
 |--------------------------|-------------|----------------------------------------------------|
-| **PDF Rendering**        | ✅ Complete  | PDFKit, including Internet Archive layered PDFs    |
-| **Continuous Scroll**    | ✅ Complete  | Native trackpad scrolling                          |
-| **Text Selection**       | ✅ Complete  | Drag to select, per-line quad extraction           |
-| **Highlight Creation**   | ✅ Complete  | ENTER with selection, dual-write, no reload        |
+| **PDF Rendering** | ✅ Complete  | PDFKit, including Internet Archive layered PDFs    |
+| **Continuous Scroll** | ✅ Complete  | Native trackpad scrolling                          |
+| **Text Selection** | ✅ Complete  | Drag to select, per-line quad extraction           |
+| **Highlight Creation** | ✅ Complete  | ENTER with selection, dual-write, no reload        |
 | **Persistent Highlight** | ✅ Complete  | H key toggles mode; mouseUp = instant highlight    |
-| **Comment Dialog**       | ✅ Complete  | Double-click highlight to add/edit comment         |
-| **Highlight Deletion**   | ✅ Complete  | Click + Delete key, dual-write removal             |
-| **Incremental Save**     | ✅ Complete  | fitz preserves all existing annotations            |
+| **Comment Dialog** | ✅ Complete  | Double-click highlight to add/edit comment         |
+| **Highlight Deletion** | ✅ Complete  | Click + Delete key, dual-write removal             |
+| **Incremental Save** | ✅ Complete  | fitz preserves all existing annotations            |
 | **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
-| **Xcode Project**        | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
-| **Sidebar**              | 🚧 Planned  | Comment cards panel (Milestone 1)                  |
-| **Tabs**                 | 🚧 Planned  | Multi-PDF in single window (Milestone 1)           |
-| **pdf:// URL Handler**   | 🚧 Planned  | Open PDFs from Obsidian links (Milestone 2)        |
+| **Xcode Project** | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
+| **Sidebar** | ✅ Phase 1   | Comment cards panel (Read-only, synchronized)      |
+| **Tabs** | 🚧 Planned  | Multi-PDF in single window (Milestone 1)           |
+| **pdf:// URL Handler** | 🚧 Planned  | Open PDFs from Obsidian links (Milestone 2)        |
 
 ### Highlight Workflow
 
@@ -168,10 +170,13 @@ anima/
 │   │   ├── AnimaPDFView.swift      ← PDFView subclass: keyboard, mouse, dual-write
 │   │   ├── AppDelegate.swift       ← Window setup, PDF loading, event monitor
 │   │   ├── FitzBridge.swift        ← Subprocess bridge to Python helper
+│   │   ├── MainViewController.swift← NSSplitView layout & sidebar scroll sync
+│   │   ├── SidebarExtractor.swift  ← Parses annotations into sidebar CommentCard structs
+│   │   ├── CommentCardView.swift   ← Custom NSView for rendering sidebar cards
 │   │   ├── Assets.xcassets/        ← App icon and colors
 │   │   └── Base.lproj/            ← MainMenu.xib (menu bar)
 │   ├── Anima.xcodeproj/           ← Xcode project file
-│   ├── AnimaTests/                ← Swift Testing unit tests
+│   ├── AnimaTests/                ← Swift Testing unit tests (SidebarExtractor)
 │   └── AnimaUITests/              ← UI tests (unused)
 ├── tools/
 │   ├── anima_helper.py            ← CLI: add-highlight, edit-comment, delete-highlight
@@ -210,6 +215,10 @@ resolves the Python executable from the project's `.venv`.
 **`anima_helper.py`** — Standalone CLI tool with three subcommands: `add-highlight`,
 `edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save
 preserves existing annotations. Tested independently from Terminal.
+
+**`MainViewController.swift`** — Manages the dual-pane layout (`NSSplitView`),
+instantiates the `SidebarScrollView`, and coordinates the complex scrolling math
+and `scaleFactor` logic required to keep the sidebar perfectly synchronized with the PDF.
 
 ---
 

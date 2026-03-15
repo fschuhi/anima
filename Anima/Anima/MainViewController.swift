@@ -9,44 +9,40 @@
 import Cocoa
 import Quartz
 
-// --- Test Pattern View ---
-class TallStripedView: NSView {
+// --- Sidebar Master Container ---
+class SidebarDocumentView: NSView {
+    // Top-left origin makes layout math easier
+    override var isFlipped: Bool { return true }
+}
 
-    // Top-left origin (Y increases downwards)
+// --- Page-Sidebar Container ---
+class PageSidebarView: NSView {
+    let pageIndex: Int
+    var cardViews: [CommentCardView] = []
+
     override var isFlipped: Bool { return true }
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
+    init(pageIndex: Int) {
+        self.pageIndex = pageIndex
+        super.init(frame: .zero)
+    }
 
-        let stripeHeight: CGFloat = 50
-        let colors: [NSColor] = [
-            NSColor.systemRed.withAlphaComponent(0.1),
-            NSColor.systemBlue.withAlphaComponent(0.1)
-        ]
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 
-        var y: CGFloat = 0
-        var index = 0
-
-        while y < bounds.height {
-            colors[index % 2].setFill()
-            let rect = NSRect(x: 0, y: y, width: bounds.width, height: stripeHeight)
-            if dirtyRect.intersects(rect) {
-                rect.fill()
-            }
-            y += stripeHeight
-            index += 1
-        }
+    func addCardView(_ cardView: CommentCardView) {
+        self.addSubview(cardView)
+        self.cardViews.append(cardView)
     }
 }
 
 // --- Custom Sidebar Scroll View ---
-// Hides its scrollbar and forwards trackpad/mouse wheel events to the PDF's internal scroll view
 class SidebarScrollView: NSScrollView {
     weak var targetScrollView: NSScrollView?
 
     override func scrollWheel(with event: NSEvent) {
         if let target = targetScrollView {
-            // Pass the scroll event directly to the PDF's internal scroll view
             target.scrollWheel(with: event)
         } else {
             super.scrollWheel(with: event)
@@ -61,6 +57,7 @@ class MainViewController: NSViewController {
     var splitView: NSSplitView!
 
     private var pdfScrollView: NSScrollView?
+    private var pageSidebarViews: [PageSidebarView] = []
 
     override func loadView() {
         splitView = NSSplitView()
@@ -75,8 +72,8 @@ class MainViewController: NSViewController {
         sidebarScrollView.hasVerticalScroller = false
         sidebarScrollView.borderType = .noBorder
 
-        let tallView = TallStripedView(frame: NSRect(x: 0, y: 0, width: 300, height: 10000))
-        sidebarScrollView.documentView = tallView
+        let sidebarDocView = SidebarDocumentView(frame: NSRect(x: 0, y: 0, width: 300, height: 100))
+        sidebarScrollView.documentView = sidebarDocView
 
         splitView.addArrangedSubview(pdfView)
         splitView.addArrangedSubview(sidebarScrollView)
@@ -104,21 +101,46 @@ class MainViewController: NSViewController {
         splitView.setPosition(totalWidth - initialSidebarWidth, ofDividerAt: 0)
 
         setupScrollSynchronization()
+        setupResizeObserver()
+    }
+
+    // --- Data Loading ---
+
+    func loadPDF(document: PDFDocument) {
+        pdfView.document = document
+
+        let cards = SidebarExtractor.extractCards(from: document)
+        guard let sidebarDocView = sidebarScrollView.documentView else { return }
+
+        sidebarDocView.subviews.forEach { $0.removeFromSuperview() }
+        pageSidebarViews.removeAll()
+
+        let cardsByPage = Dictionary(grouping: cards, by: { $0.pageIndex })
+
+        for pageIndex in 0..<document.pageCount {
+            let pageView = PageSidebarView(pageIndex: pageIndex)
+
+            if let pageCards = cardsByPage[pageIndex] {
+                for card in pageCards {
+                    let cardView = CommentCardView(card: card)
+                    pageView.addCardView(cardView)
+                }
+            }
+
+            sidebarDocView.addSubview(pageView)
+            pageSidebarViews.append(pageView)
+        }
+
+        pdfView.layoutDocumentView()
+        updateSidebarLayout()
     }
 
     // --- Scroll Physics ---
 
     private func setupScrollSynchronization() {
         pdfScrollView = pdfView.subviews.compactMap { $0 as? NSScrollView }.first
-
-        guard let pdfScrollView = pdfScrollView else {
-            Swift.print("⚠️ Could not find internal PDF scroll view!")
-            return
-        }
-
-        // Link the hover scrolling
+        guard let pdfScrollView = pdfScrollView else { return }
         sidebarScrollView.targetScrollView = pdfScrollView
-
         pdfScrollView.contentView.postsBoundsChangedNotifications = true
 
         NotificationCenter.default.addObserver(
@@ -131,31 +153,91 @@ class MainViewController: NSViewController {
 
     @objc private func pdfViewDidScroll(_ notification: Notification) {
         guard let pdfClipView = notification.object as? NSClipView,
-              let pdfDocView = pdfClipView.documentView,
-              let sidebarDocView = sidebarScrollView.documentView else { return }
+              let pdfDocView = pdfClipView.documentView else { return }
 
-        // 1. Fix the "Overtaking" Parallax: Force the sidebar document to be exactly as tall as the scaled PDF document
-        if sidebarDocView.frame.height != pdfDocView.frame.height {
-            sidebarDocView.setFrameSize(NSSize(width: sidebarDocView.frame.width, height: pdfDocView.frame.height))
-        }
-
-        // 2. Calculate the synchronized Y position
+        let scale = pdfView.scaleFactor
         let pdfOriginY = pdfClipView.bounds.origin.y
-        var targetY: CGFloat = 0
+        let unscaledDocHeight = pdfDocView.bounds.height
+        let unscaledClipHeight = pdfClipView.bounds.height
 
-        if pdfDocView.isFlipped {
-            // Rare, but if PDFKit ever changes to top-left origin, map it 1:1
-            targetY = pdfOriginY
-        } else {
-            // Standard PDFKit: Bottom-left origin. We invert it to match our top-left sidebar.
-            targetY = pdfDocView.bounds.height - pdfClipView.bounds.height - pdfOriginY
-        }
+        // Calculate unscaled target, then multiply by zoom factor
+        let unscaledTargetY = pdfDocView.isFlipped ? pdfOriginY : (unscaledDocHeight - unscaledClipHeight - pdfOriginY)
+        let scaledTargetY = unscaledTargetY * scale
 
-        // 3. Apply the scroll
         let sidebarClipView = sidebarScrollView.contentView
         var newBounds = sidebarClipView.bounds
-        newBounds.origin.y = targetY
+        newBounds.origin.y = scaledTargetY
         sidebarClipView.bounds = newBounds
+    }
+
+    // --- Layout & Coordinate Math ---
+
+    private func setupResizeObserver() {
+        pdfView.postsFrameChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(pdfViewDidResize(_:)),
+            name: NSView.frameDidChangeNotification,
+            object: pdfView
+        )
+    }
+
+    @objc private func pdfViewDidResize(_ notification: Notification) {
+        updateSidebarLayout()
+    }
+
+    private func updateSidebarLayout() {
+        guard let document = pdfView.document,
+              let pdfDocView = pdfScrollView?.documentView,
+              let sidebarDocView = sidebarScrollView.documentView else { return }
+
+        let sidebarWidth = sidebarScrollView.contentSize.width
+        let scale = pdfView.scaleFactor
+
+        // 1. Scale the master sidebar document view
+        let scaledDocHeight = pdfDocView.bounds.height * scale
+        if sidebarDocView.frame.height != scaledDocHeight {
+            sidebarDocView.setFrameSize(NSSize(width: sidebarWidth, height: scaledDocHeight))
+        }
+
+        // 2. Position pages using scaled math
+        for pageView in pageSidebarViews {
+            guard let page = document.page(at: pageView.pageIndex) else { continue }
+
+            let pageBounds = page.bounds(for: pdfView.displayBox)
+            let pdfTopLeft = NSPoint(x: pageBounds.minX, y: pageBounds.maxY)
+            let pdfBottomLeft = NSPoint(x: pageBounds.minX, y: pageBounds.minY)
+
+            // Convert to unscaled document coordinates
+            let docTopLeft = pdfView.convert(pdfView.convert(pdfTopLeft, from: page), to: pdfDocView)
+            let docBottomLeft = pdfView.convert(pdfView.convert(pdfBottomLeft, from: page), to: pdfDocView)
+
+            let unscaledTopY = pdfDocView.bounds.height - docTopLeft.y
+            let unscaledBottomY = pdfDocView.bounds.height - docBottomLeft.y
+            let unscaledPageHeight = unscaledBottomY - unscaledTopY
+
+            // Multiply by scale factor to get physical screen pixels
+            let scaledTopY = unscaledTopY * scale
+            let scaledPageHeight = unscaledPageHeight * scale
+
+            pageView.frame = NSRect(x: 0, y: scaledTopY, width: sidebarWidth, height: scaledPageHeight)
+
+            // 3. Position cards locally inside the scaled page container
+            for cardView in pageView.cardViews {
+                let card = cardView.card
+
+                // Distance from top of page * scale factor
+                let distanceFromTop = pageBounds.maxY - card.anchorY
+                let localCenterY = distanceFromTop * scale
+
+                // Let the card calculate its own height
+                cardView.frame.size.width = sidebarWidth
+                let fittingHeight = cardView.fittingSize.height
+
+                let finalY = localCenterY - (fittingHeight / 2)
+                cardView.frame = NSRect(x: 0, y: finalY, width: sidebarWidth, height: fittingHeight)
+            }
+        }
     }
 
     deinit {
