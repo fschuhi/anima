@@ -3,12 +3,16 @@
     "uuid": "58f16b6c-bc9c-4d09-9ffb4e19c0433d54",
     "text": "H2",
     "pageIndex": 0,
-    "anchorY": 237.44885299999999
+    "anchorY": 237.44885299999999,
+    "author": "fschuhi",
+    "dateString": "2026-03-15 12:27"
   },
   {
     "uuid": "f6680769-4b50-46e2-af936dd7f77ed53b",
     "text": "original highlight",
     "pageIndex": 0,
-    "anchorY": 116.47913
+    "anchorY": 116.47913,
+    "author": "fschuhi",
+    "dateString": "2026-03-13 08:13"
   }
 ]

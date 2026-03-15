@@ -2,14 +2,6 @@
 //  MainViewController.swift
 //  Anima
 //
-//  Created by Frank Schuhardt on 15.03.26.
-//
-
-
-//
-//  MainViewController.swift
-//  Anima
-//
 //  Manages the primary NSSplitView layout containing the PDF rendering view
 //  on the left and the annotation sidebar on the right.
 //
@@ -17,59 +9,156 @@
 import Cocoa
 import Quartz
 
+// --- Test Pattern View ---
+class TallStripedView: NSView {
+
+    // Top-left origin (Y increases downwards)
+    override var isFlipped: Bool { return true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        let stripeHeight: CGFloat = 50
+        let colors: [NSColor] = [
+            NSColor.systemRed.withAlphaComponent(0.1),
+            NSColor.systemBlue.withAlphaComponent(0.1)
+        ]
+
+        var y: CGFloat = 0
+        var index = 0
+
+        while y < bounds.height {
+            colors[index % 2].setFill()
+            let rect = NSRect(x: 0, y: y, width: bounds.width, height: stripeHeight)
+            if dirtyRect.intersects(rect) {
+                rect.fill()
+            }
+            y += stripeHeight
+            index += 1
+        }
+    }
+}
+
+// --- Custom Sidebar Scroll View ---
+// Hides its scrollbar and forwards trackpad/mouse wheel events to the PDF's internal scroll view
+class SidebarScrollView: NSScrollView {
+    weak var targetScrollView: NSScrollView?
+
+    override func scrollWheel(with event: NSEvent) {
+        if let target = targetScrollView {
+            // Pass the scroll event directly to the PDF's internal scroll view
+            target.scrollWheel(with: event)
+        } else {
+            super.scrollWheel(with: event)
+        }
+    }
+}
+
 class MainViewController: NSViewController {
 
     var pdfView: AnimaPDFView!
-    var sidebarView: NSView!
+    var sidebarScrollView: SidebarScrollView!
     var splitView: NSSplitView!
 
+    private var pdfScrollView: NSScrollView?
+
     override func loadView() {
-        // 1. Create the Split View
         splitView = NSSplitView()
         splitView.isVertical = true
         splitView.dividerStyle = .thin
 
-        // 2. Create and configure the PDF View
         pdfView = AnimaPDFView()
         pdfView.autoScales = true
         pdfView.displayMode = .singlePageContinuous
 
-        // 3. Create the placeholder Sidebar View
-        sidebarView = NSView()
-        sidebarView.wantsLayer = true
-        // Give it a subtle background color so we can see its geometry during Phase 0
-        sidebarView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        sidebarScrollView = SidebarScrollView()
+        sidebarScrollView.hasVerticalScroller = false
+        sidebarScrollView.borderType = .noBorder
 
-        // 4. Add views to the split view
+        let tallView = TallStripedView(frame: NSRect(x: 0, y: 0, width: 300, height: 10000))
+        sidebarScrollView.documentView = tallView
+
         splitView.addArrangedSubview(pdfView)
-        splitView.addArrangedSubview(sidebarView)
+        splitView.addArrangedSubview(sidebarScrollView)
 
-        // 5. Layout rules
-        // Tell the Auto Layout engine that the PDF view should eagerly stretch to fill space,
-        // and the sidebar should resist stretching.
         pdfView.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        sidebarView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        sidebarScrollView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
 
-        // Enforce minimum widths so neither pane can be completely collapsed
         pdfView.translatesAutoresizingMaskIntoConstraints = false
-        sidebarView.translatesAutoresizingMaskIntoConstraints = false
+        sidebarScrollView.translatesAutoresizingMaskIntoConstraints = false
 
         NSLayoutConstraint.activate([
             pdfView.widthAnchor.constraint(greaterThanOrEqualToConstant: 400),
             pdfView.heightAnchor.constraint(greaterThanOrEqualToConstant: 600),
-            sidebarView.widthAnchor.constraint(greaterThanOrEqualToConstant: 250)
+            sidebarScrollView.widthAnchor.constraint(greaterThanOrEqualToConstant: 250)
         ])
 
-        // The split view is the root view of this controller
         self.view = splitView
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Set an initial reasonable width for the sidebar (e.g., 300 pixels)
-        // by positioning the divider relative to the window's starting width.
+
         let initialSidebarWidth: CGFloat = 300
         let totalWidth = self.view.bounds.width
         splitView.setPosition(totalWidth - initialSidebarWidth, ofDividerAt: 0)
+
+        setupScrollSynchronization()
+    }
+
+    // --- Scroll Physics ---
+
+    private func setupScrollSynchronization() {
+        pdfScrollView = pdfView.subviews.compactMap { $0 as? NSScrollView }.first
+
+        guard let pdfScrollView = pdfScrollView else {
+            Swift.print("⚠️ Could not find internal PDF scroll view!")
+            return
+        }
+
+        // Link the hover scrolling
+        sidebarScrollView.targetScrollView = pdfScrollView
+
+        pdfScrollView.contentView.postsBoundsChangedNotifications = true
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(pdfViewDidScroll(_:)),
+            name: NSView.boundsDidChangeNotification,
+            object: pdfScrollView.contentView
+        )
+    }
+
+    @objc private func pdfViewDidScroll(_ notification: Notification) {
+        guard let pdfClipView = notification.object as? NSClipView,
+              let pdfDocView = pdfClipView.documentView,
+              let sidebarDocView = sidebarScrollView.documentView else { return }
+
+        // 1. Fix the "Overtaking" Parallax: Force the sidebar document to be exactly as tall as the scaled PDF document
+        if sidebarDocView.frame.height != pdfDocView.frame.height {
+            sidebarDocView.setFrameSize(NSSize(width: sidebarDocView.frame.width, height: pdfDocView.frame.height))
+        }
+
+        // 2. Calculate the synchronized Y position
+        let pdfOriginY = pdfClipView.bounds.origin.y
+        var targetY: CGFloat = 0
+
+        if pdfDocView.isFlipped {
+            // Rare, but if PDFKit ever changes to top-left origin, map it 1:1
+            targetY = pdfOriginY
+        } else {
+            // Standard PDFKit: Bottom-left origin. We invert it to match our top-left sidebar.
+            targetY = pdfDocView.bounds.height - pdfClipView.bounds.height - pdfOriginY
+        }
+
+        // 3. Apply the scroll
+        let sidebarClipView = sidebarScrollView.contentView
+        var newBounds = sidebarClipView.bounds
+        newBounds.origin.y = targetY
+        sidebarClipView.bounds = newBounds
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }

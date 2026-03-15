@@ -14,6 +14,8 @@ struct CommentCard: Codable, Equatable {
     let text: String
     let pageIndex: Int
     let anchorY: Double
+    let author: String
+    let dateString: String
 }
 
 class SidebarExtractor {
@@ -32,29 +34,32 @@ class SidebarExtractor {
                 guard annot.type == "Highlight" else { continue }
 
                 // 2. Must have a non-empty comment
-                // We trim whitespace so a comment containing just " " is treated as empty
                 guard let text = annot.contents?.trimmingCharacters(in: .whitespacesAndNewlines),
                       !text.isEmpty else { continue }
 
                 // 3. Must have a UUID
                 guard let uuid = getUUID(for: annot) else { continue }
 
-                // 4. Calculate anchorY (vertical midpoint of bounds in PDFKit space)
+                // 4. Calculate anchorY
                 let anchorY = Double(annot.bounds.midY)
+
+                // 5. Extract Author and Date
+                let author = getAuthor(for: annot)
+                let dateString = getDateString(for: annot)
 
                 // Create card
                 let card = CommentCard(
                     uuid: uuid,
                     text: text,
                     pageIndex: pageIndex,
-                    anchorY: anchorY
+                    anchorY: anchorY,
+                    author: author,
+                    dateString: dateString
                 )
                 pageCards.append(card)
             }
 
-            // 5. Sort cards for this page top-to-bottom.
-            // In PDFKit space, Y=0 is the bottom of the page.
-            // So higher on the page = larger Y value.
+            // Sort cards for this page top-to-bottom.
             pageCards.sort { $0.anchorY > $1.anchorY }
 
             cards.append(contentsOf: pageCards)
@@ -63,8 +68,8 @@ class SidebarExtractor {
         return cards
     }
 
-    /// Safely extracts the UUID from the annotation.
-    /// Matches the logic used in AnimaPDFView.
+    // --- Extraction Helpers ---
+
     private static func getUUID(for annot: PDFAnnotation) -> String? {
         if let nm = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/NM")) as? String {
             return nm
@@ -73,5 +78,23 @@ class SidebarExtractor {
             return name
         }
         return nil
+    }
+
+    private static func getAuthor(for annot: PDFAnnotation) -> String {
+        // The author is typically stored in the /T (Title) field
+        if let author = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/T")) as? String, !author.isEmpty {
+            return author
+        }
+        return "Unknown"
+    }
+
+    private static func getDateString(for annot: PDFAnnotation) -> String {
+        // PDFKit automatically parses standard PDF dates into Swift Date objects
+        if let validDate = annot.modificationDate {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd HH:mm"
+            return formatter.string(from: validDate)
+        }
+        return ""
     }
 }
