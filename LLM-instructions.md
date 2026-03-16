@@ -23,13 +23,18 @@ The following rules are detailed in CRITICAL_RULES.md (attached separately to th
 ## ⚠️ OUTPUT FORMATTING RULES (Anti-Breakage)
 
 **CRITICAL: Markdown Generation**
-The chat UI breaks if you nest triple backticks inside code blocks.
+The chat UI might break down if you nest triple backticks inside code blocks, or inside
+markdown blocks opened with triple backticks followed by `markdown` or the like.
 
 1. **Outer Wrapper**: Use standard triple backticks to wrap the file you are generating.
-2. **Inner Content**: If the file content contains code blocks (e.g., Markdown, JS examples), you **MUST** use **triple single quotes** instead of backticks.
+2. **Inner Content**: If the file content contains code blocks (e.g., Markdown, JS examples),
+   you **MUST** use **triple single quotes** instead of backticks.
 
 - ❌ BAD: Nested backticks inside the file content.
 - ✅ GOOD: Use triple single quotes inside the file content.
+
+In case you are handling artefacts alongside (and not _in_) the conversation stream, this
+rule will most likely not apply.
 
 ---
 
@@ -279,6 +284,9 @@ A good interaction:
 ✅ User feels empowered to make future changes
 ✅ Documentation stays current
 ✅ Swift concepts are explained at the right level
+✅ There is "flow" happening, something akin to true collaboration, something which
+   can be celebrated after accomplishing tasks together.
+
 
 ---
 
