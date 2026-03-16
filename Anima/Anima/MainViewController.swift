@@ -15,16 +15,30 @@ class SidebarDocumentView: NSView {
     override var isFlipped: Bool { return true }
 }
 
+// --- Page-Sidebar Internal Canvas ---
+class PageDocumentView: NSView {
+    override var isFlipped: Bool { return true }
+}
+
 // --- Page-Sidebar Container ---
-class PageSidebarView: NSView {
+// Upgraded to NSScrollView to handle overflow!
+class PageSidebarView: NSScrollView {
     let pageIndex: Int
     var cardViews: [CommentCardView] = []
-
-    override var isFlipped: Bool { return true }
 
     init(pageIndex: Int) {
         self.pageIndex = pageIndex
         super.init(frame: .zero)
+
+        // Configure the scroll view
+        self.hasVerticalScroller = true
+        self.hasHorizontalScroller = false
+        self.autohidesScrollers = true // Only show scrollbar if cards overflow
+        self.drawsBackground = false   // Keep the sidebar background visible
+        self.borderType = .noBorder
+
+        // Give it an internal canvas to hold the cards
+        self.documentView = PageDocumentView()
     }
 
     required init?(coder: NSCoder) {
@@ -32,7 +46,8 @@ class PageSidebarView: NSView {
     }
 
     func addCardView(_ cardView: CommentCardView) {
-        self.addSubview(cardView)
+        // Add the card to the internal canvas, not the scroll view frame
+        self.documentView?.addSubview(cardView)
         self.cardViews.append(cardView)
     }
 }
@@ -160,7 +175,6 @@ class MainViewController: NSViewController {
         let unscaledDocHeight = pdfDocView.bounds.height
         let unscaledClipHeight = pdfClipView.bounds.height
 
-        // Calculate unscaled target, then multiply by zoom factor
         let unscaledTargetY = pdfDocView.isFlipped ? pdfOriginY : (unscaledDocHeight - unscaledClipHeight - pdfOriginY)
         let scaledTargetY = unscaledTargetY * scale
 
@@ -194,13 +208,11 @@ class MainViewController: NSViewController {
         let sidebarWidth = sidebarScrollView.contentSize.width
         let scale = pdfView.scaleFactor
 
-        // 1. Scale the master sidebar document view
         let scaledDocHeight = pdfDocView.bounds.height * scale
         if sidebarDocView.frame.height != scaledDocHeight {
             sidebarDocView.setFrameSize(NSSize(width: sidebarWidth, height: scaledDocHeight))
         }
 
-        // 2. Position pages using scaled math
         for pageView in pageSidebarViews {
             guard let page = document.page(at: pageView.pageIndex) else { continue }
 
@@ -208,7 +220,6 @@ class MainViewController: NSViewController {
             let pdfTopLeft = NSPoint(x: pageBounds.minX, y: pageBounds.maxY)
             let pdfBottomLeft = NSPoint(x: pageBounds.minX, y: pageBounds.minY)
 
-            // Convert to unscaled document coordinates
             let docTopLeft = pdfView.convert(pdfView.convert(pdfTopLeft, from: page), to: pdfDocView)
             let docBottomLeft = pdfView.convert(pdfView.convert(pdfBottomLeft, from: page), to: pdfDocView)
 
@@ -216,26 +227,47 @@ class MainViewController: NSViewController {
             let unscaledBottomY = pdfDocView.bounds.height - docBottomLeft.y
             let unscaledPageHeight = unscaledBottomY - unscaledTopY
 
-            // Multiply by scale factor to get physical screen pixels
             let scaledTopY = unscaledTopY * scale
             let scaledPageHeight = unscaledPageHeight * scale
 
+            // Set the outer scroll view frame to exactly match the PDF page boundaries
             pageView.frame = NSRect(x: 0, y: scaledTopY, width: sidebarWidth, height: scaledPageHeight)
 
-            // 3. Position cards locally inside the scaled page container
+            // --- COLLISION AVOIDANCE ALGORITHM ---
+            var previousCardBottomEdge: CGFloat = 0
+            let cardPadding: CGFloat = 8
+
+            // Note: The scrollbar itself takes up about 15px. If we let the cards fill the whole width,
+            // they will draw *underneath* the scrollbar. So we pad the width slightly.
+            let cardWidth = sidebarWidth - 16
+
             for cardView in pageView.cardViews {
                 let card = cardView.card
 
-                // Distance from top of page * scale factor
                 let distanceFromTop = pageBounds.maxY - card.anchorY
                 let localCenterY = distanceFromTop * scale
 
-                // Let the card calculate its own height
-                cardView.frame.size.width = sidebarWidth
+                cardView.frame.size.width = cardWidth
                 let fittingHeight = cardView.fittingSize.height
 
-                let finalY = localCenterY - (fittingHeight / 2)
-                cardView.frame = NSRect(x: 0, y: finalY, width: sidebarWidth, height: fittingHeight)
+                var finalY = localCenterY - (fittingHeight / 2)
+
+                if finalY < previousCardBottomEdge {
+                    finalY = previousCardBottomEdge
+                }
+
+                // Position the card inside the internal document view
+                cardView.frame = NSRect(x: 0, y: finalY, width: cardWidth, height: fittingHeight)
+
+                previousCardBottomEdge = finalY + fittingHeight + cardPadding
+            }
+
+            // --- OVERFLOW HANDLING ---
+            // If the cards pushed past the bottom of the page, expand the internal canvas
+            // so the NSScrollView allows scrolling!
+            if let docView = pageView.documentView {
+                let requiredHeight = max(scaledPageHeight, previousCardBottomEdge)
+                docView.setFrameSize(NSSize(width: sidebarWidth, height: requiredHeight))
             }
         }
     }
