@@ -190,4 +190,166 @@ final class AnimaTests: XCTestCase {
                            "Document-level card \(docCard.uuid) differs from per-page card")
         }
     }
+
+    // MARK: - In-Memory Annotation Round-Trip
+
+    /// Verifies that an annotation built in-memory using the same pattern as
+    /// AnimaPDFView.addInMemoryHighlight produces a CommentCard that is
+    /// indistinguishable from the original fitz-written annotation.
+    ///
+    /// This test catches dual-write field omissions — like the /NM and /T
+    /// bugs we discovered during Phase 3 development. If addInMemoryHighlight
+    /// changes how it sets annotation fields, this test should be updated to
+    /// mirror those changes.
+    ///
+    /// Flow:
+    ///   1. Extract cards from page 0 (fitz-written annotations = ground truth)
+    ///   2. Pick the last card and find its PDFAnnotation on the page
+    ///   3. Read the annotation's key fields (bounds, UUID, author, comment)
+    ///   4. Remove the annotation from the page
+    ///   5. Verify the card count dropped by one
+    ///   6. Recreate the annotation in-memory (mirrors addInMemoryHighlight)
+    ///   7. Extract cards again
+    ///   8. Assert the recreated card matches the original
+    func testInMemoryAnnotationRoundTrip() throws {
+        let (document, _) = try loadMultiPageFixture()
+
+        let pageIndex = 0
+        guard let page = document.page(at: pageIndex) else {
+            XCTFail("Could not get page \(pageIndex)")
+            return
+        }
+
+        // --- Step 1: Extract ground-truth cards ---
+        let originalCards = SidebarExtractor.extractCards(from: page, at: pageIndex)
+        XCTAssertTrue(originalCards.count >= 1, "Need at least one card on page \(pageIndex)")
+        guard let targetCard = originalCards.last else { return }
+
+        print("🎯 Round-trip target: '\(targetCard.text)' (uuid: \(targetCard.uuid))")
+
+        // --- Step 2: Find the corresponding PDFAnnotation ---
+        var targetAnnot: PDFAnnotation?
+        for annot in page.annotations {
+            // Check /NM first (same logic as annotationUUID)
+            if let nm = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/NM")) as? String,
+               nm == targetCard.uuid {
+                targetAnnot = annot
+                break
+            }
+            // Fallback: userName
+            if let name = annot.userName, name == targetCard.uuid {
+                targetAnnot = annot
+                break
+            }
+        }
+
+        guard let annot = targetAnnot else {
+            XCTFail("Could not find annotation with UUID \(targetCard.uuid) on page \(pageIndex)")
+            return
+        }
+
+        // --- Step 3: Read the annotation's fields ---
+        let originalBounds = annot.bounds
+        let originalContents = annot.contents ?? ""
+        let originalUUID = targetCard.uuid
+        let originalAuthor = targetCard.author
+
+        print("📋 Original annotation: bounds=\(originalBounds), author=\(originalAuthor), text=\(originalContents)")
+
+        // --- Step 4: Remove the annotation ---
+        page.removeAnnotation(annot)
+
+        // --- Step 5: Verify count dropped ---
+        let afterRemovalCards = SidebarExtractor.extractCards(from: page, at: pageIndex)
+        XCTAssertEqual(afterRemovalCards.count, originalCards.count - 1,
+                       "Removing annotation should reduce card count by 1")
+
+        // Verify the removed card is actually gone
+        let removedStillPresent = afterRemovalCards.contains { $0.uuid == originalUUID }
+        XCTAssertFalse(removedStillPresent,
+                       "Removed annotation's card should not appear in extraction")
+
+        // --- Step 6: Recreate in-memory (mirrors addInMemoryHighlight) ---
+        // This must stay in sync with AnimaPDFView.addInMemoryHighlight.
+        // If that method changes, update this block accordingly.
+
+        let recreated = PDFAnnotation(
+            bounds: originalBounds,
+            forType: .highlight,
+            withProperties: nil
+        )
+
+        // Appearance — matches anima_helper.py constants
+        recreated.color = AnimaPDFView.highlightColor
+        recreated.setValue(AnimaPDFView.highlightOpacity,
+                          forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
+
+        // Comment
+        if !originalContents.isEmpty {
+            recreated.contents = originalContents
+        }
+
+        // UUID — /NM is primary, userName is backup
+        recreated.setValue(originalUUID,
+                          forAnnotationKey: PDFAnnotationKey(rawValue: "/NM"))
+        recreated.userName = originalUUID
+
+        // Author — must be set AFTER userName (PDFKit maps userName → /T)
+        recreated.setValue(originalAuthor,
+                          forAnnotationKey: PDFAnnotationKey(rawValue: "/T"))
+
+        // QuadPoints from bounds (same approach as addInMemoryHighlight:
+        // one quad per bounds rect, built from the bounding rect corners)
+        let bottomLeft  = NSPoint(x: originalBounds.minX, y: originalBounds.minY)
+        let bottomRight = NSPoint(x: originalBounds.maxX, y: originalBounds.minY)
+        let topLeft     = NSPoint(x: originalBounds.minX, y: originalBounds.maxY)
+        let topRight    = NSPoint(x: originalBounds.maxX, y: originalBounds.maxY)
+
+        let quadPoints: [NSValue] = [
+            NSValue(point: bottomLeft),
+            NSValue(point: bottomRight),
+            NSValue(point: topLeft),
+            NSValue(point: topRight),
+        ]
+        recreated.setValue(quadPoints,
+                          forAnnotationKey: PDFAnnotationKey(rawValue: "/QuadPoints"))
+
+        // Add to page
+        page.addAnnotation(recreated)
+
+        // --- Step 7: Extract cards again ---
+        let afterRecreationCards = SidebarExtractor.extractCards(from: page, at: pageIndex)
+
+        // --- Step 8: Assert the recreated card matches the original ---
+        XCTAssertEqual(afterRecreationCards.count, originalCards.count,
+                       "Card count should be restored after recreation")
+
+        guard let recreatedCard = afterRecreationCards.first(where: { $0.uuid == originalUUID }) else {
+            XCTFail("Recreated annotation not found in extracted cards. " +
+                    "This likely means /NM or userName is not set correctly.")
+            return
+        }
+
+        // Core identity
+        XCTAssertEqual(recreatedCard.uuid, targetCard.uuid,
+                       "UUID mismatch — /NM not set correctly on in-memory annotation")
+        XCTAssertEqual(recreatedCard.text, targetCard.text,
+                       "Comment text mismatch — .contents not set correctly")
+        XCTAssertEqual(recreatedCard.pageIndex, targetCard.pageIndex,
+                       "Page index mismatch")
+
+        // Author — this is the field that broke when /T wasn't set explicitly
+        XCTAssertEqual(recreatedCard.author, targetCard.author,
+                       "Author mismatch — /T not set correctly on in-memory annotation. " +
+                       "Got '\(recreatedCard.author)', expected '\(targetCard.author)'. " +
+                       "If the author looks like a UUID, /T is picking up userName instead.")
+
+        // Anchor position — may differ slightly because the original annotation
+        // might have multi-line quads (larger bounds) while our recreation uses
+        // the overall bounding rect. We use a generous tolerance.
+        XCTAssertEqual(recreatedCard.anchorY, targetCard.anchorY, accuracy: 1.0,
+                       "Anchor Y mismatch — bounds may differ between original and recreated")
+
+        print("✅ Round-trip passed: '\(recreatedCard.text)' matches original")
+    }
 }

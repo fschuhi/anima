@@ -5,6 +5,14 @@
 //  Manages the primary NSSplitView layout containing the PDF rendering view
 //  on the left and the annotation sidebar on the right.
 //
+//  Sidebar update flow:
+//    AnimaPDFView mutates an annotation (create/edit/delete) and calls
+//    sidebarDelegate.annotationsDidChange(onPageIndex:). This triggers
+//    rebuildPageSidebar(at:), which tears down the affected page's card
+//    views, re-extracts cards via SidebarExtractor, rebuilds the views,
+//    and re-runs the layout algorithm. All within one run loop cycle,
+//    so the user sees a single atomic visual update.
+//
 
 import Cocoa
 import Quartz
@@ -46,6 +54,14 @@ class PageSidebarView: NSScrollView {
         self.cardViews.append(cardView)
     }
 
+    /// Remove all card views and reset the list.
+    func removeAllCardViews() {
+        for cardView in cardViews {
+            cardView.removeFromSuperview()
+        }
+        cardViews.removeAll()
+    }
+
     // Smart Scroll Routing
     override func scrollWheel(with event: NSEvent) {
         if let docView = documentView, docView.frame.height <= self.bounds.height {
@@ -71,7 +87,7 @@ class SidebarScrollView: NSScrollView {
     }
 }
 
-class MainViewController: NSViewController {
+class MainViewController: NSViewController, SidebarUpdateDelegate {
 
     var pdfView: AnimaPDFView!
     var sidebarScrollView: SidebarScrollView!
@@ -130,6 +146,9 @@ class MainViewController: NSViewController {
     func loadPDF(document: PDFDocument) {
         pdfView.document = document
 
+        // Wire up the sidebar delegate so annotation mutations trigger rebuilds
+        pdfView.sidebarDelegate = self
+
         let cards = SidebarExtractor.extractCards(from: document)
         guard let sidebarDocView = sidebarScrollView.documentView else { return }
 
@@ -154,6 +173,41 @@ class MainViewController: NSViewController {
 
         pdfView.layoutDocumentView()
         updateSidebarLayout()
+    }
+
+    // --- SidebarUpdateDelegate ---
+
+    func annotationsDidChange(onPageIndex pageIndex: Int) {
+        rebuildPageSidebar(at: pageIndex)
+        updateSidebarLayout()
+    }
+
+    // --- Page-Sidebar Rebuild ---
+
+    /// Tears down all card views for the given page, re-extracts cards from
+    /// the PDFDocument's current in-memory annotations, and rebuilds the
+    /// card views. Called after any annotation mutation on that page.
+    private func rebuildPageSidebar(at pageIndex: Int) {
+        guard let document = pdfView.document,
+              let page = document.page(at: pageIndex) else { return }
+
+        // Find the PageSidebarView for this page index
+        guard pageIndex < pageSidebarViews.count else { return }
+        let pageView = pageSidebarViews[pageIndex]
+
+        // Tear down existing cards
+        pageView.removeAllCardViews()
+
+        // Re-extract cards from the page's current annotations
+        let cards = SidebarExtractor.extractCards(from: page, at: pageIndex)
+
+        // Rebuild card views
+        for card in cards {
+            let cardView = CommentCardView(card: card)
+            pageView.addCardView(cardView)
+        }
+
+        Swift.print("🔄 Sidebar rebuilt for page \(pageIndex): \(cards.count) card(s)")
     }
 
     // --- Scroll Physics ---

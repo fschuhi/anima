@@ -17,6 +17,12 @@
 //    fitz-written file is source of truth on disk; in-memory annotation is
 //    display-only for the current session.
 //
+//  Sidebar integration:
+//    After any annotation mutation (create, edit comment, delete), the
+//    sidebarDelegate is notified so the sidebar can rebuild the affected
+//    page's cards. The delegate receives only the page index — the sidebar
+//    re-extracts all cards for that page from scratch.
+//
 //  NOTE: Inside a PDFView subclass, bare `print()` is ambiguous because
 //  NSView has its own print() method (send to printer). We use Swift.print()
 //  throughout to call the global console print function.
@@ -24,14 +30,29 @@
 import Cocoa
 import Quartz
 
+// --- Sidebar Update Protocol ---
+// AnimaPDFView notifies its delegate after any annotation mutation so
+// the sidebar can rebuild the affected page's cards.
+protocol SidebarUpdateDelegate: AnyObject {
+    func annotationsDidChange(onPageIndex pageIndex: Int)
+}
+
 class AnimaPDFView: PDFView {
 
     // Path to the Python helper — absolute path for Xcode-launched app
     let helperPath = "/Users/fschuhi/Projects/anima/tools/anima_helper.py"
 
+    // Default author for in-memory annotations. Must match anima_helper.py's
+    // DEFAULT_AUTHOR so that cards created during a session show the same
+    // author as cards loaded from disk on next launch.
+    static let authorName = "fschuhi"
+
     // Track which highlight is currently "selected" (for Delete key)
     var selectedAnnotation: PDFAnnotation?
     var selectedAnnotationPage: PDFPage?
+
+    // --- Sidebar delegate ---
+    weak var sidebarDelegate: SidebarUpdateDelegate?
 
     // --- Persistent Highlight Mode ---
     // When active, releasing the mouse after a text selection immediately
@@ -55,6 +76,33 @@ class AnimaPDFView: PDFView {
         super.keyDown(with: event)
     }
 
+    // TEMPORARY — testing color/opacity emphasis on highlight annotations
+    func testHighlightEmphasis() {
+        guard let page = currentPage else { return }
+
+        for annot in page.annotations {
+            if annot.type == "Highlight" {
+                let isEmphasized = annot.color.redComponent < 0.5  // crude toggle check
+
+                if isEmphasized {
+                    // Restore normal appearance
+                    annot.color = AnimaPDFView.highlightColor
+                    annot.setValue(AnimaPDFView.highlightOpacity,
+                                  forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
+                    Swift.print("⚪ Emphasis removed")
+                } else {
+                    // Emphasize: bright blue, higher opacity
+                    annot.color = NSColor(red: 0.2, green: 0.5, blue: 1.0, alpha: 1.0)
+                    annot.setValue(0.6, forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
+                    Swift.print("🔵 Emphasis applied: blue, opacity 0.6")
+                }
+                setNeedsDisplay(bounds)
+                return
+            }
+        }
+        Swift.print("⚠️  No highlight found on current page")
+    }
+
     func handleKeyEvent(_ event: NSEvent) -> Bool {
         if event === lastHandledEvent {
             return true
@@ -69,6 +117,13 @@ class AnimaPDFView: PDFView {
         // H = toggle persistent highlight mode
         if event.keyCode == 4 {  // keyCode 4 = H
             toggleHighlightMode()
+            lastHandledEvent = event
+            return true
+        }
+
+        // B = test highlight border (TEMPORARY)
+        if event.keyCode == 11 {
+            testHighlightEmphasis()
             lastHandledEvent = event
             return true
         }
@@ -230,6 +285,12 @@ class AnimaPDFView: PDFView {
             annot.contents = newComment
             Swift.print("✅ Comment updated on \(uuid)")
             Swift.print("   New comment: \(newComment.isEmpty ? "(removed)" : newComment)")
+
+            // Notify sidebar to rebuild this page's cards
+            if let document = self.document {
+                let pageIndex = document.index(for: page)
+                sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)
+            }
         }
 
         return true
@@ -286,6 +347,12 @@ class AnimaPDFView: PDFView {
             selectedAnnotation = nil
             selectedAnnotationPage = nil
             Swift.print("✅ Highlight deleted: \(uuid)")
+
+            // Notify sidebar to rebuild this page's cards
+            if let document = self.document {
+                let pageIndex = document.index(for: page)
+                sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)
+            }
         }
 
         return success
@@ -406,6 +473,11 @@ class AnimaPDFView: PDFView {
             )
             clearSelection()
             Swift.print("✅ Highlight created (dual-write): \(uuid)")
+
+            // Notify sidebar — currently a no-op since highlights start without
+            // comments (no card to show), but this ensures the sidebar stays
+            // correct if we ever change the default or add Phase 4 in-place editing.
+            sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)
         }
 
         return success
@@ -416,6 +488,19 @@ class AnimaPDFView: PDFView {
     /// Create a PDFAnnotation in PDFKit's in-memory document for immediate display.
     /// The annotation matches what fitz wrote to disk. On next app launch, PDFKit
     /// will load the fitz-written version from the file.
+    ///
+    /// Fields set here must match what anima_helper.py writes via fitz:
+    ///   - bounds, QuadPoints, color, opacity  (geometry + appearance)
+    ///   - /NM                                  (UUID for identification)
+    ///   - userName                              (backup UUID for hit-testing)
+    ///   - /T                                   (author for sidebar cards)
+    ///   - contents                             (comment text)
+    ///
+    /// IMPORTANT: /NM must be set explicitly. PDFKit maps userName to /T
+    /// internally, so relying on userName alone for UUID storage causes /T
+    /// (author) writes to overwrite the UUID. Setting /NM directly ensures
+    /// annotationUUID() finds the UUID on its first check, independent of
+    /// the userName ↔ /T mapping.
     ///
     /// - Parameters:
     ///   - page: The PDFPage to add the annotation to
@@ -446,8 +531,16 @@ class AnimaPDFView: PDFView {
             annot.contents = comment
         }
 
-        // Set UUID via userName (PDFKit's closest equivalent to /NM)
+        // Set UUID — both via /NM (primary, used by annotationUUID) and
+        // userName (backup). /NM must be set explicitly because PDFKit
+        // does not populate it from userName.
+        annot.setValue(uuid, forAnnotationKey: PDFAnnotationKey(rawValue: "/NM"))
         annot.userName = uuid
+
+        // Set author — matches anima_helper.py's DEFAULT_AUTHOR.
+        // Must be set AFTER userName to avoid PDFKit's internal
+        // userName ↔ /T mapping from overwriting the author with the UUID.
+        annot.setValue(AnimaPDFView.authorName, forAnnotationKey: PDFAnnotationKey(rawValue: "/T"))
 
         // Build QuadPoints — PDFKit expects an array of NSValue-wrapped NSPoints,
         // four points per quad (one quad per selection line).
