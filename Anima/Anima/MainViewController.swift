@@ -21,7 +21,6 @@ class PageDocumentView: NSView {
 }
 
 // --- Page-Sidebar Container ---
-// Upgraded to NSScrollView to handle overflow!
 class PageSidebarView: NSScrollView {
     let pageIndex: Int
     var cardViews: [CommentCardView] = []
@@ -30,14 +29,11 @@ class PageSidebarView: NSScrollView {
         self.pageIndex = pageIndex
         super.init(frame: .zero)
 
-        // Configure the scroll view
         self.hasVerticalScroller = true
         self.hasHorizontalScroller = false
-        self.autohidesScrollers = true // Only show scrollbar if cards overflow
-        self.drawsBackground = false   // Keep the sidebar background visible
+        self.autohidesScrollers = true
+        self.drawsBackground = false
         self.borderType = .noBorder
-
-        // Give it an internal canvas to hold the cards
         self.documentView = PageDocumentView()
     }
 
@@ -46,9 +42,19 @@ class PageSidebarView: NSScrollView {
     }
 
     func addCardView(_ cardView: CommentCardView) {
-        // Add the card to the internal canvas, not the scroll view frame
         self.documentView?.addSubview(cardView)
         self.cardViews.append(cardView)
+    }
+
+    // Smart Scroll Routing
+    override func scrollWheel(with event: NSEvent) {
+        if let docView = documentView, docView.frame.height <= self.bounds.height {
+            // Content fits perfectly. Pass the scroll event up to the master sidebar/PDF!
+            self.nextResponder?.scrollWheel(with: event)
+        } else {
+            // Cards are overflowing. Let this local scroll view handle it.
+            super.scrollWheel(with: event)
+        }
     }
 }
 
@@ -230,15 +236,12 @@ class MainViewController: NSViewController {
             let scaledTopY = unscaledTopY * scale
             let scaledPageHeight = unscaledPageHeight * scale
 
-            // Set the outer scroll view frame to exactly match the PDF page boundaries
             pageView.frame = NSRect(x: 0, y: scaledTopY, width: sidebarWidth, height: scaledPageHeight)
 
             // --- COLLISION AVOIDANCE ALGORITHM ---
             var previousCardBottomEdge: CGFloat = 0
             let cardPadding: CGFloat = 8
 
-            // Note: The scrollbar itself takes up about 15px. If we let the cards fill the whole width,
-            // they will draw *underneath* the scrollbar. So we pad the width slightly.
             let cardWidth = sidebarWidth - 16
 
             for cardView in pageView.cardViews {
@@ -256,15 +259,12 @@ class MainViewController: NSViewController {
                     finalY = previousCardBottomEdge
                 }
 
-                // Position the card inside the internal document view
                 cardView.frame = NSRect(x: 0, y: finalY, width: cardWidth, height: fittingHeight)
 
                 previousCardBottomEdge = finalY + fittingHeight + cardPadding
             }
 
             // --- OVERFLOW HANDLING ---
-            // If the cards pushed past the bottom of the page, expand the internal canvas
-            // so the NSScrollView allows scrolling!
             if let docView = pageView.documentView {
                 let requiredHeight = max(scaledPageHeight, previousCardBottomEdge)
                 docView.setFrameSize(NSSize(width: sidebarWidth, height: requiredHeight))

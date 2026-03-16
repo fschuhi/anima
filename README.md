@@ -206,6 +206,16 @@ PDFKit space to fitz space.
 monitor as a fallback for keyboard events (PDFKit's internal `PDFDocumentView`
 sometimes captures keyboard focus).
 
+**`MainViewController.swift`** — Manages the dual-pane layout (`NSSplitView`),
+instantiates the `SidebarScrollView`, and coordinates the complex scrolling math
+and `scaleFactor` logic required to keep the sidebar perfectly synchronized with the PDF.
+
+**`SidebarExtractor.swift`** — The pure data layer for the sidebar. Scans the
+PDFDocument for highlight annotations and safely extracts their text, UUID (/NM),
+author (/T), modification date, and vertical anchor points. Converts this raw PDFKit
+data into sorted `CommentCard` structs, keeping the extraction logic completely
+decoupled from the UI. Tested with `AnimaTests.swift`.
+
 **`FitzBridge.swift`** — Static methods that call `anima_helper.py` via `Process()`
 (Swift's subprocess equivalent). Captures stdout/stderr, checks exit codes, and
 resolves the Python executable from the project's `.venv`.
@@ -214,9 +224,10 @@ resolves the Python executable from the project's `.venv`.
 `edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save
 preserves existing annotations. Tested independently from Terminal.
 
-**`MainViewController.swift`** — Manages the dual-pane layout (`NSSplitView`),
-instantiates the `SidebarScrollView`, and coordinates the complex scrolling math
-and `scaleFactor` logic required to keep the sidebar perfectly synchronized with the PDF.
+**`CommentCardView.swift`** — The visual representation of a single annotation in
+the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based
+on the length of the comment text. Handles all visual styling, including the muted
+typography applied to structural pipeline commands (e.g., `link` or `H2`).
 
 ---
 

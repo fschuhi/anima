@@ -70,6 +70,7 @@
 
 ## Cosmetic / UX Improvements
 
+- [ ] **Sidebar Card Polish** — Tweak internal/external padding, reduce title font size to ~9pt, adjust comment font to ~11pt, and experiment with custom absolute grayscale background colors (e.g., `white: 0.15`) for better contrast against the sidebar background in Dark Mode.
 - [ ] **Status bar indicator** — Replace window title suffix with a proper
       bottom status bar (thin NSTextField below the PDF view). Shows
       "Highlight Mode" when active, hidden/empty when not. The window title
@@ -106,7 +107,7 @@ High value, protects the annotation contract that the whole app depends on.
 - [x] Scrolls in sync with PDF
 - [x] Cards shown for all highlights with non-empty comments
 - [x] Empty-comment highlights: no card (or minimal indicator)
-- [ ] Implement Collision Avoidance (greedy algorithm to prevent overlapping cards)
+- [x] Implement Collision Avoidance (greedy algorithm to prevent overlapping cards)
 - [ ] Double-click highlight → focus jumps to card, comment becomes editable
 - [ ] Edit happens in sidebar only (no tooltips, no in-place editing)
 - [ ] Clear comment text = remove comment (keep highlight)
