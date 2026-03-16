@@ -38,6 +38,7 @@ graph TB
         UI[PDFView Subclass]
         DW[Dual-Write Controller]
         FB[FitzBridge]
+        SB[Sidebar + Cards]
     end
 
     subgraph "Python Backend"
@@ -50,10 +51,12 @@ graph TB
     UI -->|user action| DW
     DW -->|in-memory PDFAnnotation| UI
     DW -->|subprocess call| FB
+    DW -->|SidebarUpdateDelegate| SB
     FB -->|CLI args + JSON| AH
     AH -->|incremental save| FZ
     FZ -->|read/write| PDF
     UI -->|read for display| PDF
+    SB -->|card click → emphasis| UI
 ```
 
 ### Why Hybrid?
@@ -76,7 +79,9 @@ When creating, editing, or deleting highlights during a session:
    to write the annotation with incremental save.
 2. **Update in-memory** — add, modify, or remove a `PDFAnnotation` in PDFKit's
    in-memory document for immediate display.
-3. **No reload** — the document is never reloaded during a session, eliminating
+3. **Notify sidebar** — call `sidebarDelegate.annotationsDidChange(onPageIndex:)`
+   so the sidebar rebuilds the affected page's cards.
+4. **No reload** — the document is never reloaded during a session, eliminating
    the scroll drift that plagued both PoCs.
 
 On next app launch, PDFKit loads the fitz-written file from disk. The file is
@@ -93,18 +98,28 @@ This is the critical cross-language contract:
 The coordinate flip happens in Swift (`AnimaPDFView`) before calling the helper.
 The helper receives fitz-native coordinates only — it has no knowledge of PDFKit.
 
+**Note:** PDFKit's `annot.bounds` does not directly match the raw PDF `/Rect`
+values. PDFKit transforms the coordinates internally. When building test fixtures,
+always use the values reported by PDFKit, not the raw PDF rect.
+
 ### UUID Contract
 
 Every annotation gets a UUID stored in the PDF `/NM` field. Swift generates UUIDs,
 passes them to the helper via CLI arguments, and uses them for hit-testing and
 identification. The helper sets `/NM` via fitz's xref API (`doc.xref_set_key`).
 
+**Important:** On in-memory annotations, `/NM` must be set explicitly via
+`setValue(_:forAnnotationKey:)`. PDFKit maps `userName` to `/T` (the author
+field), not to `/NM`. Relying on `userName` alone for UUID storage causes the
+author field to overwrite the UUID. See SIDEBAR_DESIGN.md "Known Gotchas" for
+full details.
+
 ---
 
 ## Current Status
 
 | Feature                  | Status      | Notes                                              |
-|--------------------------|-------------|----------------------------------------------------|
+|--------------------------|-------------|-----------------------------------------------------|
 | **PDF Rendering** | ✅ Complete  | PDFKit, including Internet Archive layered PDFs    |
 | **Continuous Scroll** | ✅ Complete  | Native trackpad scrolling                          |
 | **Text Selection** | ✅ Complete  | Drag to select, per-line quad extraction           |
@@ -115,7 +130,7 @@ identification. The helper sets `/NM` via fitz's xref API (`doc.xref_set_key`).
 | **Incremental Save** | ✅ Complete  | fitz preserves all existing annotations            |
 | **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
 | **Xcode Project** | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
-| **Sidebar** | ✅ Phase 1   | Comment cards panel (Read-only, synchronized)      |
+| **Sidebar** | ✅ Phase 3   | Live-updating cards, emphasis on click              |
 | **Tabs** | 🚧 Planned  | Multi-PDF in single window (Milestone 1)           |
 | **pdf:// URL Handler** | 🚧 Planned  | Open PDFs from Obsidian links (Milestone 2)        |
 
@@ -126,6 +141,25 @@ especially in persistent highlight mode where mouseUp instantly highlights.
 To add or edit a comment after the fact, double-click the highlight. This matches
 the PDF-XChange Viewer workflow where highlighting and commenting are separate
 actions.
+
+### Sidebar
+
+The sidebar is a fixed-width panel on the right showing **comment cards** — one
+per annotation with a non-empty comment. Cards are positioned vertically to
+align with their corresponding highlights in the PDF, using anchor-based layout
+with collision avoidance.
+
+Key capabilities:
+- **Live updates**: Cards appear, update, or disappear immediately when comments
+  are added, edited, or deleted during a session (Phase 3).
+- **Emphasis**: Clicking a card highlights the corresponding annotation in the
+  PDF (light yellow) and marks the card with an accent border. Click again to
+  clear. No distracting leader lines.
+- **Scroll sync**: The sidebar scrolls in lockstep with the PDF.
+- **Per-page architecture**: Each PDF page has its own page-sidebar container,
+  enabling efficient per-page rebuilds on mutation.
+
+See `SIDEBAR_DESIGN.md` for the full design document.
 
 ---
 
@@ -168,7 +202,7 @@ anima/
 │   │   ├── AnimaPDFView.swift      ← PDFView subclass: keyboard, mouse, dual-write
 │   │   ├── AppDelegate.swift       ← Window setup, PDF loading, event monitor
 │   │   ├── FitzBridge.swift        ← Subprocess bridge to Python helper
-│   │   ├── MainViewController.swift← NSSplitView layout & sidebar scroll sync
+│   │   ├── MainViewController.swift← NSSplitView layout, sidebar sync & emphasis
 │   │   ├── SidebarExtractor.swift  ← Parses annotations into sidebar CommentCard structs
 │   │   ├── CommentCardView.swift   ← Custom NSView for rendering sidebar cards
 │   │   ├── Assets.xcassets/        ← App icon and colors
@@ -186,6 +220,7 @@ anima/
 ├── .venv/                         ← Python virtual environment
 ├── CRITICAL_RULES.md              ← Non-negotiable collaboration rules
 ├── LLM-instructions.md            ← AI session context and conventions
+├── SIDEBAR_DESIGN.md              ← Sidebar design document
 ├── TODO.md                        ← Task list with milestones
 ├── HANDOVER.md                    ← Session handover notes
 ├── Makefile                       ← Build, setup, and utility targets
@@ -200,7 +235,8 @@ anima/
 keyboard and mouse events. Handles highlight creation (with dual-write), persistent
 highlight mode (H key toggle, mouseUp auto-highlight), comment editing via
 double-click, highlight deletion, hit-testing, and coordinate conversion from
-PDFKit space to fitz space.
+PDFKit space to fitz space. Defines the `SidebarUpdateDelegate` protocol and
+notifies its delegate after every annotation mutation so the sidebar stays in sync.
 
 **`AppDelegate.swift`** — Creates the window, loads the PDF, sets up the NSEvent
 monitor as a fallback for keyboard events (PDFKit's internal `PDFDocumentView`
@@ -208,13 +244,19 @@ sometimes captures keyboard focus).
 
 **`MainViewController.swift`** — Manages the dual-pane layout (`NSSplitView`),
 instantiates the `SidebarScrollView`, and coordinates the complex scrolling math
-and `scaleFactor` logic required to keep the sidebar perfectly synchronized with the PDF.
+and `scaleFactor` logic required to keep the sidebar perfectly synchronized with
+the PDF. Conforms to `SidebarUpdateDelegate` to handle live sidebar rebuilds on
+annotation mutation. Manages highlight emphasis state: when a sidebar card is
+clicked, the corresponding PDF highlight turns light yellow and the card gets an
+accent border.
 
 **`SidebarExtractor.swift`** — The pure data layer for the sidebar. Scans the
 PDFDocument for highlight annotations and safely extracts their text, UUID (/NM),
 author (/T), modification date, and vertical anchor points. Converts this raw PDFKit
 data into sorted `CommentCard` structs, keeping the extraction logic completely
-decoupled from the UI. Tested with `AnimaTests.swift`.
+decoupled from the UI. Supports both document-level and per-page extraction (the
+latter used by the live-update path to rebuild a single page efficiently).
+Tested with `AnimaTests.swift`.
 
 **`FitzBridge.swift`** — Static methods that call `anima_helper.py` via `Process()`
 (Swift's subprocess equivalent). Captures stdout/stderr, checks exit codes, and
@@ -227,7 +269,9 @@ preserves existing annotations. Tested independently from Terminal.
 **`CommentCardView.swift`** — The visual representation of a single annotation in
 the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based
 on the length of the comment text. Handles all visual styling, including the muted
-typography applied to structural pipeline commands (e.g., `link` or `H2`).
+typography applied to structural pipeline commands (e.g., `link` or `H2`). Reports
+clicks via an `onClicked` closure and supports active/inactive visual states for
+the emphasis feature.
 
 ---
 
@@ -264,6 +308,14 @@ make test-verbose   # Run Python tests with output
 
 Swift tests run via Xcode: **Cmd+U** or **Product → Test**.
 
+Current Swift test suite:
+- `testSidebarExtraction` — Golden JSON test against `sidebar_basic.pdf`
+- `testMultiPageExtraction` — Multi-page extraction against `sidebar_page_extract.pdf`
+- `testPerPageExtraction` — Per-page extraction (page 0, page 1, empty page 2)
+- `testPerPageConsistencyWithDocumentLevel` — Reassembly matches document-level
+- `testInMemoryAnnotationRoundTrip` — Verifies in-memory annotations produce
+  correct `CommentCard` data, guarding against dual-write field omissions
+
 ### Code Formatting
 
 ```bash
@@ -291,6 +343,16 @@ make clean        # Remove build output, venv, cache
 - `document.index(for:)` returns `Int`, not Optional — same issue.
 - Command-line GUI apps need `setActivationPolicy(.regular)` for keyboard focus.
   Not needed in Xcode .app bundles.
+- PDFKit maps `userName` to `/T` (author), not `/NM` (unique name). Set `/NM`
+  explicitly via `setValue(_:forAnnotationKey:)` for UUID storage. Set `/T`
+  after `userName` to avoid the mapping overwriting the author with the UUID.
+
+### PDFKit Coordinate Note
+
+PDFKit's `annot.bounds` values do not match the raw PDF `/Rect` midpoints.
+PDFKit applies an internal coordinate transformation. When comparing with fitz
+or raw PDF data, always verify against actual PDFKit-reported values. The test
+fixtures contain PDFKit values, not raw PDF values.
 
 ### Appearance Stream Caveat
 

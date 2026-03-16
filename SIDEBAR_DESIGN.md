@@ -1,7 +1,7 @@
 # Anima — Sidebar Design Document
 
-**Status:** Phase 1 Implemented (Read-only view), Phase 2 Pending
-**Date:** 2026-03-14
+**Status:** Phase 1 & 3 Implemented, Phase 2 Partial (emphasis only), Phase 4 Pending
+**Date:** 2026-03-16
 **Context:** This document captures design decisions for Anima's annotation
 sidebar. It is intended as a reference for future LLM conversations and for
 Frank's own planning.
@@ -24,7 +24,7 @@ makes Anima a viable replacement for PDF-XChange Viewer.
 ## Terminology
 
 | Term              | Meaning                                                    |
-|-------------------|------------------------------------------------------------|
+|-------------------|------------------------------------------------------------ |
 | **Sidebar** | The right-side panel containing all cards                  |
 | **Card** | A single comment entry in the sidebar                      |
 | **Page-sidebar** | The vertical zone within the sidebar that corresponds to   |
@@ -35,6 +35,9 @@ makes Anima a viable replacement for PDF-XChange Viewer.
 |                   | to be positioned.                                          |
 | **Command comment** | A comment whose text is a pipeline instruction ("link",  |
 |                   | "H1", "H2", etc.) rather than a human-readable note.       |
+| **Emphasis** | The visual indication shown when a card is clicked:        |
+|                   | the corresponding highlight turns light yellow, and the    |
+|                   | card gets an accent-colored border.                        |
 
 ---
 
@@ -181,25 +184,40 @@ cards in all other respects.
 
 ## Interaction
 
-### Bidirectional Navigation
+### Card Click → Highlight Emphasis (Implemented)
 
-- **Click a card** → the corresponding highlight in the PDF is visually
-  indicated (e.g., briefly emphasized or connected by a leader line).
-  If the highlight is off-screen, the PDF scrolls to show it.
+Clicking a sidebar card **emphasizes** the corresponding highlight in the
+PDF: the highlight changes to light yellow (#FFFFE0) at higher opacity
+(0.7), and the card itself gets a 2pt accent-colored border. This provides
+a clear visual link between card and highlight without leader lines or
+other clutter.
+
+- Clicking the same card again clears the emphasis (toggle behavior).
+- Only one card/highlight pair can be emphasized at a time.
+- Emphasis does not scroll the PDF — the card and highlight are always
+  in close proximity due to the anchor-based layout.
+- When an annotation is mutated (comment edited, highlight deleted),
+  emphasis is automatically cleared.
+
+### Highlight Click → Card Indication (Planned — Phase 2 Remainder)
+
 - **Click a highlight** → the corresponding card in the sidebar is
   visually indicated. If the card is off-screen (in a page-sidebar
   with overflow), scroll to show it.
+- This is the reverse direction of the card-click emphasis above.
 
-### Leader Lines
+### Leader Lines (Decided Against)
 
-Leader lines (thin lines connecting a card to its highlight) are shown
-**only when a card has focus** — i.e., when the user clicks on a card or
-on a highlight. No always-on leader lines; they would be visually
-distracting with many annotations.
+Leader lines (thin lines connecting a card to its highlight) were
+considered and rejected. The card-click emphasis approach is simpler,
+less visually cluttered, and achieves the same goal of connecting
+card ↔ highlight for the user. The anchor-based layout already keeps
+cards close to their highlights, so a connecting line adds complexity
+without proportional benefit.
 
 ### Comment Editing — Phased Approach
 
-**Phase 1 (initial implementation):**
+**Phase 1 (implemented):**
 
 Double-click a highlight → the existing `askForComment()` NSAlert dialog
 appears. The sidebar displays cards as **read-only**. This phase delivers
@@ -225,6 +243,43 @@ Phase 2 editing rules:
 
 When Phase 2 is complete, `askForComment()` becomes dead code and should
 be removed.
+
+---
+
+## Live Sidebar Updates (Phase 3 — Implemented)
+
+The sidebar stays in sync with annotation mutations during a session.
+When the user creates a highlight, edits a comment, or deletes a
+highlight, the sidebar updates immediately.
+
+### Architecture
+
+AnimaPDFView notifies MainViewController via the `SidebarUpdateDelegate`
+protocol. The delegate receives only the affected page index. On
+notification, MainViewController:
+
+1. Clears any active highlight emphasis (stale state after mutation)
+2. Tears down all card views for the affected page
+3. Re-extracts cards via `SidebarExtractor.extractCards(from:at:)`
+4. Rebuilds card views with click handlers
+5. Re-runs the layout algorithm
+
+This "rebuild the whole page" approach is deliberately simple — no
+surgical card insertion or removal, no diffing. Pages typically have
+a handful of annotations, so the performance cost is negligible. The
+benefit is a single code path for all mutation types.
+
+### Mutation Points
+
+Three places in AnimaPDFView trigger the delegate:
+
+1. **Comment edited** (`handleDoubleClickOnHighlight`) — after the
+   in-memory annotation's `.contents` is updated
+2. **Highlight deleted** (`deleteSelectedHighlight`) — after the
+   annotation is removed from the page
+3. **Highlight created** (`createHighlightFromSelection`) — after the
+   in-memory annotation is added. Currently a no-op (highlights start
+   without comments), but wired for future-proofing.
 
 ---
 
@@ -260,28 +315,25 @@ on earlier ones. A phase can be split into sub-steps during implementation.
 - Scan the document's annotations on load; build card data for every
   highlight with a non-empty comment.
 - Render cards in page-sidebars aligned to their PDF pages.
-- Implement anchor-based layout with collision avoidance. *(Collision avoidance pending)*
+- Implement anchor-based layout with collision avoidance.
 - Card auto-sizing (height fits content, internal scroll on overflow).
 - Page-sidebar scrollbars when cards exceed page height.
 - Command comments ("link", "H1", "H2") rendered in light gray.
 - Title bar toggle (global initially, per-document later).
 - Sidebar scrolls in lockstep with PDF.
 
-### Phase 2: Bidirectional Navigation
+### Phase 2: Bidirectional Navigation (PARTIAL)
 
-- Click card → indicate/scroll to highlight.
-- Click highlight → indicate/scroll to card.
-- Leader line shown on focused card only.
+- [x] Click card → emphasize highlight (color/opacity change) + card
+      gets active border. Toggle on re-click.
+- [ ] Click highlight → indicate/scroll to card.
 
-### Phase 3: Live Updates
+### Phase 3: Live Updates (DONE)
 
-- When a highlight is created (ENTER or mouseUp in highlight mode),
-  the sidebar adds a card in real time (if comment is non-empty — which
-  currently it never is, since highlights are created without comments).
-- When a comment is added/edited via `askForComment()`, the sidebar
-  updates the card (or creates/removes it).
-- When a highlight is deleted, the sidebar removes the card.
-- Layout reflows after each change.
+- SidebarUpdateDelegate protocol: AnimaPDFView → MainViewController.
+- Per-page re-extraction via SidebarExtractor.extractCards(from:at:).
+- Sidebar rebuilds affected page on comment add/edit/delete.
+- Emphasis auto-clears on mutation (prevents stale state).
 
 ### Phase 4: In-Place Editing
 
@@ -293,10 +345,39 @@ on earlier ones. A phase can be split into sub-steps during implementation.
 
 ---
 
+## Known Gotchas
+
+### PDFKit userName ↔ /T ↔ /NM Mapping
+
+PDFKit internally maps the `userName` property to the `/T` (Title/Author)
+PDF field. This means:
+
+- Setting `annot.userName = uuid` writes the UUID into `/T`.
+- Subsequently setting `/T` to the author name overwrites `userName`.
+- `annotationUUID()` must check `/NM` first, not `userName`.
+
+The fix (implemented): set `/NM` explicitly via `setValue(_:forAnnotationKey:)`
+for UUID storage, and set `/T` explicitly for the author. Keep `userName`
+as a backup but never rely on it as the primary UUID source.
+
+This was caught empirically (the sidebar showed UUIDs instead of author
+names, and `anima_helper.py` received "fschuhi" as the UUID). A round-trip
+unit test (`testInMemoryAnnotationRoundTrip`) now guards against
+regressions.
+
+### PDFKit annot.bounds vs Raw PDF /Rect
+
+PDFKit's `annot.bounds.midY` does **not** match the raw PDF `/Rect` midY
+value. PDFKit appears to transform the coordinates, effectively returning
+`pageHeight - rawMidY`. The `sidebar_basic_expected.json` and
+`sidebar_page_extract_expected.json` fixtures contain the PDFKit-reported
+values. When creating new test fixtures, always use the values printed by
+the `💡 Extracted Anchor Y` diagnostic lines on first test run.
+
+---
+
 ## Open Questions
 
-- **Leader line style:** Thin straight line? Curved? Color? Needs visual
-  experimentation during implementation.
 - **Card visual style:** Border? Shadow? Background tint? Rounded corners?
   Needs visual experimentation. Start simple (thin border, white
   background) and refine.
@@ -305,6 +386,8 @@ on earlier ones. A phase can be split into sub-steps during implementation.
 - **Per-document title bar toggle:** Storage mechanism — where does this
   preference live? In-memory only (resets on close)? Or persisted
   somewhere?
+- **Emphasis color tuning:** Light yellow (#FFFFE0) at 0.7 opacity works
+  but may need adjustment for different PDF backgrounds or dark mode.
 
 ---
 
@@ -319,3 +402,4 @@ The sidebar deliberately does **not** support:
 - Cards for highlights without comments (no indicators)
 - Thumbnail or minimap views
 - Filtering or searching within the sidebar
+- Leader lines (decided against — see Interaction section)

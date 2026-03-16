@@ -76,33 +76,6 @@ class AnimaPDFView: PDFView {
         super.keyDown(with: event)
     }
 
-    // TEMPORARY — testing color/opacity emphasis on highlight annotations
-    func testHighlightEmphasis() {
-        guard let page = currentPage else { return }
-
-        for annot in page.annotations {
-            if annot.type == "Highlight" {
-                let isEmphasized = annot.color.redComponent < 0.5  // crude toggle check
-
-                if isEmphasized {
-                    // Restore normal appearance
-                    annot.color = AnimaPDFView.highlightColor
-                    annot.setValue(AnimaPDFView.highlightOpacity,
-                                  forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
-                    Swift.print("⚪ Emphasis removed")
-                } else {
-                    // Emphasize: bright blue, higher opacity
-                    annot.color = NSColor(red: 0.2, green: 0.5, blue: 1.0, alpha: 1.0)
-                    annot.setValue(0.6, forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
-                    Swift.print("🔵 Emphasis applied: blue, opacity 0.6")
-                }
-                setNeedsDisplay(bounds)
-                return
-            }
-        }
-        Swift.print("⚠️  No highlight found on current page")
-    }
-
     func handleKeyEvent(_ event: NSEvent) -> Bool {
         if event === lastHandledEvent {
             return true
@@ -117,13 +90,6 @@ class AnimaPDFView: PDFView {
         // H = toggle persistent highlight mode
         if event.keyCode == 4 {  // keyCode 4 = H
             toggleHighlightMode()
-            lastHandledEvent = event
-            return true
-        }
-
-        // B = test highlight border (TEMPORARY)
-        if event.keyCode == 11 {
-            testHighlightEmphasis()
             lastHandledEvent = event
             return true
         }

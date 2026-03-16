@@ -13,6 +13,12 @@
 //    and re-runs the layout algorithm. All within one run loop cycle,
 //    so the user sees a single atomic visual update.
 //
+//  Highlight emphasis:
+//    Clicking a sidebar card emphasizes the corresponding highlight in the
+//    PDF by temporarily changing its color/opacity, and visually marks the
+//    card as active. Only one highlight/card pair can be emphasized at a
+//    time. Clicking the same card again clears the emphasis.
+//
 
 import Cocoa
 import Quartz
@@ -96,6 +102,18 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     private var pdfScrollView: NSScrollView?
     private var pageSidebarViews: [PageSidebarView] = []
 
+    // --- Highlight emphasis state ---
+    // Tracks the currently emphasized annotation and card so we can restore
+    // their original appearance when emphasis moves or clears.
+    private var emphasizedAnnotation: PDFAnnotation?
+    private var emphasizedOriginalColor: NSColor?
+    private var emphasizedOriginalOpacity: CGFloat?
+    private var activeCardView: CommentCardView?
+
+    // Emphasis appearance — light yellow (#FFFFE0) at higher opacity
+    private static let emphasisColor = NSColor(red: 1.0, green: 1.0, blue: 0.878, alpha: 1.0)
+    private static let emphasisOpacity: CGFloat = 0.7
+
     override func loadView() {
         splitView = NSSplitView()
         splitView.isVertical = true
@@ -163,6 +181,7 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
             if let pageCards = cardsByPage[pageIndex] {
                 for card in pageCards {
                     let cardView = CommentCardView(card: card)
+                    wireCardClickHandler(cardView)
                     pageView.addCardView(cardView)
                 }
             }
@@ -178,6 +197,9 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     // --- SidebarUpdateDelegate ---
 
     func annotationsDidChange(onPageIndex pageIndex: Int) {
+        // Clear emphasis — the underlying annotation may have been deleted
+        // or its comment changed, so the emphasis state could be stale.
+        clearHighlightEmphasis()
         rebuildPageSidebar(at: pageIndex)
         updateSidebarLayout()
     }
@@ -204,10 +226,106 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         // Rebuild card views
         for card in cards {
             let cardView = CommentCardView(card: card)
+            wireCardClickHandler(cardView)
             pageView.addCardView(cardView)
         }
 
         Swift.print("🔄 Sidebar rebuilt for page \(pageIndex): \(cards.count) card(s)")
+    }
+
+    // --- Card Click → Highlight Emphasis ---
+
+    /// Sets up the onClicked closure for a card view. Called during initial
+    /// load and after page-sidebar rebuilds.
+    private func wireCardClickHandler(_ cardView: CommentCardView) {
+        cardView.onClicked = { [weak self] card in
+            self?.handleCardClicked(card, fromCardView: cardView)
+        }
+    }
+
+    /// Responds to a sidebar card being clicked: emphasizes the corresponding
+    /// highlight in the PDF and marks the card as active. Clicking the same
+    /// card again clears the emphasis.
+    private func handleCardClicked(_ card: CommentCard, fromCardView cardView: CommentCardView) {
+        guard let document = pdfView.document,
+              let page = document.page(at: card.pageIndex) else { return }
+
+        // Find the annotation by UUID
+        var targetAnnot: PDFAnnotation?
+        for annot in page.annotations {
+            if annot.type == "Highlight" {
+                // Check /NM first
+                if let nm = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/NM")) as? String,
+                   nm == card.uuid {
+                    targetAnnot = annot
+                    break
+                }
+                // Fallback: userName
+                if let name = annot.userName, name == card.uuid {
+                    targetAnnot = annot
+                    break
+                }
+            }
+        }
+
+        guard let annot = targetAnnot else {
+            Swift.print("⚠️  Could not find highlight for card \(card.uuid)")
+            return
+        }
+
+        // Toggle: if clicking the already-emphasized annotation, clear it
+        if annot === emphasizedAnnotation {
+            clearHighlightEmphasis()
+            Swift.print("⚪ Emphasis cleared (same card clicked)")
+            return
+        }
+
+        // Clear any existing emphasis first
+        clearHighlightEmphasis()
+
+        // Apply highlight emphasis — save originals so we can restore later
+        emphasizedAnnotation = annot
+        emphasizedOriginalColor = annot.color
+        emphasizedOriginalOpacity = annot.value(
+            forAnnotationKey: PDFAnnotationKey(rawValue: "/CA")
+        ) as? CGFloat ?? AnimaPDFView.highlightOpacity
+
+        annot.color = MainViewController.emphasisColor
+        annot.setValue(MainViewController.emphasisOpacity,
+                       forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
+
+        // Apply card emphasis
+        activeCardView = cardView
+        cardView.setActive()
+
+        // Force PDF redraw
+        pdfView.setNeedsDisplay(pdfView.bounds)
+
+        Swift.print("🟡 Emphasis applied to \(card.uuid) on page \(card.pageIndex)")
+    }
+
+    /// Restores the previously emphasized annotation and card to their
+    /// normal appearance.
+    private func clearHighlightEmphasis() {
+        // Restore highlight
+        if let annot = emphasizedAnnotation {
+            if let originalColor = emphasizedOriginalColor {
+                annot.color = originalColor
+            }
+            if let originalOpacity = emphasizedOriginalOpacity {
+                annot.setValue(originalOpacity,
+                              forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
+            }
+            pdfView.setNeedsDisplay(pdfView.bounds)
+        }
+
+        // Restore card
+        activeCardView?.setInactive()
+
+        emphasizedAnnotation = nil
+        emphasizedOriginalColor = nil
+        emphasizedOriginalOpacity = nil
+        activeCardView = nil
     }
 
     // --- Scroll Physics ---

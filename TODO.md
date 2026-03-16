@@ -51,8 +51,7 @@
 - [!] **In-memory highlight has no popup indicator (yellow square)**
       The fitz-written annotation includes a popup annotation; the in-memory
       PDFAnnotation does not. After app restart, the popup appears (loaded
-      from disk). Low priority — the sidebar (Milestone 1) replaces this
-      indicator entirely.
+      from disk). Low priority — the sidebar replaces this indicator entirely.
 
 - [!] **annot.update() regenerates appearance stream**
       When fitz calls `annot.update()`, it regenerates the annotation's
@@ -75,6 +74,9 @@
       bottom status bar (thin NSTextField below the PDF view). Shows
       "Highlight Mode" when active, hidden/empty when not. The window title
       suffix works but a status bar is the conventional macOS location.
+- [ ] **Emphasis color tuning** — Light yellow (#FFFFE0) at 0.7 opacity
+      works but may need adjustment for different PDF backgrounds or
+      dark mode. Experiment when more PDFs are in daily use.
 
 ---
 
@@ -90,9 +92,15 @@ High value, protects the annotation contract that the whole app depends on.
 - [ ] Verify coordinate values in stored QuadPoints match input
 
 ### Swift — Swift Testing (XCTest for UI)
+- [x] SidebarExtractor: golden JSON test against sidebar_basic.pdf
+- [x] SidebarExtractor: multi-page extraction against sidebar_page_extract.pdf
+- [x] SidebarExtractor: per-page extraction (page 0, page 1, empty page 2)
+- [x] Consistency: per-page reassembly matches document-level extraction
+- [x] In-memory annotation round-trip: create in-memory → extract → verify
+      all fields (UUID, author, text, anchorY) match fitz-written original.
+      Guards against dual-write field omissions (/NM, /T gotchas).
 - [ ] Coordinate conversion: y-flip math for known page heights and points
 - [ ] QuadPoints construction: verify PDFKit-space quad geometry
-- [ ] UUID handling: annotationUUID() reads /NM from annotations
 - [ ] Integration: FitzBridge round-trip against test PDF (requires venv)
 
 ---
@@ -108,6 +116,11 @@ High value, protects the annotation contract that the whole app depends on.
 - [x] Cards shown for all highlights with non-empty comments
 - [x] Empty-comment highlights: no card (or minimal indicator)
 - [x] Implement Collision Avoidance (greedy algorithm to prevent overlapping cards)
+- [x] Live sidebar updates: cards appear/update/disappear on comment add/edit/delete
+- [x] SidebarUpdateDelegate protocol (AnimaPDFView → MainViewController)
+- [x] Per-page re-extraction (SidebarExtractor.extractCards(from:at:))
+- [x] Card click → highlight emphasis (light yellow + card active border)
+- [ ] Click highlight → indicate/scroll to corresponding card
 - [ ] Double-click highlight → focus jumps to card, comment becomes editable
 - [ ] Edit happens in sidebar only (no tooltips, no in-place editing)
 - [ ] Clear comment text = remove comment (keep highlight)

@@ -4,12 +4,23 @@
 //
 //  A visual representation of a single comment card in the sidebar.
 //
+//  Interaction:
+//    Clicking a card triggers the onClicked closure, which MainViewController
+//    uses to emphasize the corresponding highlight in the PDF. The card itself
+//    does not manage emphasis state — MainViewController calls setActive()
+//    and setInactive() to control the visual indication.
+//
 
 import Cocoa
 
 class CommentCardView: NSView {
 
     let card: CommentCard
+
+    /// Called when the user clicks this card. MainViewController sets this
+    /// closure when creating card views, using it to trigger highlight
+    /// emphasis in the PDF.
+    var onClicked: ((CommentCard) -> Void)?
 
     // UI Elements
     private let titleLabel: NSTextField
@@ -18,6 +29,12 @@ class CommentCardView: NSView {
 
     // Top-left origin makes layout math easier
     override var isFlipped: Bool { return true }
+
+    // --- Active state appearance ---
+    private static let activeBorderColor = NSColor.controlAccentColor
+    private static let activeBorderWidth: CGFloat = 2.0
+    private static let normalBorderColor = NSColor.separatorColor
+    private static let normalBorderWidth: CGFloat = 1.0
 
     init(card: CommentCard) {
         self.card = card
@@ -60,8 +77,8 @@ class CommentCardView: NSView {
         self.wantsLayer = true
         self.layer?.cornerRadius = 5
         self.layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
-        self.layer?.borderColor = NSColor.separatorColor.cgColor
-        self.layer?.borderWidth = 1
+        self.layer?.borderColor = CommentCardView.normalBorderColor.cgColor
+        self.layer?.borderWidth = CommentCardView.normalBorderWidth
 
         self.addSubview(titleLabel)
         self.addSubview(divider)
@@ -91,5 +108,26 @@ class CommentCardView: NSView {
             commentLabel.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -6),
             commentLabel.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -6)
         ])
+    }
+
+    // --- Active state (controlled by MainViewController) ---
+
+    /// Visually indicate that this card's highlight is currently emphasized.
+    func setActive() {
+        self.layer?.borderColor = CommentCardView.activeBorderColor.cgColor
+        self.layer?.borderWidth = CommentCardView.activeBorderWidth
+    }
+
+    /// Restore the card to its normal visual state.
+    func setInactive() {
+        self.layer?.borderColor = CommentCardView.normalBorderColor.cgColor
+        self.layer?.borderWidth = CommentCardView.normalBorderWidth
+    }
+
+    // --- Click handling ---
+
+    override func mouseDown(with event: NSEvent) {
+        super.mouseDown(with: event)
+        onClicked?(card)
     }
 }
