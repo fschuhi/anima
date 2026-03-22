@@ -13,11 +13,17 @@
 //    and re-runs the layout algorithm. All within one run loop cycle,
 //    so the user sees a single atomic visual update.
 //
-//  Highlight emphasis:
-//    Clicking a sidebar card emphasizes the corresponding highlight in the
-//    PDF by temporarily changing its color/opacity, and visually marks the
-//    card as active. Only one highlight/card pair can be emphasized at a
-//    time. Clicking the same card again clears the emphasis.
+//  Highlight emphasis (bidirectional):
+//    Clicking a sidebar card OR clicking a highlight in the PDF both
+//    trigger the same emphasis logic via applyEmphasis(to:on:cardView:).
+//    The emphasized highlight gets a light yellow color/opacity change,
+//    and the corresponding card (if any) gets an accent border.
+//
+//    Only one highlight/card pair can be emphasized at a time. Clicking
+//    the same highlight or card again clears the emphasis (toggle).
+//
+//    The emphasis state is unified with AnimaPDFView's selectedAnnotation
+//    so that the Delete key always targets the visually emphasized highlight.
 //
 
 import Cocoa
@@ -199,9 +205,42 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     func annotationsDidChange(onPageIndex pageIndex: Int) {
         // Clear emphasis — the underlying annotation may have been deleted
         // or its comment changed, so the emphasis state could be stale.
-        clearHighlightEmphasis()
+        clearEmphasis()
         rebuildPageSidebar(at: pageIndex)
         updateSidebarLayout()
+    }
+
+    func highlightWasClicked(uuid: String, onPageIndex pageIndex: Int) {
+        // Empty UUID means "clicked outside any highlight" — clear emphasis
+        if uuid.isEmpty {
+            clearEmphasis()
+            Swift.print("⚪ Emphasis cleared (clicked outside highlight)")
+            return
+        }
+
+        guard let document = pdfView.document,
+              let page = document.page(at: pageIndex) else { return }
+
+        // Find the annotation by UUID
+        guard let annot = findAnnotation(uuid: uuid, on: page) else {
+            Swift.print("⚠️  Could not find highlight for UUID \(uuid)")
+            return
+        }
+
+        // Toggle: if clicking the already-emphasized annotation, clear it
+        if annot === emphasizedAnnotation {
+            clearEmphasis()
+            Swift.print("⚪ Emphasis cleared (same highlight clicked)")
+            return
+        }
+
+        // Find the corresponding card view (may be nil if highlight has no comment)
+        let cardView = findCardView(uuid: uuid, onPageIndex: pageIndex)
+
+        // Apply emphasis to both highlight and card (if any)
+        applyEmphasis(to: annot, on: page, cardView: cardView)
+
+        Swift.print("🟡 Emphasis applied to \(uuid) on page \(pageIndex) (from PDF click)")
     }
 
     // --- Page-Sidebar Rebuild ---
@@ -233,7 +272,7 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         Swift.print("🔄 Sidebar rebuilt for page \(pageIndex): \(cards.count) card(s)")
     }
 
-    // --- Card Click → Highlight Emphasis ---
+    // --- Card Click Handler ---
 
     /// Sets up the onClicked closure for a card view. Called during initial
     /// load and after page-sidebar rebuilds.
@@ -251,62 +290,94 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
               let page = document.page(at: card.pageIndex) else { return }
 
         // Find the annotation by UUID
-        var targetAnnot: PDFAnnotation?
-        for annot in page.annotations {
-            if annot.type == "Highlight" {
-                // Check /NM first
-                if let nm = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/NM")) as? String,
-                   nm == card.uuid {
-                    targetAnnot = annot
-                    break
-                }
-                // Fallback: userName
-                if let name = annot.userName, name == card.uuid {
-                    targetAnnot = annot
-                    break
-                }
-            }
-        }
-
-        guard let annot = targetAnnot else {
+        guard let annot = findAnnotation(uuid: card.uuid, on: page) else {
             Swift.print("⚠️  Could not find highlight for card \(card.uuid)")
             return
         }
 
         // Toggle: if clicking the already-emphasized annotation, clear it
         if annot === emphasizedAnnotation {
-            clearHighlightEmphasis()
+            clearEmphasis()
             Swift.print("⚪ Emphasis cleared (same card clicked)")
             return
         }
 
-        // Clear any existing emphasis first
-        clearHighlightEmphasis()
+        // Apply emphasis to both highlight and card
+        applyEmphasis(to: annot, on: page, cardView: cardView)
 
-        // Apply highlight emphasis — save originals so we can restore later
+        Swift.print("🟡 Emphasis applied to \(card.uuid) on page \(card.pageIndex) (from card click)")
+    }
+
+    // --- Shared Emphasis Logic ---
+    // Used by both card-click and highlight-click paths.
+
+    /// Find an annotation by UUID on a specific page.
+    private func findAnnotation(uuid: String, on page: PDFPage) -> PDFAnnotation? {
+        for annot in page.annotations {
+            if annot.type == "Highlight" {
+                // Check /NM first
+                if let nm = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/NM")) as? String,
+                   nm == uuid {
+                    return annot
+                }
+                // Fallback: userName
+                if let name = annot.userName, name == uuid {
+                    return annot
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Find the CommentCardView for a given UUID on a given page.
+    /// Returns nil if no card exists (e.g. highlight has no comment).
+    private func findCardView(uuid: String, onPageIndex pageIndex: Int) -> CommentCardView? {
+        guard pageIndex < pageSidebarViews.count else { return nil }
+        let pageView = pageSidebarViews[pageIndex]
+        return pageView.cardViews.first { $0.card.uuid == uuid }
+    }
+
+    /// Apply emphasis to a highlight annotation and optionally its sidebar card.
+    /// Saves original appearance for later restoration, updates the PDF view,
+    /// and unifies with AnimaPDFView's selectedAnnotation for Delete key support.
+    ///
+    /// - Parameters:
+    ///   - annot: The PDFAnnotation to emphasize
+    ///   - page: The page the annotation lives on
+    ///   - cardView: The corresponding CommentCardView, or nil if the highlight has no comment
+    private func applyEmphasis(to annot: PDFAnnotation, on page: PDFPage, cardView: CommentCardView?) {
+        // Clear any existing emphasis first
+        clearEmphasis()
+
+        // Save originals so we can restore later
         emphasizedAnnotation = annot
         emphasizedOriginalColor = annot.color
         emphasizedOriginalOpacity = annot.value(
             forAnnotationKey: PDFAnnotationKey(rawValue: "/CA")
         ) as? CGFloat ?? AnimaPDFView.highlightOpacity
 
+        // Apply highlight emphasis
         annot.color = MainViewController.emphasisColor
         annot.setValue(MainViewController.emphasisOpacity,
                        forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
 
-        // Apply card emphasis
-        activeCardView = cardView
-        cardView.setActive()
+        // Apply card emphasis (if card exists)
+        if let cardView = cardView {
+            activeCardView = cardView
+            cardView.setActive()
+        }
+
+        // Unify with selectedAnnotation so Delete key targets the emphasized highlight
+        pdfView.selectedAnnotation = annot
+        pdfView.selectedAnnotationPage = page
 
         // Force PDF redraw
         pdfView.setNeedsDisplay(pdfView.bounds)
-
-        Swift.print("🟡 Emphasis applied to \(card.uuid) on page \(card.pageIndex)")
     }
 
     /// Restores the previously emphasized annotation and card to their
-    /// normal appearance.
-    private func clearHighlightEmphasis() {
+    /// normal appearance, and clears the selectedAnnotation state.
+    private func clearEmphasis() {
         // Restore highlight
         if let annot = emphasizedAnnotation {
             if let originalColor = emphasizedOriginalColor {
@@ -322,10 +393,15 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         // Restore card
         activeCardView?.setInactive()
 
+        // Clear emphasis state
         emphasizedAnnotation = nil
         emphasizedOriginalColor = nil
         emphasizedOriginalOpacity = nil
         activeCardView = nil
+
+        // Clear selectedAnnotation (unified with emphasis)
+        pdfView.selectedAnnotation = nil
+        pdfView.selectedAnnotationPage = nil
     }
 
     // --- Scroll Physics ---

@@ -16,7 +16,7 @@ TODO.md
 
 ### --- Build & Configuration ---
 Makefile
-pyprojet.toml
+pyproject.toml
 tools/requirements.txt
 #.editorconfig
 .gitignore

@@ -8,7 +8,8 @@
 //    - ENTER with selection → create highlight (dual-write: fitz + in-memory)
 //    - H key → toggle persistent highlight mode (mouseUp creates highlight)
 //    - Double-click on highlight → edit its comment
-//    - Single-click highlight + Delete → remove highlight
+//    - Single-click highlight → emphasize (via sidebar delegate)
+//    - Single-click highlight + Delete → remove highlighted highlight
 //
 //  Dual-write pattern:
 //    On highlight creation, we persist via fitz (anima_helper.py) AND add a
@@ -23,6 +24,10 @@
 //    page's cards. The delegate receives only the page index — the sidebar
 //    re-extracts all cards for that page from scratch.
 //
+//    Single-clicking a highlight notifies the delegate via
+//    highlightWasClicked(uuid:onPageIndex:), which triggers the shared
+//    emphasis logic (same visual effect as clicking a sidebar card).
+//
 //  NOTE: Inside a PDFView subclass, bare `print()` is ambiguous because
 //  NSView has its own print() method (send to printer). We use Swift.print()
 //  throughout to call the global console print function.
@@ -32,9 +37,11 @@ import Quartz
 
 // --- Sidebar Update Protocol ---
 // AnimaPDFView notifies its delegate after any annotation mutation so
-// the sidebar can rebuild the affected page's cards.
+// the sidebar can rebuild the affected page's cards, and after highlight
+// clicks so the sidebar can apply emphasis.
 protocol SidebarUpdateDelegate: AnyObject {
     func annotationsDidChange(onPageIndex pageIndex: Int)
+    func highlightWasClicked(uuid: String, onPageIndex pageIndex: Int)
 }
 
 class AnimaPDFView: PDFView {
@@ -47,7 +54,10 @@ class AnimaPDFView: PDFView {
     // author as cards loaded from disk on next launch.
     static let authorName = "fschuhi"
 
-    // Track which highlight is currently "selected" (for Delete key)
+    // Track which highlight is currently "selected" for Delete key.
+    // Unified with emphasis state: MainViewController sets these when
+    // emphasis is applied (from either card-click or highlight-click)
+    // and clears them when emphasis is cleared.
     var selectedAnnotation: PDFAnnotation?
     var selectedAnnotationPage: PDFPage?
 
@@ -142,7 +152,7 @@ class AnimaPDFView: PDFView {
         }
 
         if event.clickCount == 1 {
-            // Single-click: check if we hit a highlight (for selecting it)
+            // Single-click: check if we hit a highlight (for emphasis + delete)
             handleSingleClickOnHighlight(event)
             // Fall through to let PDFKit handle normally (text cursor, etc.)
         }
@@ -262,22 +272,31 @@ class AnimaPDFView: PDFView {
         return true
     }
 
-    // --- Single-click: select a highlight (for Delete) ---
+    // --- Single-click: select a highlight (for emphasis + Delete) ---
 
     func handleSingleClickOnHighlight(_ event: NSEvent) {
         guard let (page, pagePoint) = pageAndPoint(for: event) else {
+            // Clicked outside any page — notify delegate to clear emphasis
+            sidebarDelegate?.highlightWasClicked(uuid: "", onPageIndex: -1)
             selectedAnnotation = nil
             selectedAnnotationPage = nil
             return
         }
 
         if let annot = highlightAnnotation(at: pagePoint, on: page) {
-            selectedAnnotation = annot
-            selectedAnnotationPage = page
+            // Hit a highlight — notify delegate for emphasis handling.
+            // selectedAnnotation/Page will be set by MainViewController
+            // via applyEmphasis/clearEmphasis (unified with emphasis state).
             if let uuid = annotationUUID(annot) {
-                Swift.print("🔵 Selected highlight: \(uuid)")
+                if let document = self.document {
+                    let pageIndex = document.index(for: page)
+                    sidebarDelegate?.highlightWasClicked(uuid: uuid, onPageIndex: pageIndex)
+                }
+                Swift.print("🔵 Clicked highlight: \(uuid)")
             }
         } else {
+            // Clicked on page but not on a highlight — clear emphasis
+            sidebarDelegate?.highlightWasClicked(uuid: "", onPageIndex: -1)
             selectedAnnotation = nil
             selectedAnnotationPage = nil
         }
