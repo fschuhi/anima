@@ -121,17 +121,12 @@ High value, protects the annotation contract that the whole app depends on.
 - [x] Per-page re-extraction (SidebarExtractor.extractCards(from:at:))
 - [x] Card click → highlight emphasis (light yellow + card active border)
 - [ ] Click highlight → indicate/scroll to corresponding card
-- [ ] Double-click highlight → focus jumps to card, comment becomes editable
-- [ ] Edit happens in sidebar only (no tooltips, no in-place editing)
+- [ ] review remove highlight (now emphasized; which keys)
+- [ ] Undo (i.e. remove) last highlight
+- [ ] refactor input box (no buttons -- exit with write on escape; slim appearence; remember position)
 - [ ] Clear comment text = remove comment (keep highlight)
-
-### Tabs
-- [ ] Browser-style tabs in single window
-- [ ] Each tab: independent PDF + sidebar
-- [ ] Cmd+Shift+] / Cmd+Shift+[ to switch tabs
-- [ ] Ctrl+Tab mapping (for Windows muscle memory, via app or Karabiner)
-- [ ] Tab shows filename
-- [ ] Open new tab: Cmd+O or drag-drop
+- [ ] Double-click highlight → focus jumps to card, comment becomes editable (possibly deprecated -- discuss)
+- [ ] Edit happens in sidebar only (no tooltips, no in-place editing -- or stick with input box for now)
 
 ### Navigation
 - [ ] Cmd+F find (PDFKit native — may come free)
@@ -140,16 +135,16 @@ High value, protects the annotation contract that the whole app depends on.
 - [ ] Page Up / Page Down (Windows-style: one screenful)
 - [ ] Zoom via menu bar or simple widget (not pinch)
 
+---
+
+## Milestone 2: Toolchain Integration
+
 ### macOS Integration
 - [ ] Register as default PDF viewer (Info.plist CFBundleDocumentTypes)
 - [ ] Accept file open via double-click in Finder
 - [ ] Accept file open via command line argument
 - [ ] Proper .app bundle with icon
 - [ ] Resolve helper/venv paths relative to bundle (eliminate hardcoded paths)
-
----
-
-## Milestone 2: Toolchain Integration
 
 ### pdf:// URL handler (macOS native)
 - [ ] Register custom `pdf://` URL scheme
@@ -169,6 +164,14 @@ High value, protects the annotation contract that the whole app depends on.
 
 ## Milestone 3: Nice to Have (Backlog)
 
+### Tabs
+- [ ] Browser-style tabs in single window
+- [ ] Each tab: independent PDF + sidebar
+- [ ] Cmd+Shift+] / Cmd+Shift+[ to switch tabs
+- [ ] Ctrl+Tab mapping (for Windows muscle memory, via app or Karabiner)
+- [ ] Tab shows filename
+- [ ] Open new tab: Cmd+O or drag-drop
+
 ### Find
 - [ ] Regex search
 - [ ] "Find all" — highlight all matches, list in sidebar (like Excel)
@@ -186,6 +189,5 @@ High value, protects the annotation contract that the whole app depends on.
 
 - [x] Add .editorconfig (LF line endings, indentation rules)
 - [x] Add `make format` target (SwiftFormat + black)
-- [x] Update manifest.lst for Anima/Anima/ path nesting
 - [ ] Review and clean up MainMenu.xib (remove unused Font/Format/Text menus)
 - [ ] Delete HANDOVER.md (superseded by README.md)

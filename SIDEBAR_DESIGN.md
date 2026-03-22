@@ -227,12 +227,16 @@ which is the hard part.
 **Phase 2 (later):**
 
 Double-click a highlight → the corresponding card in the sidebar becomes
-**editable in-place**. The NSAlert dialog is removed.
+**editable in-place**. The NSAlert dialog would be removed.
 
-Phase 2 editing rules:
-- Double-click a highlight → card gets focus and becomes editable.
-  If the highlight has no comment, a temporary empty card appears.
-- Double-click a card → card becomes editable.
+There needs to be a longer discussion on if the in-sidebar-editing of
+cards is just a gimmick or truly necessary. Frank is leaning towards
+leaving it as (i.e. modal input box), but having changing its behavior
+(slim appearence, bigger text input area, no buttons but exit on escape,
+reappears on last position).
+
+General editing functionality (regardless if implemented in-sidebar or
+in input box):
 - **Enter** inserts a newline (multi-line comments are normal).
 - **Escape** saves and exits editing. There is no "cancel" — Escape
   always means "save what's there."
@@ -241,8 +245,13 @@ Phase 2 editing rules:
 - Editing persists via the existing dual-write pattern (fitz to disk,
   in-memory update for display).
 
-When Phase 2 is complete, `askForComment()` becomes dead code and should
-be removed.
+Phase 2 in-sidebar-editing rules (possibly deprecated):
+- Double-click a highlight → card gets focus and becomes editable.
+  If the highlight has no comment, a temporary empty card appears.
+- Double-click a card → card becomes editable.
+
+When Phase 2 is complete, `askForComment()` might become dead code and
+should then be removed.
 
 ---
 
