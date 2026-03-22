@@ -90,12 +90,14 @@ def _quads_from_json(quads_json: str):
     quads = []
     for q in items:
         x0, y0, x1, y1 = q["x0"], q["y0"], q["x1"], q["y1"]
-        quads.append(fitz.Quad(
-            fitz.Point(x0, y0),  # top-left
-            fitz.Point(x1, y0),  # top-right
-            fitz.Point(x0, y1),  # bottom-left
-            fitz.Point(x1, y1),  # bottom-right
-        ))
+        quads.append(
+            fitz.Quad(
+                fitz.Point(x0, y0),  # top-left
+                fitz.Point(x1, y0),  # top-right
+                fitz.Point(x0, y1),  # bottom-left
+                fitz.Point(x1, y1),  # bottom-right
+            )
+        )
     return quads
 
 
@@ -190,6 +192,14 @@ def cmd_edit_comment(args):
     annot.set_opacity(original_opacity)
     annot.update()
 
+    # fitz's set_info() silently ignores empty strings for "content" —
+    # the old value survives both in memory and after save. To actually
+    # clear a comment, we must write an empty PDF string "()" directly
+    # to the /Contents key via xref. This is the mechanism that makes
+    # "clear comment = remove from sidebar" work in Anima's UX.
+    if not args.comment:
+        doc.xref_set_key(annot.xref, "Contents", "()")
+
     # Ensure a popup exists (for comment visibility in other viewers)
     if not annot.has_popup:
         annot_rect = annot.rect
@@ -252,10 +262,12 @@ def main():
     p_add.add_argument(
         "--quads",
         required=True,
-        help='JSON array of quads: [{"x0":..,"y0":..,"x1":..,"y1":..}, ...]  (fitz coordinates)',
+        help='JSON array of quads: [{"x0":.."y0":.."x1":.."y1":..}, ...]  (fitz coordinates)',
     )
     p_add.add_argument("--comment", default="", help="Optional comment text")
-    p_add.add_argument("--author", default=DEFAULT_AUTHOR, help=f"Author (default: {DEFAULT_AUTHOR})")
+    p_add.add_argument(
+        "--author", default=DEFAULT_AUTHOR, help=f"Author (default: {DEFAULT_AUTHOR})"
+    )
 
     # --- edit-comment ---
     p_edit = subparsers.add_parser(
@@ -264,7 +276,9 @@ def main():
     )
     p_edit.add_argument("--file", required=True, help="Path to the PDF file")
     p_edit.add_argument("--uuid", required=True, help="UUID of the annotation to edit")
-    p_edit.add_argument("--comment", required=True, help="New comment text (empty string to remove comment)")
+    p_edit.add_argument(
+        "--comment", required=True, help="New comment text (empty string to remove comment)"
+    )
 
     # --- delete-highlight ---
     p_del = subparsers.add_parser(
@@ -286,4 +300,3 @@ def main():
 
 if __name__ == "__main__":
     main()
- 

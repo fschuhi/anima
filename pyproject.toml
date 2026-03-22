@@ -1,0 +1,15 @@
+[project]
+name = "anima"
+version = "0.1.0"
+description = "A minimal, no-frills PDF reader for annotation work"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+filterwarnings = [
+    "ignore::DeprecationWarning:importlib._bootstrap",
+    "ignore::DeprecationWarning:sys",
+]
+[tool.black]
+line-length = 100
+target-version = ["py312"]
