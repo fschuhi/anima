@@ -130,7 +130,7 @@ full details.
 | **Incremental Save** | ✅ Complete  | fitz preserves all existing annotations            |
 | **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
 | **Xcode Project** | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
-| **Sidebar** | ✅ Phase 3   | Live-updating cards, emphasis on click              |
+| **Sidebar** | ✅ Complete  | Live cards, bidirectional emphasis, scroll sync    |
 | **Tabs** | 🚧 Planned  | Multi-PDF in single window (Milestone 1)           |
 | **pdf:// URL Handler** | 🚧 Planned  | Open PDFs from Obsidian links (Milestone 2)        |
 
@@ -151,10 +151,11 @@ with collision avoidance.
 
 Key capabilities:
 - **Live updates**: Cards appear, update, or disappear immediately when comments
-  are added, edited, or deleted during a session (Phase 3).
-- **Emphasis**: Clicking a card highlights the corresponding annotation in the
-  PDF (light yellow) and marks the card with an accent border. Click again to
-  clear. No distracting leader lines.
+  are added, edited, or deleted during a session.
+- **Bidirectional emphasis**: Clicking a card emphasizes the corresponding highlight
+  in the PDF (light yellow), and clicking a highlight emphasizes the corresponding
+  card. Both directions use the same visual treatment. Emphasis is unified with
+  the Delete key target, so the user always sees which highlight will be affected.
 - **Scroll sync**: The sidebar scrolls in lockstep with the PDF.
 - **Per-page architecture**: Each PDF page has its own page-sidebar container,
   enabling efficient per-page rebuilds on mutation.
@@ -214,9 +215,11 @@ anima/
 │   ├── anima_helper.py            ← CLI: add-highlight, edit-comment, delete-highlight
 │   ├── concat_files.py            ← Filesdump generator for LLM sessions
 │   └── requirements.txt           ← Python dependencies (PyMuPDF)
+├── tests/                         ← Python tests (pytest)
+│   ├── conftest.py                ← Fixtures: test_pdf, run_helper
+│   └── test_anima_helper.py       ← 11 tests: round-trip, contracts, edge cases
 ├── data/
 │   └── input_original.pdf         ← Test PDF (unmodified backup)
-├── tests/                         ← Python tests (future)
 ├── .venv/                         ← Python virtual environment
 ├── CRITICAL_RULES.md              ← Non-negotiable collaboration rules
 ├── LLM-instructions.md            ← AI session context and conventions
@@ -224,6 +227,7 @@ anima/
 ├── TODO.md                        ← Task list with milestones
 ├── HANDOVER.md                    ← Session handover notes
 ├── Makefile                       ← Build, setup, and utility targets
+├── pyproject.toml                 ← Project metadata, pytest & black config
 ├── manifest.lst                   ← File list for filesdump generation
 ├── .editorconfig                  ← Editor settings (LF line endings, indentation)
 └── .gitignore
@@ -236,7 +240,8 @@ keyboard and mouse events. Handles highlight creation (with dual-write), persist
 highlight mode (H key toggle, mouseUp auto-highlight), comment editing via
 double-click, highlight deletion, hit-testing, and coordinate conversion from
 PDFKit space to fitz space. Defines the `SidebarUpdateDelegate` protocol and
-notifies its delegate after every annotation mutation so the sidebar stays in sync.
+notifies its delegate after every annotation mutation and highlight click so the
+sidebar stays in sync and emphasis is applied.
 
 **`AppDelegate.swift`** — Creates the window, loads the PDF, sets up the NSEvent
 monitor as a fallback for keyboard events (PDFKit's internal `PDFDocumentView`
@@ -246,9 +251,11 @@ sometimes captures keyboard focus).
 instantiates the `SidebarScrollView`, and coordinates the complex scrolling math
 and `scaleFactor` logic required to keep the sidebar perfectly synchronized with
 the PDF. Conforms to `SidebarUpdateDelegate` to handle live sidebar rebuilds on
-annotation mutation. Manages highlight emphasis state: when a sidebar card is
-clicked, the corresponding PDF highlight turns light yellow and the card gets an
-accent border.
+annotation mutation. Manages bidirectional highlight emphasis: clicking a sidebar
+card or a highlight in the PDF triggers the same shared emphasis logic, with
+toggle behavior on single-click and ensure-on behavior on double-click. Emphasis
+is unified with `selectedAnnotation` so the Delete key targets the visually
+emphasized highlight.
 
 **`SidebarExtractor.swift`** — The pure data layer for the sidebar. Scans the
 PDFDocument for highlight annotations and safely extracts their text, UUID (/NM),
@@ -264,7 +271,8 @@ resolves the Python executable from the project's `.venv`.
 
 **`anima_helper.py`** — Standalone CLI tool with three subcommands: `add-highlight`,
 `edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save
-preserves existing annotations. Tested independently from Terminal.
+preserves existing annotations. Tested with 11 pytest tests covering round-trips,
+contract verification (UUID in /NM, opacity survival), and error handling.
 
 **`CommentCardView.swift`** — The visual representation of a single annotation in
 the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based
@@ -305,6 +313,17 @@ make run      # Build + run
 make test           # Run Python tests (quiet)
 make test-verbose   # Run Python tests with output
 ```
+
+Python test suite (`tests/test_anima_helper.py`):
+- `TestAddHighlight` — basic round-trip, with-comment, multi-quad
+- `TestEditComment` — add-then-edit (with opacity survival check), clear-comment
+- `TestDeleteHighlight` — create-then-delete round-trip
+- `TestUUIDContract` — xref-level /NM verification
+- `TestIncrementalSavePreservation` — pre-existing annotations survive new writes
+- `TestErrorHandling` — invalid page, missing file, nonexistent UUID
+
+To inspect test output PDFs: `ANIMA_KEEP_TEST_OUTPUT=1 make test`
+(copies modified PDFs to `tmp/tests/` for manual inspection).
 
 Swift tests run via Xcode: **Cmd+U** or **Product → Test**.
 
@@ -361,6 +380,13 @@ When fitz calls `annot.update()`, it regenerates the annotation's appearance str
 slightly differently in PDF-XChange Viewer compared to annotations originally
 created by Viewer, even though the underlying data (color, opacity, coordinates)
 is identical. PDFKit renders them consistently regardless.
+
+### fitz Empty Content Quirk
+
+`annot.set_info()` with `info["content"] = ""` is silently ignored by fitz — the
+previous content value survives. To clear a comment, use
+`doc.xref_set_key(annot.xref, "Contents", "()")` to write an empty PDF string
+directly at the xref level. This is handled in `anima_helper.py`'s `cmd_edit_comment`.
 
 ### Background
 

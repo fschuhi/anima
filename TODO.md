@@ -65,6 +65,16 @@
       executable, and helper script. Works for development; needs proper
       path resolution for a distributable .app bundle (Milestone 1).
 
+- [!] **Clip Tools Launcher.workflow clipboard corruption**
+      A macOS Service called "Clip Tools Launcher.workflow" appears to
+      corrupt clipboard contents during paste, injecting `rm -rf` fragments
+      into pasted text. Observed when pasting Python f-strings containing
+      `!r` format specifiers into Terminal. Needs investigation:
+      — Check ~/Library/Services/ for this workflow
+      — Determine if it's a clipboard manager or a macOS Automator service
+      — Remove or disable if confirmed as the source of corruption
+      — Potentially related to Karabiner-Elements or another input tool
+
 ---
 
 ## Cosmetic / UX Improvements
@@ -82,14 +92,24 @@
 
 ## Testing
 
-### Python (anima_helper.py) — pytest
+### Python (anima_helper.py) — pytest (DONE)
+
 High value, protects the annotation contract that the whole app depends on.
-- [ ] Round-trip test: create highlight → verify with fitz → edit comment →
+- [x] Round-trip test: create highlight → verify with fitz → edit comment →
       verify → delete → verify gone (use test PDF in `data/`)
-- [ ] Edge cases: invalid page number, missing file, nonexistent UUID
-- [ ] Verify incremental save preserves existing annotations
-- [ ] Verify UUID is correctly written to /NM field
-- [ ] Verify coordinate values in stored QuadPoints match input
+- [x] Edge cases: invalid page number, missing file, nonexistent UUID
+- [x] Verify incremental save preserves existing annotations
+- [x] Verify UUID is correctly written to /NM field (xref-level check)
+- [x] Verify coordinate values in stored QuadPoints match input (multi-quad)
+- [x] Verify comment clearing works (empty string via xref_set_key)
+- [x] Verify opacity survives edit (annot.update() regression guard)
+- [x] Bug discovered and fixed: fitz set_info() ignores empty content strings
+
+Test infrastructure:
+- [x] `tests/conftest.py` — fixtures for test_pdf, run_helper
+- [x] `tests/test_anima_helper.py` — 11 tests, all passing
+- [x] `pyproject.toml` — pytest config, warning filters for SWIG deprecations
+- [x] `ANIMA_KEEP_TEST_OUTPUT=1` — optional flag to copy test PDFs to tmp/tests/
 
 ### Swift — Swift Testing (XCTest for UI)
 - [x] SidebarExtractor: golden JSON test against sidebar_basic.pdf
@@ -120,13 +140,16 @@ High value, protects the annotation contract that the whole app depends on.
 - [x] SidebarUpdateDelegate protocol (AnimaPDFView → MainViewController)
 - [x] Per-page re-extraction (SidebarExtractor.extractCards(from:at:))
 - [x] Card click → highlight emphasis (light yellow + card active border)
-- [ ] Click highlight → indicate/scroll to corresponding card
+- [x] Click highlight → emphasize highlight + activate card (bidirectional)
+- [x] Double-click → ensure emphasis + open dialog, emphasis survives rebuild
+- [x] Emphasis unified with selectedAnnotation (Delete targets emphasized highlight)
+- [ ] Scroll card into view when emphasized via highlight-click (if not visible)
 - [ ] review remove highlight (now emphasized; which keys)
 - [ ] Undo (i.e. remove) last highlight
-- [ ] refactor input box (no buttons -- exit with write on escape; slim appearence; remember position)
-- [ ] Clear comment text = remove comment (keep highlight)
-- [ ] Double-click highlight → focus jumps to card, comment becomes editable (possibly deprecated -- discuss)
-- [ ] Edit happens in sidebar only (no tooltips, no in-place editing -- or stick with input box for now)
+- [ ] Input form: custom NSPanel replacing NSAlert (see SIDEBAR_DESIGN.md Phase 4)
+- [ ] Clear comment text = remove comment (keep highlight) — backend done, needs UX wiring
+- [ ] Double-click highlight → focus jumps to card, comment becomes editable (deprecated — use input form instead)
+- [ ] Edit happens in sidebar only (deprecated — use input form instead)
 
 ### Navigation
 - [ ] Cmd+F find (PDFKit native — may come free)
@@ -191,3 +214,4 @@ High value, protects the annotation contract that the whole app depends on.
 - [x] Add `make format` target (SwiftFormat + black)
 - [ ] Review and clean up MainMenu.xib (remove unused Font/Format/Text menus)
 - [ ] Delete HANDOVER.md (superseded by README.md)
+- [ ] Update manifest.lst to include new test files (pyproject.toml, tests/)

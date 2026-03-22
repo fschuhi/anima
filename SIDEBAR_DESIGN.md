@@ -1,7 +1,7 @@
 # Anima — Sidebar Design Document
 
-**Status:** Phase 1 & 3 Implemented, Phase 2 Partial (emphasis only), Phase 4 Pending
-**Date:** 2026-03-16
+**Status:** Phase 1 & 3 Implemented, Phase 2 Done, Phase 4 Redesigned (Input Form)
+**Date:** 2026-03-22
 **Context:** This document captures design decisions for Anima's annotation
 sidebar. It is intended as a reference for future LLM conversations and for
 Frank's own planning.
@@ -35,9 +35,9 @@ makes Anima a viable replacement for PDF-XChange Viewer.
 |                   | to be positioned.                                          |
 | **Command comment** | A comment whose text is a pipeline instruction ("link",  |
 |                   | "H1", "H2", etc.) rather than a human-readable note.       |
-| **Emphasis** | The visual indication shown when a card is clicked:        |
-|                   | the corresponding highlight turns light yellow, and the    |
-|                   | card gets an accent-colored border.                        |
+| **Emphasis** | The visual indication shown when a highlight is clicked    |
+|                   | (from either PDF or sidebar): the highlight turns light    |
+|                   | yellow, and the card (if any) gets an accent border.       |
 
 ---
 
@@ -179,32 +179,58 @@ cards in all other respects.
 - When the user removes a comment (clears the text), the card disappears.
 - `""` and missing `/Contents` are treated identically.
 - The sidebar is purely comment-focused.
+- **fitz quirk:** `annot.set_info()` silently ignores empty strings for
+  the "content" field. Clearing a comment requires writing an empty PDF
+  string `"()"` directly via `doc.xref_set_key(annot.xref, "Contents", "()")`.
+  This was discovered by the `test_clear_comment` test and fixed in
+  `anima_helper.py` (2026-03-22).
 
 ---
 
 ## Interaction
 
-### Card Click → Highlight Emphasis (Implemented)
+### Bidirectional Emphasis (Implemented)
 
-Clicking a sidebar card **emphasizes** the corresponding highlight in the
+Emphasis works in both directions — from sidebar to PDF and from PDF to
+sidebar — using the same shared logic in MainViewController.
+
+**Card → Highlight (click card in sidebar):**
+Clicking a sidebar card emphasizes the corresponding highlight in the
 PDF: the highlight changes to light yellow (#FFFFE0) at higher opacity
-(0.7), and the card itself gets a 2pt accent-colored border. This provides
-a clear visual link between card and highlight without leader lines or
-other clutter.
+(0.7), and the card itself gets a 2pt accent-colored border.
 
-- Clicking the same card again clears the emphasis (toggle behavior).
+**Highlight → Card (click highlight in PDF):**
+Clicking a highlight in the PDF emphasizes it (same visual change) and
+activates the corresponding card in the sidebar (if one exists). Highlights
+without comments (no card) still get the visual emphasis — this is useful
+for identifying which highlight will be affected by the Delete key.
+
+**Shared behavior for both directions:**
+
+- Clicking the same card/highlight again clears the emphasis (toggle).
 - Only one card/highlight pair can be emphasized at a time.
-- Emphasis does not scroll the PDF — the card and highlight are always
-  in close proximity due to the anchor-based layout.
+- Emphasis is unified with `selectedAnnotation` — the Delete key always
+  targets the visually emphasized highlight.
 - When an annotation is mutated (comment edited, highlight deleted),
-  emphasis is automatically cleared.
+  emphasis is preserved through the sidebar rebuild so the user sees
+  the result of their edit.
 
-### Highlight Click → Card Indication (Planned — Phase 2 Remainder)
+**Double-click behavior:**
+Double-clicking a highlight ensures emphasis is ON (no toggle) before
+opening the comment dialog. This guarantees the user always sees which
+highlight they're editing. After saving, emphasis persists — the user
+sees the newly created/updated card with its accent border, confirming
+the edit took effect.
 
-- **Click a highlight** → the corresponding card in the sidebar is
-  visually indicated. If the card is off-screen (in a page-sidebar
-  with overflow), scroll to show it.
-- This is the reverse direction of the card-click emphasis above.
+The `toggle` parameter on `highlightWasClicked(uuid:onPageIndex:toggle:)`
+distinguishes single-click (toggle: true) from double-click (toggle: false).
+
+### Scroll Card Into View (Planned)
+
+When emphasis is applied to a card via highlight-click, and the card is
+not fully visible (in a page-sidebar with overflow), the sidebar should
+scroll to show the card. If the page-sidebar has no scrollbar (content
+fits), no scrolling is needed — the card is by definition visible.
 
 ### Leader Lines (Decided Against)
 
@@ -215,43 +241,55 @@ card ↔ highlight for the user. The anchor-based layout already keeps
 cards close to their highlights, so a connecting line adds complexity
 without proportional benefit.
 
-### Comment Editing — Phased Approach
+### Comment Editing — Input Form (Phase 4 Redesign)
 
-**Phase 1 (implemented):**
+**Decision (2026-03-22):** In-sidebar editing was considered and deferred
+indefinitely. The complexity of making cards editable in-place (temporary
+placeholder cards, dynamic height changes during editing, keyboard handling)
+does not justify the benefit over a well-designed modal input form.
 
-Double-click a highlight → the existing `askForComment()` NSAlert dialog
-appears. The sidebar displays cards as **read-only**. This phase delivers
-the full layout engine, scroll synchronization, and visual alignment —
-which is the hard part.
+The current NSAlert-based dialog will be replaced by a **custom input
+form** — a modal NSPanel styled to match the card aesthetic.
 
-**Phase 2 (later):**
+**Input Form Specification:**
 
-Double-click a highlight → the corresponding card in the sidebar becomes
-**editable in-place**. The NSAlert dialog would be removed.
+- **Type:** Custom `NSPanel`, modal, borderless (no traffic light buttons).
+  The only way to dismiss is Escape.
+- **Visual style:** Matches CommentCardView — same background color,
+  corner radius, font. Title area shows "Add comment" or "Edit comment"
+  in the same muted style as the card's date/author line. Creates visual
+  continuity between input and result.
+- **Text input:** Editable `NSTextView` (not NSTextField) for multi-line
+  support with word wrapping. Comments are often longer than they appear
+  in the test PDFs — wrapping across 2-3 lines is common.
+- **Escape to save and close:** Always saves the current text. There is
+  no "cancel" — Escape always means "save what's there." This aligns
+  with Anima's "always immediate autosave" philosophy and with Frank's
+  Excel workflow (Escape to exit cell editing).
+- **Enter for newlines:** Enter inserts a line break. No special key
+  handling for commit — Escape is the only exit.
+- **Empty comment confirmation:** If the user presses Escape with empty
+  text and the highlight previously had a comment, show a brief
+  confirmation ("Remove comment from this highlight?") before clearing.
+  This guards against accidental deletion.
+- **Initial position:** Centered on screen, with default dimensions
+  providing room for approximately 3 lines of text. Width and height
+  are defined as easily configurable constants.
+- **Resizable and draggable:** The user can drag the form to a new
+  position and resize it (wider or taller). The form is not limited
+  to its initial dimensions.
+- **Session memory:** After any move or resize, the new frame is saved
+  in memory. The next time the form opens (for any annotation), it
+  appears at the last-used position and size. This persists for the
+  session only (resets on app launch).
 
-There needs to be a longer discussion on if the in-sidebar-editing of
-cards is just a gimmick or truly necessary. Frank is leaning towards
-leaving it as (i.e. modal input box), but having changing its behavior
-(slim appearence, bigger text input area, no buttons but exit on escape,
-reappears on last position).
+**Invocation:** Double-click a highlight in the PDF (same as today).
+The emphasis is applied first (toggle: false), then the input form
+appears. After saving, emphasis persists and the sidebar shows the
+updated card.
 
-General editing functionality (regardless if implemented in-sidebar or
-in input box):
-- **Enter** inserts a newline (multi-line comments are normal).
-- **Escape** saves and exits editing. There is no "cancel" — Escape
-  always means "save what's there."
-- If the user presses Escape with empty text, the card disappears
-  (no empty cards rule).
-- Editing persists via the existing dual-write pattern (fitz to disk,
-  in-memory update for display).
-
-Phase 2 in-sidebar-editing rules (possibly deprecated):
-- Double-click a highlight → card gets focus and becomes editable.
-  If the highlight has no comment, a temporary empty card appears.
-- Double-click a card → card becomes editable.
-
-When Phase 2 is complete, `askForComment()` might become dead code and
-should then be removed.
+When the input form is implemented, `askForComment()` and its NSAlert
+become dead code and should be removed.
 
 ---
 
@@ -267,16 +305,23 @@ AnimaPDFView notifies MainViewController via the `SidebarUpdateDelegate`
 protocol. The delegate receives only the affected page index. On
 notification, MainViewController:
 
-1. Clears any active highlight emphasis (stale state after mutation)
-2. Tears down all card views for the affected page
-3. Re-extracts cards via `SidebarExtractor.extractCards(from:at:)`
-4. Rebuilds card views with click handlers
-5. Re-runs the layout algorithm
+1. Remembers the current emphasis state (UUID + page index)
+2. Clears card-side emphasis (the card view is about to be torn down)
+3. Tears down all card views for the affected page
+4. Re-extracts cards via `SidebarExtractor.extractCards(from:at:)`
+5. Rebuilds card views with click handlers
+6. Re-runs the layout algorithm
+7. Re-applies card-side emphasis if the annotation is still emphasized
 
 This "rebuild the whole page" approach is deliberately simple — no
 surgical card insertion or removal, no diffing. Pages typically have
 a handful of annotations, so the performance cost is negligible. The
 benefit is a single code path for all mutation types.
+
+The emphasis-preservation in steps 1/2/7 ensures that the double-click
+editing flow works smoothly: the user edits a comment, the sidebar
+rebuilds, and the newly created/updated card appears with its accent
+border still active.
 
 ### Mutation Points
 
@@ -331,26 +376,32 @@ on earlier ones. A phase can be split into sub-steps during implementation.
 - Title bar toggle (global initially, per-document later).
 - Sidebar scrolls in lockstep with PDF.
 
-### Phase 2: Bidirectional Navigation (PARTIAL)
+### Phase 2: Bidirectional Navigation (DONE)
 
 - [x] Click card → emphasize highlight (color/opacity change) + card
       gets active border. Toggle on re-click.
-- [ ] Click highlight → indicate/scroll to card.
+- [x] Click highlight → emphasize highlight + activate card (if any).
+      Toggle on re-click. Unified with selectedAnnotation for Delete.
+- [x] Double-click highlight → ensure emphasis (no toggle) + open
+      comment dialog. Emphasis survives sidebar rebuild after edit.
+- [ ] Scroll card into view when emphasis applied via highlight-click
+      and card is not fully visible.
 
 ### Phase 3: Live Updates (DONE)
 
 - SidebarUpdateDelegate protocol: AnimaPDFView → MainViewController.
 - Per-page re-extraction via SidebarExtractor.extractCards(from:at:).
 - Sidebar rebuilds affected page on comment add/edit/delete.
-- Emphasis auto-clears on mutation (prevents stale state).
+- Emphasis preserved through rebuilds (UUID remembered, card re-activated).
 
-### Phase 4: In-Place Editing
+### Phase 4: Input Form (Planned — replaces in-place editing)
 
-- Double-click highlight or card → card becomes editable.
-- Enter = newline, Escape = save and exit.
-- Empty text on Escape = card removed.
-- Temporary empty card for highlights without comments.
-- Remove `askForComment()` and the NSAlert dialog.
+- Custom NSPanel styled to match card aesthetic.
+- Modal, borderless, Escape to save, Enter for newlines.
+- Resizable, draggable, session-remembered geometry.
+- Empty-comment confirmation before clearing.
+- Replaces `askForComment()` / NSAlert.
+- See "Comment Editing — Input Form" section for full specification.
 
 ---
 
@@ -383,6 +434,15 @@ value. PDFKit appears to transform the coordinates, effectively returning
 values. When creating new test fixtures, always use the values printed by
 the `💡 Extracted Anchor Y` diagnostic lines on first test run.
 
+### fitz set_info() Ignores Empty Strings
+
+`annot.set_info(info)` with `info["content"] = ""` is silently ignored by
+fitz — the old content value survives both in memory and after save. To
+clear a comment, use `doc.xref_set_key(annot.xref, "Contents", "()")` to
+write an empty PDF string directly at the xref level. This is implemented
+in `anima_helper.py`'s `cmd_edit_comment` and verified by
+`test_clear_comment` in the Python test suite.
+
 ---
 
 ## Open Questions
@@ -412,3 +472,4 @@ The sidebar deliberately does **not** support:
 - Thumbnail or minimap views
 - Filtering or searching within the sidebar
 - Leader lines (decided against — see Interaction section)
+- In-sidebar editing (decided against — see Comment Editing section)

@@ -21,9 +21,16 @@
 //
 //    Only one highlight/card pair can be emphasized at a time. Clicking
 //    the same highlight or card again clears the emphasis (toggle).
+//    Double-clicking ensures emphasis is on (no toggle) before opening
+//    the comment dialog.
 //
 //    The emphasis state is unified with AnimaPDFView's selectedAnnotation
 //    so that the Delete key always targets the visually emphasized highlight.
+//
+//    Emphasis survives sidebar rebuilds after annotation mutations (e.g.
+//    after editing a comment via double-click). The UUID of the emphasized
+//    annotation is remembered, and emphasis is re-applied to the (possibly
+//    rebuilt) card after the rebuild completes.
 //
 
 import Cocoa
@@ -116,6 +123,12 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     private var emphasizedOriginalOpacity: CGFloat?
     private var activeCardView: CommentCardView?
 
+    // UUID of the currently emphasized annotation. Used to re-apply emphasis
+    // after sidebar rebuilds (the card views are torn down and recreated,
+    // so activeCardView becomes stale — but the UUID survives).
+    private var emphasizedUUID: String?
+    private var emphasizedPageIndex: Int?
+
     // Emphasis appearance — light yellow (#FFFFE0) at higher opacity
     private static let emphasisColor = NSColor(red: 1.0, green: 1.0, blue: 0.878, alpha: 1.0)
     private static let emphasisOpacity: CGFloat = 0.7
@@ -203,14 +216,33 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     // --- SidebarUpdateDelegate ---
 
     func annotationsDidChange(onPageIndex pageIndex: Int) {
-        // Clear emphasis — the underlying annotation may have been deleted
-        // or its comment changed, so the emphasis state could be stale.
-        clearEmphasis()
+        // Remember emphasis state before rebuild — the card views will be
+        // destroyed and recreated, but the PDF annotation and UUID survive.
+        let preserveUUID = emphasizedUUID
+        let preservePageIndex = emphasizedPageIndex
+
+        // Clear card-side emphasis (the card view is about to be torn down).
+        // Keep the PDF-side emphasis intact — the annotation object survives
+        // the rebuild, so we don't need to save/restore its color.
+        activeCardView?.setInactive()
+        activeCardView = nil
+
         rebuildPageSidebar(at: pageIndex)
         updateSidebarLayout()
+
+        // Re-apply card-side emphasis if the annotation is still emphasized.
+        // This handles the double-click flow: user edits a comment, sidebar
+        // rebuilds, and the newly created/updated card should show as active.
+        if let uuid = preserveUUID, let pi = preservePageIndex {
+            if let cardView = findCardView(uuid: uuid, onPageIndex: pi) {
+                activeCardView = cardView
+                cardView.setActive()
+                Swift.print("🟡 Emphasis re-applied to card after rebuild: \(uuid)")
+            }
+        }
     }
 
-    func highlightWasClicked(uuid: String, onPageIndex pageIndex: Int) {
+    func highlightWasClicked(uuid: String, onPageIndex pageIndex: Int, toggle: Bool) {
         // Empty UUID means "clicked outside any highlight" — clear emphasis
         if uuid.isEmpty {
             clearEmphasis()
@@ -227,10 +259,14 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
             return
         }
 
-        // Toggle: if clicking the already-emphasized annotation, clear it
+        // Toggle mode (single-click): if clicking the already-emphasized
+        // annotation, clear it. Non-toggle mode (double-click): if already
+        // emphasized on this annotation, it's a no-op.
         if annot === emphasizedAnnotation {
-            clearEmphasis()
-            Swift.print("⚪ Emphasis cleared (same highlight clicked)")
+            if toggle {
+                clearEmphasis()
+                Swift.print("⚪ Emphasis cleared (same highlight clicked)")
+            }
             return
         }
 
@@ -238,9 +274,9 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         let cardView = findCardView(uuid: uuid, onPageIndex: pageIndex)
 
         // Apply emphasis to both highlight and card (if any)
-        applyEmphasis(to: annot, on: page, cardView: cardView)
+        applyEmphasis(to: annot, on: page, uuid: uuid, pageIndex: pageIndex, cardView: cardView)
 
-        Swift.print("🟡 Emphasis applied to \(uuid) on page \(pageIndex) (from PDF click)")
+        Swift.print("🟡 Emphasis applied to \(uuid) on page \(pageIndex)")
     }
 
     // --- Page-Sidebar Rebuild ---
@@ -303,7 +339,7 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         }
 
         // Apply emphasis to both highlight and card
-        applyEmphasis(to: annot, on: page, cardView: cardView)
+        applyEmphasis(to: annot, on: page, uuid: card.uuid, pageIndex: card.pageIndex, cardView: cardView)
 
         Swift.print("🟡 Emphasis applied to \(card.uuid) on page \(card.pageIndex) (from card click)")
     }
@@ -344,8 +380,10 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     /// - Parameters:
     ///   - annot: The PDFAnnotation to emphasize
     ///   - page: The page the annotation lives on
+    ///   - uuid: The annotation's UUID (stored for surviving sidebar rebuilds)
+    ///   - pageIndex: The page index (stored for surviving sidebar rebuilds)
     ///   - cardView: The corresponding CommentCardView, or nil if the highlight has no comment
-    private func applyEmphasis(to annot: PDFAnnotation, on page: PDFPage, cardView: CommentCardView?) {
+    private func applyEmphasis(to annot: PDFAnnotation, on page: PDFPage, uuid: String, pageIndex: Int, cardView: CommentCardView?) {
         // Clear any existing emphasis first
         clearEmphasis()
 
@@ -355,6 +393,10 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         emphasizedOriginalOpacity = annot.value(
             forAnnotationKey: PDFAnnotationKey(rawValue: "/CA")
         ) as? CGFloat ?? AnimaPDFView.highlightOpacity
+
+        // Remember UUID/page for surviving sidebar rebuilds
+        emphasizedUUID = uuid
+        emphasizedPageIndex = pageIndex
 
         // Apply highlight emphasis
         annot.color = MainViewController.emphasisColor
@@ -398,6 +440,8 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         emphasizedOriginalColor = nil
         emphasizedOriginalOpacity = nil
         activeCardView = nil
+        emphasizedUUID = nil
+        emphasizedPageIndex = nil
 
         // Clear selectedAnnotation (unified with emphasis)
         pdfView.selectedAnnotation = nil
