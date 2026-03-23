@@ -237,6 +237,7 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
             if let cardView = findCardView(uuid: uuid, onPageIndex: pi) {
                 activeCardView = cardView
                 cardView.setActive()
+                scrollCardIntoViewIfNeeded(cardView)
                 Swift.print("🟡 Emphasis re-applied to card after rebuild: \(uuid)")
             }
         }
@@ -407,6 +408,7 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         if let cardView = cardView {
             activeCardView = cardView
             cardView.setActive()
+            scrollCardIntoViewIfNeeded(cardView)
         }
 
         // Unify with selectedAnnotation so Delete key targets the emphasized highlight
@@ -446,6 +448,15 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         // Clear selectedAnnotation (unified with emphasis)
         pdfView.selectedAnnotation = nil
         pdfView.selectedAnnotationPage = nil
+    }
+
+    // --- Scroll Support ---
+
+    /// Scrolls the page-sidebar's local scroll view to ensure the given card
+    /// is fully visible. If the card is already visible (or the page-sidebar
+    /// has no overflow), this is a no-op.
+    private func scrollCardIntoViewIfNeeded(_ cardView: CommentCardView) {
+        cardView.scrollToVisible(cardView.bounds)
     }
 
     // --- Scroll Physics ---
