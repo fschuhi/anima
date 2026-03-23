@@ -2,8 +2,8 @@
 //  CommentInputPanel.swift
 //  Anima
 //
-//  A modal input panel for adding/editing highlight comments. Replaces the
-//  NSAlert-based askForComment() dialog with a proper multi-line text editor.
+//  A modal input panel for adding/editing highlight comments.
+//  Replaces the NSAlert-based askForComment() dialog with a proper multi-line text editor.
 //
 //  Design philosophy (modal-by-conviction):
 //    This panel is deliberately modal. Editing a comment is a focused act:
@@ -21,9 +21,9 @@
 //    The native traffic light buttons are hidden; Escape is the only exit.
 //
 //  Session geometry:
-//    TODO: Save panel frame after dismissal and restore on next invocation.
-//    Deferred — needs investigation into NSPanel/NSWindow frame lifecycle
-//    to understand why setFrame is ignored before runModal.
+//    The panel remembers its position and size after dismissal and restores
+//    it on the next invocation. This persists for the session only (resets
+//    on app launch) to prevent crosstalk between multiple Anima instances.
 //
 //  Usage:
 //    let newComment = CommentInputPanel.showModal(existingText: "old comment")
@@ -39,6 +39,9 @@ import Cocoa
 
 class CommentInputPanel: NSPanel {
 
+    // --- Session Geometry ---
+    private static var lastFrame: NSRect?
+
     // --- Layout constants (easily tunable) ---
     private static let defaultWidth: CGFloat = 420
     private static let defaultHeight: CGFloat = 120
@@ -49,6 +52,7 @@ class CommentInputPanel: NSPanel {
     private static let titleFont = NSFont.systemFont(ofSize: 9, weight: .medium)
     private static let titleColor = NSColor.secondaryLabelColor
     private static let commentFont = NSFont.systemFont(ofSize: 11)
+
     private static let internalPadding: CGFloat = 6
     private static let dividerTopSpacing: CGFloat = 4
     private static let dividerBottomSpacing: CGFloat = 4
@@ -69,22 +73,42 @@ class CommentInputPanel: NSPanel {
     /// - Parameter existingText: Pre-populated text for editing (empty for new comments)
     /// - Returns: The text content at the time of dismissal
     static func showModal(existingText: String = "") -> String {
-        let panel = CommentInputPanel(existingText: existingText)
+        // Pass the saved frame into the initializer so AppKit builds it at the right coordinates
+        let panel = CommentInputPanel(existingText: existingText, savedFrame: lastFrame)
+
+        // Force the window onto the screen BEFORE calling runModal.
+        // If runModal is called on a hidden window, AppKit automatically centers it,
+        // ignoring our carefully calculated geometry.
+        panel.makeKeyAndOrderFront(nil)
+
         NSApp.runModal(for: panel)
+
         let result = panel.textView.string
+
+        // Save the frame BEFORE ordering out, while the window is still fully valid on screen.
+        lastFrame = panel.frame
+
         panel.orderOut(nil)
         return result
     }
 
     // --- Initialization ---
 
-    private init(existingText: String) {
-        // Calculate initial frame centered on screen
-        let contentRect = CommentInputPanel.centeredRect()
+    private init(existingText: String, savedFrame: NSRect?) {
+        let styleMask: NSWindow.StyleMask = [.titled, .resizable, .fullSizeContentView]
+        let contentRect: NSRect
+
+        // If we have a saved frame, convert it to a content rect so AppKit doesn't
+        // fight us or snap the window back to the center.
+        if let frame = savedFrame {
+            contentRect = NSWindow.contentRect(forFrameRect: frame, styleMask: styleMask)
+        } else {
+            contentRect = CommentInputPanel.centeredRect()
+        }
 
         super.init(
             contentRect: contentRect,
-            styleMask: [.titled, .resizable, .fullSizeContentView],
+            styleMask: styleMask,
             backing: .buffered,
             defer: false
         )
