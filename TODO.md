@@ -143,13 +143,12 @@ Test infrastructure:
 - [x] Click highlight → emphasize highlight + activate card (bidirectional)
 - [x] Double-click → ensure emphasis + open dialog, emphasis survives rebuild
 - [x] Emphasis unified with selectedAnnotation (Delete targets emphasized highlight)
-- [ ] Scroll card into view when emphasized via highlight-click (if not visible)
+- [x] Scroll card into view when emphasized via highlight-click (if not visible)
 - [ ] review remove highlight (now emphasized; which keys)
 - [ ] Undo (i.e. remove) last highlight
-- [ ] Input form: custom NSPanel replacing NSAlert (see SIDEBAR_DESIGN.md Phase 4)
+- [x] Input form: custom NSPanel replacing NSAlert (CommentInputPanel.swift)
+- [ ] Input form: session-remembered geometry (deferred — needs NSPanel frame lifecycle investigation)
 - [ ] Clear comment text = remove comment (keep highlight) — backend done, needs UX wiring
-- [ ] Double-click highlight → focus jumps to card, comment becomes editable (deprecated — use input form instead)
-- [ ] Edit happens in sidebar only (deprecated — use input form instead)
 
 ### Navigation
 - [ ] Cmd+F find (PDFKit native — may come free)

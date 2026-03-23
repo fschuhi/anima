@@ -7,7 +7,7 @@
 //  Current capabilities:
 //    - ENTER with selection → create highlight (dual-write: fitz + in-memory)
 //    - H key → toggle persistent highlight mode (mouseUp creates highlight)
-//    - Double-click on highlight → ensure emphasis + edit comment
+//    - Double-click on highlight → ensure emphasis + edit comment via CommentInputPanel
 //    - Single-click highlight → toggle emphasis
 //    - Delete key → remove the currently emphasized highlight
 //
@@ -258,9 +258,8 @@ class AnimaPDFView: PDFView {
         Swift.print("🖱️  Double-clicked highlight: \(uuid)")
         Swift.print("   Existing comment: \(existingComment.isEmpty ? "(none)" : existingComment)")
 
-        // Show the modal input panel (replaces the old NSAlert-based askForComment).
-        // The panel always returns a string — there is no "cancel". Escape saves
-        // whatever text is in the editor, including empty text.
+        // Show the modal input panel. The panel always returns a string —
+        // there is no "cancel". Escape saves whatever text is in the editor.
         isShowingDialog = true
         let newComment = CommentInputPanel.showModal(existingText: existingComment)
         isShowingDialog = false
@@ -369,32 +368,6 @@ class AnimaPDFView: PDFView {
         return success
     }
 
-    // --- Comment dialog (DEPRECATED — replaced by CommentInputPanel) ---
-    // Kept temporarily for reference. Will be removed in Step 5 cleanup.
-
-    func askForComment(existingText: String = "") -> String? {
-        let alert = NSAlert()
-        alert.messageText = existingText.isEmpty ? "Add comment" : "Edit comment"
-        alert.informativeText = "Enter a comment for this highlight (or leave empty):"
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Cancel")
-
-        let textField = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-        textField.stringValue = existingText
-        textField.placeholderString = "Optional comment..."
-        alert.accessoryView = textField
-        alert.window.initialFirstResponder = textField
-
-        isShowingDialog = true
-        let response = alert.runModal()
-        isShowingDialog = false
-
-        if response == .alertFirstButtonReturn {
-            return textField.stringValue
-        }
-        return nil
-    }
-
     // --- Highlight creation (dual-write) ---
 
     func createHighlightFromSelection() -> Bool {
@@ -488,7 +461,7 @@ class AnimaPDFView: PDFView {
 
             // Notify sidebar — currently a no-op since highlights start without
             // comments (no card to show), but this ensures the sidebar stays
-            // correct if we ever change the default or add Phase 4 in-place editing.
+            // correct if we ever change the default or add in-place editing.
             sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)
         }
 

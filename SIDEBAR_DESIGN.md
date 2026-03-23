@@ -1,7 +1,7 @@
 # Anima — Sidebar Design Document
 
-**Status:** Phase 1 & 3 Implemented, Phase 2 Done, Phase 4 Redesigned (Input Form)
-**Date:** 2026-03-22
+**Status:** Phases 1–4 Implemented (Phase 4 session geometry deferred)
+**Date:** 2026-03-23
 **Context:** This document captures design decisions for Anima's annotation
 sidebar. It is intended as a reference for future LLM conversations and for
 Frank's own planning.
@@ -384,7 +384,7 @@ on earlier ones. A phase can be split into sub-steps during implementation.
       Toggle on re-click. Unified with selectedAnnotation for Delete.
 - [x] Double-click highlight → ensure emphasis (no toggle) + open
       comment dialog. Emphasis survives sidebar rebuild after edit.
-- [ ] Scroll card into view when emphasis applied via highlight-click
+- [x] Scroll card into view when emphasis applied via highlight-click
       and card is not fully visible.
 
 ### Phase 3: Live Updates (DONE)
@@ -394,14 +394,17 @@ on earlier ones. A phase can be split into sub-steps during implementation.
 - Sidebar rebuilds affected page on comment add/edit/delete.
 - Emphasis preserved through rebuilds (UUID remembered, card re-activated).
 
-### Phase 4: Input Form (Planned — replaces in-place editing)
+### Phase 4: Input Form (DONE — session geometry deferred)
 
-- Custom NSPanel styled to match card aesthetic.
-- Modal, borderless, Escape to save, Enter for newlines.
-- Resizable, draggable, session-remembered geometry.
-- Empty-comment confirmation before clearing.
-- Replaces `askForComment()` / NSAlert.
-- See "Comment Editing — Input Form" section for full specification.
+- [x] Custom NSPanel styled to match card aesthetic (CommentInputPanel.swift).
+- [x] Modal, Escape to save, Enter for newlines.
+- [x] Resizable, draggable (isMovableByWindowBackground + native title bar).
+- [x] Traffic light buttons hidden; Escape is the only exit.
+- [x] Custom title label ("Add comment" / "Edit comment") in card style.
+- [x] `askForComment()` / NSAlert removed.
+- [ ] Session-remembered geometry (deferred — needs NSPanel frame lifecycle
+      investigation; static var approach failed to restore position).
+- [ ] Empty-comment confirmation before clearing.
 
 ---
 

@@ -20,6 +20,18 @@ in a macOS-native toolchain that flows from PDF → highlights → Obsidian note
   extraction pipeline and the `pdf://` URL scheme for Obsidian integration.
 - **Single user**: Built for Frank. Configuration in code, not preferences dialogs.
 
+**Design Philosophy — Modality and Focus:**
+
+Anima treats modality as a feature, not a limitation. When the user edits a
+comment, a modal input panel enforces focus on that single annotation. There is
+no cancel — Escape always saves. This reflects a deeper principle: PDF annotations
+in Anima are a *scratchpad*. The real intellectual work happens outside the PDF,
+in Obsidian's Zettelkasten ("The Studio"). Highlights and comments are raw
+material to be developed into idea notes, not polished artifacts in their own
+right. This means Anima can and should force simplicity — one highlight, one
+comment, one action at a time. Complexity belongs in the knowledge management
+layer, not in the reading layer.
+
 **What Anima Does NOT Do:**
 
 Print, sign, fill forms, edit PDF content, draw, stamp, redact, PDF/A compliance,
@@ -125,7 +137,7 @@ full details.
 | **Text Selection** | ✅ Complete  | Drag to select, per-line quad extraction           |
 | **Highlight Creation** | ✅ Complete  | ENTER with selection, dual-write, no reload        |
 | **Persistent Highlight** | ✅ Complete  | H key toggles mode; mouseUp = instant highlight    |
-| **Comment Dialog** | ✅ Complete  | Double-click highlight to add/edit comment         |
+| **Comment Editing** | ✅ Complete  | Modal input panel (CommentInputPanel), card-styled |
 | **Highlight Deletion** | ✅ Complete  | Click + Delete key, dual-write removal             |
 | **Incremental Save** | ✅ Complete  | fitz preserves all existing annotations            |
 | **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
@@ -206,6 +218,7 @@ anima/
 │   │   ├── MainViewController.swift← NSSplitView layout, sidebar sync & emphasis
 │   │   ├── SidebarExtractor.swift  ← Parses annotations into sidebar CommentCard structs
 │   │   ├── CommentCardView.swift   ← Custom NSView for rendering sidebar cards
+│   │   ├── CommentInputPanel.swift ← Modal comment editor (replaces NSAlert)
 │   │   ├── Assets.xcassets/        ← App icon and colors
 │   │   └── Base.lproj/            ← MainMenu.xib (menu bar)
 │   ├── Anima.xcodeproj/           ← Xcode project file
@@ -238,7 +251,8 @@ anima/
 **`AnimaPDFView.swift`** — The core of the app. Subclasses `PDFView` to intercept
 keyboard and mouse events. Handles highlight creation (with dual-write), persistent
 highlight mode (H key toggle, mouseUp auto-highlight), comment editing via
-double-click, highlight deletion, hit-testing, and coordinate conversion from
+double-click (delegating to `CommentInputPanel`), highlight deletion, hit-testing,
+and coordinate conversion from
 PDFKit space to fitz space. Defines the `SidebarUpdateDelegate` protocol and
 notifies its delegate after every annotation mutation and highlight click so the
 sidebar stays in sync and emphasis is applied.
@@ -280,6 +294,13 @@ on the length of the comment text. Handles all visual styling, including the mut
 typography applied to structural pipeline commands (e.g., `link` or `H2`). Reports
 clicks via an `onClicked` closure and supports active/inactive visual states for
 the emphasis feature.
+
+**`CommentInputPanel.swift`** — A modal `NSPanel` for adding and editing highlight
+comments. Replaces the previous `NSAlert`-based dialog with a proper multi-line
+text editor (`NSTextView`). Styled to match `CommentCardView` — same background
+color, corner radius, fonts, and color palette. Escape saves and closes (no cancel),
+Enter inserts newlines. The panel is resizable and draggable. Each invocation
+creates a fresh instance; the panel is not reused across calls.
 
 ---
 
