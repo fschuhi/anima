@@ -6,9 +6,10 @@
 //
 //  Interaction:
 //    Clicking a card triggers the onClicked closure, which MainViewController
-//    uses to emphasize the corresponding highlight in the PDF. The card itself
-//    does not manage emphasis state — MainViewController calls setActive()
-//    and setInactive() to control the visual indication.
+//    uses to emphasize the corresponding highlight in the PDF.
+//    Double-clicking triggers onDoubleClicked, used to open the edit dialog.
+//    The card itself does not manage emphasis state — MainViewController calls
+//    setActive() and setInactive() to control the visual indication.
 //
 
 import Cocoa
@@ -17,10 +18,11 @@ class CommentCardView: NSView {
 
     let card: CommentCard
 
-    /// Called when the user clicks this card. MainViewController sets this
-    /// closure when creating card views, using it to trigger highlight
-    /// emphasis in the PDF.
+    /// Called when the user single-clicks this card.
     var onClicked: ((CommentCard) -> Void)?
+
+    /// Called when the user double-clicks this card.
+    var onDoubleClicked: ((CommentCard) -> Void)?
 
     // UI Elements
     private let titleLabel: NSTextField
@@ -128,6 +130,10 @@ class CommentCardView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         super.mouseDown(with: event)
-        onClicked?(card)
+        if event.clickCount == 2 {
+            onDoubleClicked?(card)
+        } else if event.clickCount == 1 {
+            onClicked?(card)
+        }
     }
 }

@@ -7,7 +7,7 @@
 //  Current capabilities:
 //    - ENTER with selection → create highlight (dual-write: fitz + in-memory)
 //    - H key → toggle persistent highlight mode (mouseUp creates highlight)
-//    - Double-click on highlight → ensure emphasis + edit comment via CommentInputPanel
+//    - Double-click on highlight (or card via delegate) → edit comment via CommentInputPanel
 //    - Single-click highlight → toggle emphasis
 //    - Delete key → remove the currently emphasized highlight
 //
@@ -32,6 +32,7 @@
 //  NOTE: Inside a PDFView subclass, bare `print()` is ambiguous because
 //  NSView has its own print() method (send to printer). We use Swift.print()
 //  throughout to call the global console print function.
+//
 
 import Cocoa
 import Quartz
@@ -229,7 +230,7 @@ class AnimaPDFView: PDFView {
         return nil
     }
 
-    // --- Double-click: edit comment on existing highlight ---
+    // --- Double-click / Edit Comment Logic ---
 
     func handleDoubleClickOnHighlight(_ event: NSEvent) -> Bool {
         guard let (page, pagePoint) = pageAndPoint(for: event) else {
@@ -253,9 +254,18 @@ class AnimaPDFView: PDFView {
             sidebarDelegate?.highlightWasClicked(uuid: uuid, onPageIndex: pageIndex, toggle: false)
         }
 
+        editComment(for: annot, uuid: uuid, on: page)
+
+        return true
+    }
+
+    /// Public method to edit an annotation's comment. Called both internally
+    /// by double-clicks on the PDF canvas, and externally by the sidebar when
+    /// a card is double-clicked.
+    func editComment(for annot: PDFAnnotation, uuid: String, on page: PDFPage) {
         let existingComment = annot.contents ?? ""
 
-        Swift.print("🖱️  Double-clicked highlight: \(uuid)")
+        Swift.print("🖱️  Editing comment: \(uuid)")
         Swift.print("   Existing comment: \(existingComment.isEmpty ? "(none)" : existingComment)")
 
         // Show the modal input panel. The panel always returns a string —
@@ -267,10 +277,10 @@ class AnimaPDFView: PDFView {
         // If the comment didn't change, skip the fitz write and sidebar rebuild.
         if newComment == existingComment {
             Swift.print("ℹ️  Comment unchanged, skipping save")
-            return true
+            return
         }
 
-        guard let documentURL = self.document?.documentURL else { return true }
+        guard let documentURL = self.document?.documentURL else { return }
 
         let success = FitzBridge.editComment(
             helperPath: helperPath,
@@ -293,8 +303,6 @@ class AnimaPDFView: PDFView {
                 sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)
             }
         }
-
-        return true
     }
 
     // --- Single-click: toggle emphasis on highlight ---
@@ -477,7 +485,7 @@ class AnimaPDFView: PDFView {
     /// Fields set here must match what anima_helper.py writes via fitz:
     ///   - bounds, QuadPoints, color, opacity  (geometry + appearance)
     ///   - /NM                                  (UUID for identification)
-    ///   - userName                              (backup UUID for hit-testing)
+    ///   - userName                             (backup UUID for hit-testing)
     ///   - /T                                   (author for sidebar cards)
     ///   - contents                             (comment text)
     ///

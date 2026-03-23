@@ -183,7 +183,7 @@ Test infrastructure:
 ## Milestone 3: Nice to Have (Backlog)
 
 ### Sidebar (comment cards)
-- [ ] Input form: session-remembered geometry (deferred — needs NSPanel frame lifecycle investigation)
+- [x] Input form: session-remembered geometry (deferred — needs NSPanel frame lifecycle investigation)
 - [ ] review remove highlight (now emphasized; which keys)
 - [ ] Undo (i.e. remove) last highlight
 

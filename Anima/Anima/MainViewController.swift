@@ -96,7 +96,6 @@ class PageSidebarView: NSScrollView {
 // --- Custom Sidebar Scroll View ---
 class SidebarScrollView: NSScrollView {
     weak var targetScrollView: NSScrollView?
-
     override func scrollWheel(with event: NSEvent) {
         if let target = targetScrollView {
             target.scrollWheel(with: event)
@@ -122,7 +121,6 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     private var emphasizedOriginalColor: NSColor?
     private var emphasizedOriginalOpacity: CGFloat?
     private var activeCardView: CommentCardView?
-
     // UUID of the currently emphasized annotation. Used to re-apply emphasis
     // after sidebar rebuilds (the card views are torn down and recreated,
     // so activeCardView becomes stale — but the UUID survives).
@@ -311,15 +309,19 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
 
     // --- Card Click Handler ---
 
-    /// Sets up the onClicked closure for a card view. Called during initial
-    /// load and after page-sidebar rebuilds.
+    /// Sets up the onClicked and onDoubleClicked closures for a card view.
+    /// Called during initial load and after page-sidebar rebuilds.
     private func wireCardClickHandler(_ cardView: CommentCardView) {
         cardView.onClicked = { [weak self] card in
             self?.handleCardClicked(card, fromCardView: cardView)
         }
+
+        cardView.onDoubleClicked = { [weak self] card in
+            self?.handleCardDoubleClicked(card, fromCardView: cardView)
+        }
     }
 
-    /// Responds to a sidebar card being clicked: emphasizes the corresponding
+    /// Responds to a sidebar card being single-clicked: emphasizes the corresponding
     /// highlight in the PDF and marks the card as active. Clicking the same
     /// card again clears the emphasis.
     private func handleCardClicked(_ card: CommentCard, fromCardView cardView: CommentCardView) {
@@ -343,6 +345,25 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         applyEmphasis(to: annot, on: page, uuid: card.uuid, pageIndex: card.pageIndex, cardView: cardView)
 
         Swift.print("🟡 Emphasis applied to \(card.uuid) on page \(card.pageIndex) (from card click)")
+    }
+
+    /// Responds to a sidebar card being double-clicked: ensures emphasis is ON,
+    /// then delegates to AnimaPDFView to open the comment editor.
+    private func handleCardDoubleClicked(_ card: CommentCard, fromCardView cardView: CommentCardView) {
+        guard let document = pdfView.document,
+              let page = document.page(at: card.pageIndex) else { return }
+
+        // Find the annotation by UUID
+        guard let annot = findAnnotation(uuid: card.uuid, on: page) else {
+            Swift.print("⚠️  Could not find highlight for card \(card.uuid)")
+            return
+        }
+
+        // Ensure emphasis is on before opening the dialog (no toggle)
+        applyEmphasis(to: annot, on: page, uuid: card.uuid, pageIndex: card.pageIndex, cardView: cardView)
+
+        // Trigger the edit flow in AnimaPDFView
+        pdfView.editComment(for: annot, uuid: card.uuid, on: page)
     }
 
     // --- Shared Emphasis Logic ---
