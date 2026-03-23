@@ -258,8 +258,16 @@ class AnimaPDFView: PDFView {
         Swift.print("🖱️  Double-clicked highlight: \(uuid)")
         Swift.print("   Existing comment: \(existingComment.isEmpty ? "(none)" : existingComment)")
 
-        guard let newComment = askForComment(existingText: existingComment) else {
-            Swift.print("⚠️  Edit cancelled")
+        // Show the modal input panel (replaces the old NSAlert-based askForComment).
+        // The panel always returns a string — there is no "cancel". Escape saves
+        // whatever text is in the editor, including empty text.
+        isShowingDialog = true
+        let newComment = CommentInputPanel.showModal(existingText: existingComment)
+        isShowingDialog = false
+
+        // If the comment didn't change, skip the fitz write and sidebar rebuild.
+        if newComment == existingComment {
+            Swift.print("ℹ️  Comment unchanged, skipping save")
             return true
         }
 
@@ -361,7 +369,8 @@ class AnimaPDFView: PDFView {
         return success
     }
 
-    // --- Comment dialog ---
+    // --- Comment dialog (DEPRECATED — replaced by CommentInputPanel) ---
+    // Kept temporarily for reference. Will be removed in Step 5 cleanup.
 
     func askForComment(existingText: String = "") -> String? {
         let alert = NSAlert()
