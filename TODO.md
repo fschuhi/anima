@@ -48,10 +48,15 @@
       — If unfixable at the data level, consider runtime color adjustment
         in PDFKit (intercept rendering, modify annotation display properties)
 
-- [!] **In-memory highlight has no popup indicator (yellow square)**
+- [x] **In-memory highlight has no popup indicator (yellow square)**
       The fitz-written annotation includes a popup annotation; the in-memory
       PDFAnnotation does not. After app restart, the popup appears (loaded
-      from disk). Low priority — the sidebar replaces this indicator entirely.
+      from disk). Low priority — the sidebar replaces this indicator entirely...
+
+- [!] ... BUT: It seems it's really difficult to reduce the size of the the
+      popup indicators, and it's also impossible to remove them without
+      removing the comments. Hacks like trying to position the popup somewhere
+      outside the visible screen area doesn't work either.
 
 - [!] **annot.update() regenerates appearance stream**
       When fitz calls `annot.update()`, it regenerates the annotation's
@@ -80,6 +85,7 @@
 ## Cosmetic / UX Improvements
 
 - [ ] **Resize Yellow Squares** — Smaller, closer to the highlight.
+      - - might be not possible at all, see above.
 - [ ] **Sidebar Card Polish** — Tweak internal/external padding, reduce title font size to ~9pt, adjust comment font to ~11pt, and experiment with custom absolute grayscale background colors (e.g., `white: 0.15`) for better contrast against the sidebar background in Dark Mode.
 - [ ] **Status bar indicator** — Replace window title suffix with a proper
       bottom status bar (thin NSTextField below the PDF view). Shows
