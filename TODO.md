@@ -144,18 +144,8 @@ Test infrastructure:
 - [x] Double-click → ensure emphasis + open dialog, emphasis survives rebuild
 - [x] Emphasis unified with selectedAnnotation (Delete targets emphasized highlight)
 - [x] Scroll card into view when emphasized via highlight-click (if not visible)
-- [ ] review remove highlight (now emphasized; which keys)
-- [ ] Undo (i.e. remove) last highlight
+- [x] Clear comment text = remove comment (keep highlight) — backend done, needs UX wiring
 - [x] Input form: custom NSPanel replacing NSAlert (CommentInputPanel.swift)
-- [ ] Input form: session-remembered geometry (deferred — needs NSPanel frame lifecycle investigation)
-- [ ] Clear comment text = remove comment (keep highlight) — backend done, needs UX wiring
-
-### Navigation
-- [ ] Cmd+F find (PDFKit native — may come free)
-- [ ] Jump to beginning: Cmd+Home or Home
-- [ ] Jump to end: Cmd+End or End
-- [ ] Page Up / Page Down (Windows-style: one screenful)
-- [ ] Zoom via menu bar or simple widget (not pinch)
 
 ---
 
@@ -186,6 +176,18 @@ Test infrastructure:
 
 ## Milestone 3: Nice to Have (Backlog)
 
+### Sidebar (comment cards)
+- [ ] review remove highlight (now emphasized; which keys)
+- [ ] Undo (i.e. remove) last highlight
+- [ ] Input form: session-remembered geometry (deferred — needs NSPanel frame lifecycle investigation)
+
+### Navigation
+- [ ] Cmd+F find (PDFKit native — may come free)
+- [ ] Jump to beginning: Cmd+Home or Home
+- [ ] Jump to end: Cmd+End or End
+- [ ] Page Up / Page Down (Windows-style: one screenful)
+- [ ] Zoom via menu bar or simple widget (not pinch)
+
 ### Tabs
 - [ ] Browser-style tabs in single window
 - [ ] Each tab: independent PDF + sidebar
@@ -212,5 +214,3 @@ Test infrastructure:
 - [x] Add .editorconfig (LF line endings, indentation rules)
 - [x] Add `make format` target (SwiftFormat + black)
 - [ ] Review and clean up MainMenu.xib (remove unused Font/Format/Text menus)
-- [ ] Delete HANDOVER.md (superseded by README.md)
-- [ ] Update manifest.lst to include new test files (pyproject.toml, tests/)

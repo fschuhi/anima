@@ -232,4 +232,3 @@ class CommentInputPanel: NSPanel {
         return NSRect(x: x, y: y, width: defaultWidth, height: defaultHeight)
     }
 }
-r

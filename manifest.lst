@@ -27,13 +27,14 @@ tools/requirements.txt
 Anima/Anima/AnimaPDFView.swift
 Anima/Anima/AppDelegate.swift
 Anima/Anima/CommentCardView.swift
+Anima/Anima/CommentInputPanel.swift
 Anima/Anima/FitzBridge.swift
 Anima/Anima/MainViewController.swift
 Anima/Anima/SidebarExtractor.swift
 
 ### --- Tools ---
 tools/anima_helper.py
-tools/concat_files.py
+# tools/concat_files.py
 
 ### --- Testing Swift---
 #Anima/AnimaTests/Fixtures/sidebar_basic.pdf
