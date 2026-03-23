@@ -79,6 +79,7 @@
 
 ## Cosmetic / UX Improvements
 
+- [ ] **Resize Yellow Squares** — Smaller, closer to the highlight.
 - [ ] **Sidebar Card Polish** — Tweak internal/external padding, reduce title font size to ~9pt, adjust comment font to ~11pt, and experiment with custom absolute grayscale background colors (e.g., `white: 0.15`) for better contrast against the sidebar background in Dark Mode.
 - [ ] **Status bar indicator** — Replace window title suffix with a proper
       bottom status bar (thin NSTextField below the PDF view). Shows
@@ -147,6 +148,11 @@ Test infrastructure:
 - [x] Clear comment text = remove comment (keep highlight) — backend done, needs UX wiring
 - [x] Input form: custom NSPanel replacing NSAlert (CommentInputPanel.swift)
 
+### Navigation
+- [x] Jump to beginning: Cmd+Home or Home
+- [x] Jump to end: Cmd+End or End
+- [x] Page Up / Page Down (Windows-style: one screenful)
+
 ---
 
 ## Milestone 2: Toolchain Integration
@@ -177,16 +183,24 @@ Test infrastructure:
 ## Milestone 3: Nice to Have (Backlog)
 
 ### Sidebar (comment cards)
+- [ ] Input form: session-remembered geometry (deferred — needs NSPanel frame lifecycle investigation)
 - [ ] review remove highlight (now emphasized; which keys)
 - [ ] Undo (i.e. remove) last highlight
-- [ ] Input form: session-remembered geometry (deferred — needs NSPanel frame lifecycle investigation)
 
 ### Navigation
 - [ ] Cmd+F find (PDFKit native — may come free)
-- [ ] Jump to beginning: Cmd+Home or Home
-- [ ] Jump to end: Cmd+End or End
-- [ ] Page Up / Page Down (Windows-style: one screenful)
 - [ ] Zoom via menu bar or simple widget (not pinch)
+
+### Find
+- [ ] Regex search
+- [ ] "Find all" — highlight all matches, list in sidebar (like Excel)
+
+### Performance
+- [ ] Test with large IA PDFs (~20MB)
+- [ ] Lazy annotation loading for PDFs with many highlights
+
+### Annotation features
+- [ ] Multiple highlight colors (configurable, switchable via keyboard)
 
 ### Tabs
 - [ ] Browser-style tabs in single window
@@ -195,17 +209,6 @@ Test infrastructure:
 - [ ] Ctrl+Tab mapping (for Windows muscle memory, via app or Karabiner)
 - [ ] Tab shows filename
 - [ ] Open new tab: Cmd+O or drag-drop
-
-### Find
-- [ ] Regex search
-- [ ] "Find all" — highlight all matches, list in sidebar (like Excel)
-
-### Annotation features
-- [ ] Multiple highlight colors (configurable, switchable via keyboard)
-
-### Performance
-- [ ] Test with large IA PDFs (~20MB)
-- [ ] Lazy annotation loading for PDFs with many highlights
 
 ---
 
