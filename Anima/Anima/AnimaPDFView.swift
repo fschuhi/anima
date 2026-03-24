@@ -5,19 +5,18 @@
 //  Subclass of PDFView that intercepts keyboard and mouse events.
 //
 //  Current capabilities:
-//    - ENTER with selection → create highlight (dual-write: fitz + in-memory)
+//    - ENTER with selection → create highlight (via AnnotationManager)
 //    - H key → toggle persistent highlight mode (mouseUp creates highlight)
 //    - P key → toggle X-Ray mode (reveals native popups for comments)
-//    - Double-click on highlight (or card via delegate) → edit comment via CommentInputPanel
+//    - Double-click on highlight (or card via delegate) → edit comment (via AnnotationManager)
 //    - Single-click highlight → toggle emphasis
-//    - Delete key → remove the currently emphasized highlight
+//    - Delete key → remove the currently emphasized highlight (via AnnotationManager)
 //
-//  Dual-write pattern:
-//    On highlight creation, we persist via fitz (anima_helper.py) AND add a
-//    matching PDFAnnotation to PDFKit's in-memory document. This eliminates
-//    the need to reload the document, which caused scroll drift.
-//    fitz-written file is source of truth on disk; in-memory annotation is
-//    display-only for the current session.
+//  Annotation CRUD:
+//    All highlight creation, comment editing, and deletion are delegated to
+//    AnnotationManager. This class handles event dispatch, hit-testing, and
+//    mode management. After each mutation, it notifies the sidebarDelegate
+//    so the sidebar can rebuild the affected page's cards.
 //
 //  Sidebar integration:
 //    After any annotation mutation (create, edit comment, delete), the
@@ -56,13 +55,10 @@ protocol SidebarUpdateDelegate: AnyObject {
 
 class AnimaPDFView: PDFView {
 
-    // Path to the Python helper — absolute path for Xcode-launched app
-    let helperPath = "/Users/fschuhi/Projects/anima/tools/anima_helper.py"
-
-    // Default author for in-memory annotations. Must match anima_helper.py's
-    // DEFAULT_AUTHOR so that cards created during a session show the same
-    // author as cards loaded from disk on next launch.
-    static let authorName = "fschuhi"
+    // --- Annotation Manager ---
+    // Handles all annotation CRUD (create, edit, delete). Initialized by
+    // the caller (AppDelegate or MainViewController) after the view is created.
+    var annotationManager: AnnotationManager!
 
     // Track which highlight is currently "selected" for Delete key.
     // Unified with emphasis state: MainViewController sets these when
@@ -82,11 +78,6 @@ class AnimaPDFView: PDFView {
     // When active, populates standard `.contents` from our custom `/AnimaComment`
     // key, which forces PDFKit to render native yellow popup indicators. Toggle with P key.
     var isXRayMode = false
-
-    // --- Highlight color/opacity constants (must match anima_helper.py) ---
-    // anima_helper.py: HIGHLIGHT_COLOR = [1.0, 0.75, 0.80], HIGHLIGHT_OPACITY = 0.4
-    static let highlightColor = NSColor(red: 1.0, green: 0.75, blue: 0.80, alpha: 1.0)
-    static let highlightOpacity: CGFloat = 0.4
 
     // --- Keyboard handling ---
 
@@ -145,7 +136,7 @@ class AnimaPDFView: PDFView {
         return false
     }
 
-    // --- Modes ---
+    // MARK: - Modes
 
     func toggleHighlightMode() {
         isHighlightMode.toggle()
@@ -189,7 +180,7 @@ class AnimaPDFView: PDFView {
                         // Restore standard contents and manually rebuild the missing popup object
                         if !animaComment.isEmpty {
                             annot.contents = animaComment
-                            ensurePopupExists(for: annot, on: page)
+                            annotationManager.ensurePopupExists(for: annot, on: page)
                         }
                     } else {
                         // Wipe standard contents to kill popups
@@ -217,21 +208,7 @@ class AnimaPDFView: PDFView {
         self.setNeedsDisplay(self.bounds)
     }
 
-    /// Manually rebuilds a PDFAnnotationPopup and links it to the highlight.
-    /// Because we aggressively destroy popups on load to prevent them from rendering,
-    /// setting `.contents` later isn't enough; PDFKit requires the actual object to exist.
-    private func ensurePopupExists(for annot: PDFAnnotation, on page: PDFPage) {
-        if annot.popup == nil {
-            // Provide a sensible default size/location. PDFKit handles the yellow icon
-            // placement automatically, but this dictates where the actual text box opens if clicked.
-            let popupBounds = NSRect(x: annot.bounds.maxX, y: annot.bounds.maxY, width: 200, height: 150)
-            let popup = PDFAnnotation(bounds: popupBounds, forType: .popup, withProperties: nil)
-            annot.popup = popup
-            page.addAnnotation(popup)
-        }
-    }
-
-    // --- Mouse handling ---
+    // MARK: - Mouse Handling
 
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {
@@ -260,7 +237,7 @@ class AnimaPDFView: PDFView {
         }
     }
 
-    // --- Hit-testing ---
+    // MARK: - Hit-Testing
 
     /// Convert a mouse event's window coordinates to a (PDFPage, point-on-page) pair.
     /// Returns nil if the click isn't on any page.
@@ -295,23 +272,7 @@ class AnimaPDFView: PDFView {
         return nil
     }
 
-    /// Get the UUID (NM field) of an annotation.
-    func annotationUUID(_ annot: PDFAnnotation) -> String? {
-        // Try the standard PDFKit way first
-        if let nm = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/NM")) as? String {
-            return nm
-        }
-
-        // PDFKit might not expose /NM directly. Try the annotation's name property.
-        let name = annot.userName
-        if let name = name, !name.isEmpty {
-            return name
-        }
-
-        return nil
-    }
-
-    // --- Double-click / Edit Comment Logic ---
+    // MARK: - Double-Click / Edit Comment
 
     func handleDoubleClickOnHighlight(_ event: NSEvent) -> Bool {
         guard let (page, pagePoint) = pageAndPoint(for: event) else {
@@ -322,7 +283,7 @@ class AnimaPDFView: PDFView {
             return false
         }
 
-        guard let uuid = annotationUUID(annot) else {
+        guard let uuid = annotationManager.annotationUUID(annot) else {
             Swift.print("⚠️  Highlight has no UUID — cannot edit")
             return false
         }
@@ -335,7 +296,7 @@ class AnimaPDFView: PDFView {
             sidebarDelegate?.highlightWasClicked(uuid: uuid, onPageIndex: pageIndex, toggle: false)
         }
 
-        editComment(for: annot, uuid: uuid, on: page)
+        editComment(for: annot, on: page)
 
         return true
     }
@@ -343,71 +304,28 @@ class AnimaPDFView: PDFView {
     /// Public method to edit an annotation's comment. Called both internally
     /// by double-clicks on the PDF canvas, and externally by the sidebar when
     /// a card is double-clicked.
-    func editComment(for annot: PDFAnnotation, uuid: String, on page: PDFPage) {
-        // Read from our custom key first, fallback to .contents
-        var existingComment = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment")) as? String ?? ""
-        if existingComment.isEmpty {
-            existingComment = annot.contents ?? ""
-        }
+    func editComment(for annot: PDFAnnotation, on page: PDFPage) {
+        guard let document = self.document else { return }
 
-        Swift.print("🖱️  Editing comment: \(uuid)")
-        Swift.print("   Existing comment: \(existingComment.isEmpty ? "(none)" : existingComment)")
-
-        // Show the modal input panel. The panel always returns a string —
-        // there is no "cancel". Escape saves whatever text is in the editor.
         isShowingDialog = true
-        let newComment = CommentInputPanel.showModal(existingText: existingComment)
+        let changed = annotationManager.editComment(
+            document: document,
+            annotation: annot,
+            page: page,
+            isXRayMode: isXRayMode
+        )
         isShowingDialog = false
 
-        // If the comment didn't change, skip the fitz write and sidebar rebuild.
-        if newComment == existingComment {
-            Swift.print("ℹ️  Comment unchanged, skipping save")
-            return
-        }
-
-        guard let documentURL = self.document?.documentURL else { return }
-
-        let success = FitzBridge.editComment(
-            helperPath: helperPath,
-            filePath: documentURL.path,
-            uuid: uuid,
-            comment: newComment
-        )
-
-        if success {
-            // Dual-write: update the custom key.
-            annot.setValue(newComment, forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment"))
-
-            // Sync standard contents based on active X-Ray Mode
-            if isXRayMode {
-                annot.contents = newComment
-                if !newComment.isEmpty {
-                    ensurePopupExists(for: annot, on: page)
-                }
-            } else {
-                annot.contents = ""
-                // Destroy popup if PDFKit aggressively re-spawned one
-                if let popup = annot.popup {
-                    page.removeAnnotation(popup)
-                    annot.popup = nil
-                }
-                annot.removeValue(forAnnotationKey: PDFAnnotationKey(rawValue: "/Popup"))
-            }
-
-            Swift.print("✅ Comment updated on \(uuid)")
-            Swift.print("   New comment: \(newComment.isEmpty ? "(removed)" : newComment)")
-
+        if changed {
             // Notify sidebar to rebuild this page's cards.
             // annotationsDidChange will preserve emphasis on the current
             // annotation so the user sees the card they just edited.
-            if let document = self.document {
-                let pageIndex = document.index(for: page)
-                sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)
-            }
+            let pageIndex = document.index(for: page)
+            sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)
         }
     }
 
-    // --- Single-click: toggle emphasis on highlight ---
+    // MARK: - Single-Click: Toggle Emphasis
 
     func handleSingleClickOnHighlight(_ event: NSEvent) {
         guard let (page, pagePoint) = pageAndPoint(for: event) else {
@@ -422,7 +340,7 @@ class AnimaPDFView: PDFView {
             // Hit a highlight — notify delegate for emphasis toggle.
             // selectedAnnotation/Page will be set by MainViewController
             // via applyEmphasis/clearEmphasis (unified with emphasis state).
-            if let uuid = annotationUUID(annot) {
+            if let uuid = annotationManager.annotationUUID(annot) {
                 if let document = self.document {
                     let pageIndex = document.index(for: page)
                     sidebarDelegate?.highlightWasClicked(uuid: uuid, onPageIndex: pageIndex, toggle: true)
@@ -437,7 +355,7 @@ class AnimaPDFView: PDFView {
         }
     }
 
-    // --- Delete: remove selected highlight ---
+    // MARK: - Delete Selected Highlight
 
     func deleteSelectedHighlight() -> Bool {
         guard let annot = selectedAnnotation,
@@ -446,39 +364,27 @@ class AnimaPDFView: PDFView {
             return false
         }
 
-        guard let uuid = annotationUUID(annot) else {
-            Swift.print("⚠️  Selected highlight has no UUID — cannot delete")
-            return false
-        }
+        guard let document = self.document else { return false }
 
-        guard let documentURL = self.document?.documentURL else { return false }
-
-        Swift.print("🗑️  Deleting highlight: \(uuid)")
-
-        let success = FitzBridge.deleteHighlight(
-            helperPath: helperPath,
-            filePath: documentURL.path,
-            uuid: uuid
+        let success = annotationManager.deleteHighlight(
+            document: document,
+            annotation: annot,
+            page: page
         )
 
         if success {
-            // Dual-write: remove the in-memory annotation from the page
-            page.removeAnnotation(annot)
             selectedAnnotation = nil
             selectedAnnotationPage = nil
-            Swift.print("✅ Highlight deleted: \(uuid)")
 
             // Notify sidebar to rebuild this page's cards
-            if let document = self.document {
-                let pageIndex = document.index(for: page)
-                sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)
-            }
+            let pageIndex = document.index(for: page)
+            sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)
         }
 
         return success
     }
 
-    // --- Highlight creation (dual-write) ---
+    // MARK: - Highlight Creation (from Selection)
 
     func createHighlightFromSelection() -> Bool {
         guard let selection = currentSelection else {
@@ -497,179 +403,36 @@ class AnimaPDFView: PDFView {
 
         guard let firstPage = selection.pages.first else { return false }
         let pageIndex = document.index(for: firstPage)
-        let pageHeight = firstPage.bounds(for: .mediaBox).height
 
-        // Build quads in both coordinate systems:
-        // - fitzQuads: for anima_helper.py (fitz space, origin top-left)
-        // - pdfkitBounds: for in-memory PDFAnnotation (PDFKit space, origin bottom-left)
-        var fitzQuads: [[String: Double]] = []
-        var pdfkitBounds: [NSRect] = []
-
+        // Extract per-line bounds in PDFKit coordinate space
+        var selectionBounds: [NSRect] = []
         for lineSel in lineSelections {
             let bounds = lineSel.bounds(for: firstPage)
-
-            if bounds.size.width < 1 || bounds.size.height < 1 {
-                continue
-            }
-
-            // PDFKit-space bounds — keep as-is for in-memory annotation
-            pdfkitBounds.append(bounds)
-
-            // Fitz-space quads — flip y for the helper
-            let x0 = Double(bounds.origin.x)
-            let x1 = Double(bounds.origin.x + bounds.size.width)
-            let y0_fitz = Double(pageHeight - (bounds.origin.y + bounds.size.height))
-            let y1_fitz = Double(pageHeight - bounds.origin.y)
-
-            fitzQuads.append(["x0": x0, "y0": y0_fitz, "x1": x1, "y1": y1_fitz])
+            selectionBounds.append(bounds)
         }
 
-        if fitzQuads.isEmpty {
-            Swift.print("⚠️  No valid quads from selection")
-            return false
-        }
-
-        // Highlights are created without a comment. To add or edit a comment
-        // later, double-click the highlight (matches PDF-XChange Viewer workflow).
-        let comment = ""
-
-        let uuid = UUID().uuidString.lowercased()
-
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: fitzQuads),
-              let jsonString = String(data: jsonData, encoding: .utf8) else {
-            Swift.print("❌ Failed to serialize quads to JSON")
-            return false
-        }
-
-        guard let documentURL = document.documentURL else {
-            Swift.print("❌ Document has no URL")
-            return false
-        }
-
-        Swift.print("📝 Creating highlight: page=\(pageIndex), quads=\(fitzQuads.count) lines, uuid=\(uuid)")
-
-        // Step 1: Persist to disk via fitz
-        let success = FitzBridge.addHighlight(
-            helperPath: helperPath,
-            filePath: documentURL.path,
-            page: pageIndex,
-            uuid: uuid,
-            quadsJSON: jsonString,
-            comment: comment
+        let uuid = annotationManager.createHighlight(
+            document: document,
+            page: firstPage,
+            pageIndex: pageIndex,
+            selectionBounds: selectionBounds,
+            isXRayMode: isXRayMode
         )
 
-        if success {
-            // Step 2: Add in-memory annotation for immediate display (no reload)
-            addInMemoryHighlight(
-                page: firstPage,
-                bounds: pdfkitBounds,
-                uuid: uuid,
-                comment: comment
-            )
+        if uuid != nil {
             clearSelection()
-            Swift.print("✅ Highlight created (dual-write): \(uuid)")
 
             // Notify sidebar — currently a no-op since highlights start without
             // comments (no card to show), but this ensures the sidebar stays
             // correct if we ever change the default or add in-place editing.
             sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)
+            return true
         }
 
-        return success
+        return false
     }
 
-    // --- In-memory annotation (display-only, not persisted) ---
-
-    /// Create a PDFAnnotation in PDFKit's in-memory document for immediate display.
-    /// The annotation matches what fitz wrote to disk. On next app launch, PDFKit
-    /// will load the fitz-written version from the file.
-    ///
-    /// Fields set here must match what anima_helper.py writes via fitz:
-    ///   - bounds, QuadPoints, color, opacity  (geometry + appearance)
-    ///   - /NM                                  (UUID for identification)
-    ///   - userName                             (backup UUID for hit-testing)
-    ///   - /T                                   (author for sidebar cards)
-    ///   - /AnimaComment                        (custom comment text key to suppress popups)
-    ///
-    /// IMPORTANT: /NM must be set explicitly. PDFKit maps userName to /T
-    /// internally, so relying on userName alone for UUID storage causes /T
-    /// (author) writes to overwrite the UUID. Setting /NM directly ensures
-    /// annotationUUID() finds the UUID on its first check, independent of
-    /// the userName ↔ /T mapping.
-    ///
-    /// - Parameters:
-    ///   - page: The PDFPage to add the annotation to
-    ///   - bounds: Array of NSRect per selection line (PDFKit coordinate space)
-    ///   - uuid: The annotation's UUID (matches what fitz wrote to /NM)
-    ///   - comment: The annotation's comment text
-    func addInMemoryHighlight(page: PDFPage, bounds: [NSRect], uuid: String, comment: String) {
-
-        // Calculate the overall bounding rect (union of all line rects)
-        var overallBounds = bounds[0]
-        for i in 1..<bounds.count {
-            overallBounds = overallBounds.union(bounds[i])
-        }
-
-        // Create the highlight annotation
-        let annot = PDFAnnotation(
-            bounds: overallBounds,
-            forType: .highlight,
-            withProperties: nil
-        )
-
-        // Set color and opacity to match anima_helper.py constants
-        annot.color = AnimaPDFView.highlightColor
-        annot.setValue(AnimaPDFView.highlightOpacity, forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
-
-        // Handle comment based on X-Ray mode
-        if !comment.isEmpty {
-            annot.setValue(comment, forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment"))
-            annot.contents = isXRayMode ? comment : ""
-        }
-
-        // Set UUID — both via /NM (primary, used by annotationUUID) and
-        // userName (backup). /NM must be set explicitly because PDFKit
-        // does not populate it from userName.
-        annot.setValue(uuid, forAnnotationKey: PDFAnnotationKey(rawValue: "/NM"))
-        annot.userName = uuid
-
-        // Set author — matches anima_helper.py's DEFAULT_AUTHOR.
-        // Must be set AFTER userName to avoid PDFKit's internal
-        // userName ↔ /T mapping from overwriting the author with the UUID.
-        annot.setValue(AnimaPDFView.authorName, forAnnotationKey: PDFAnnotationKey(rawValue: "/T"))
-
-        // Build QuadPoints — PDFKit expects an array of NSValue-wrapped NSPoints,
-        // four points per quad (one quad per selection line).
-        // Order: bottom-left, bottom-right, top-left, top-right
-        // (This is the PDF spec order for QuadPoints)
-        var quadPoints: [NSValue] = []
-        for rect in bounds {
-            let bottomLeft  = NSPoint(x: rect.minX, y: rect.minY)
-            let bottomRight = NSPoint(x: rect.maxX, y: rect.minY)
-            let topLeft     = NSPoint(x: rect.minX, y: rect.maxY)
-            let topRight    = NSPoint(x: rect.maxX, y: rect.maxY)
-
-            quadPoints.append(NSValue(point: bottomLeft))
-            quadPoints.append(NSValue(point: bottomRight))
-            quadPoints.append(NSValue(point: topLeft))
-            quadPoints.append(NSValue(point: topRight))
-        }
-
-        // Set QuadPoints via the annotation key
-        annot.setValue(quadPoints, forAnnotationKey: PDFAnnotationKey(rawValue: "/QuadPoints"))
-
-        // Add to the page — PDFKit renders it immediately
-        page.addAnnotation(annot)
-
-        // Now that it's on the page, link the popup if necessary
-        if isXRayMode && !comment.isEmpty {
-            ensurePopupExists(for: annot, on: page)
-        }
-
-        Swift.print("🔧 In-memory annotation added: \(uuid) (\(bounds.count) quads, bounds=\(overallBounds))")
-    }
-
-    // --- Document reload (kept for edge cases, no longer used for highlight creation) ---
+    // MARK: - Document Reload (kept for edge cases, no longer used for highlight creation)
 
     func reloadDocument() {
         guard let document = self.document,

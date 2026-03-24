@@ -410,7 +410,7 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         applyEmphasis(to: annot, on: page, uuid: card.uuid, pageIndex: card.pageIndex, cardView: cardView)
 
         // Trigger the edit flow in AnimaPDFView
-        pdfView.editComment(for: annot, uuid: card.uuid, on: page)
+        pdfView.editComment(for: annot, on: page)
     }
 
     // --- Shared Emphasis Logic ---
@@ -461,7 +461,7 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         emphasizedOriginalColor = annot.color
         emphasizedOriginalOpacity = annot.value(
             forAnnotationKey: PDFAnnotationKey(rawValue: "/CA")
-        ) as? CGFloat ?? AnimaPDFView.highlightOpacity
+        ) as? CGFloat ?? AnnotationManager.highlightOpacity
 
         // Remember UUID/page for surviving sidebar rebuilds
         emphasizedUUID = uuid

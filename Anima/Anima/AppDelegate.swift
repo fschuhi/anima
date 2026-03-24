@@ -24,6 +24,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         mainViewController = MainViewController()
         window.contentViewController = mainViewController
 
+        // --- Wire up the annotation manager ---
+        let helperPath = "/Users/fschuhi/Projects/anima/tools/anima_helper.py"
+        mainViewController.pdfView.annotationManager = AnnotationManager(helperPath: helperPath)
+
         // --- Load the PDF ---
         let pdfPath = NSString("~/Projects/anima/data/input.pdf").expandingTildeInPath
         let url = URL(fileURLWithPath: pdfPath)
