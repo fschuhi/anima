@@ -126,25 +126,46 @@ field), not to `/NM`. Relying on `userName` alone for UUID storage causes the
 author field to overwrite the UUID. See SIDEBAR_DESIGN.md "Known Gotchas" for
 full details.
 
+### Popup Suppression (`/AnimaComment` Contract)
+
+PDFKit renders native yellow popup indicators for any annotation with non-empty
+`.contents`. These popups cannot be resized, repositioned off-screen, or hidden
+through standard PDFKit APIs. Anima suppresses them entirely:
+
+- **On document load**, `scrubCommentsForPopupSuppression()` (in MainViewController)
+  migrates each highlight's `.contents` into a custom `/AnimaComment` dictionary key,
+  clears `.contents`, and removes all `/Popup` annotation objects from every page.
+- **During the session**, all comment reads and writes go through `/AnimaComment`.
+  The standard `.contents` field stays empty, preventing popup rendering.
+- **X-Ray mode** (P key toggle) temporarily restores `.contents` and rebuilds popup
+  objects, allowing inspection of native popup behavior for debugging. Toggling off
+  re-scrubs the document.
+
+The `/AnimaComment` key is read by `SidebarExtractor` (with `.contents` fallback),
+by `editComment()` in AnimaPDFView, and by `addInMemoryHighlight()`. The fitz-written
+file on disk always uses standard `/Contents` — the custom key exists only in PDFKit's
+in-memory representation.
+
 ---
 
 ## Current Status
 
 | Feature                  | Status      | Notes                                              |
-|--------------------------|-------------|-----------------------------------------------------|
-| **PDF Rendering** | ✅ Complete  | PDFKit, including Internet Archive layered PDFs    |
-| **Continuous Scroll** | ✅ Complete  | Native trackpad scrolling                          |
-| **Text Selection** | ✅ Complete  | Drag to select, per-line quad extraction           |
-| **Highlight Creation** | ✅ Complete  | ENTER with selection, dual-write, no reload        |
+|--------------------------|-------------|----------------------------------------------------|
+| **PDF Rendering**        | ✅ Complete  | PDFKit, including Internet Archive layered PDFs    |
+| **Continuous Scroll**    | ✅ Complete  | Native trackpad scrolling                          |
+| **Text Selection**       | ✅ Complete  | Drag to select, per-line quad extraction           |
+| **Highlight Creation**   | ✅ Complete  | ENTER with selection, dual-write, no reload        |
 | **Persistent Highlight** | ✅ Complete  | H key toggles mode; mouseUp = instant highlight    |
-| **Comment Editing** | ✅ Complete  | Modal input panel (CommentInputPanel), card-styled |
-| **Highlight Deletion** | ✅ Complete  | Click + Delete key, dual-write removal             |
-| **Incremental Save** | ✅ Complete  | fitz preserves all existing annotations            |
+| **Comment Editing**      | ✅ Complete  | Modal input panel (CommentInputPanel), card-styled |
+| **Highlight Deletion**   | ✅ Complete  | Click + Delete key, dual-write removal             |
+| **Incremental Save**     | ✅ Complete  | fitz preserves all existing annotations            |
 | **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
-| **Xcode Project** | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
-| **Sidebar** | ✅ Complete  | Live cards, bidirectional emphasis, scroll sync    |
-| **Tabs** | 🚧 Planned  | Multi-PDF in single window (Milestone 1)           |
-| **pdf:// URL Handler** | 🚧 Planned  | Open PDFs from Obsidian links (Milestone 2)        |
+| **Xcode Project**        | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
+| **Sidebar**              | ✅ Complete  | Live cards, bidirectional emphasis, scroll sync    |
+| **Popup Suppression**    | ✅ Complete  | Yellow squares in x-ray mode, toggle with P        |
+| **Tabs**                 | 🚧 Planned  | Multi-PDF in single window (Milestone 1)           |
+| **pdf:// URL Handler**   | 🚧 Planned  | Open PDFs from Obsidian links (Milestone 2)        |
 
 ### Highlight Workflow
 

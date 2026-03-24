@@ -1,163 +1,75 @@
+# TODO
+
 ## Status Key
-- `[x]` Done (verified)
 - `[ ]` To do
 - `[~]` Partially done / workaround exists
 - `[!]` Known issue, needs investigation
 
 ---
 
-## Current: Dual-Write + Xcode Migration (DONE)
-
-- [x] Xcode project setup (.app bundle, menu bar, Cmd+Q)
-- [x] Migrated PoC Swift files into Xcode project
-- [x] Sandbox disabled (filesystem access for PDFs and Python helper)
-- [x] Absolute path resolution for helper and PDF (Xcode launches from DerivedData)
-- [x] Dual-write: highlight creation (fitz persist + in-memory PDFAnnotation)
-- [x] Dual-write: comment editing (fitz persist + in-memory update)
-- [x] Dual-write: highlight deletion (fitz persist + in-memory removal)
-- [x] No document reload during session — scroll drift eliminated
-- [x] Dialog focus fix (isShowingDialog flag prevents duplicate Enter handling)
-- [x] Git repo on GitHub (private), PyCharm for Git operations
-
----
-
-## Persistent Highlight Mode (DONE)
-
-- [x] Toggle with H key
-- [x] Status indicator shows current mode (window title suffix)
-- [x] In highlight mode: mouseUp after drag → immediate highlight creation
-- [x] No ENTER needed — select text and release mouse to highlight
-- [x] Highlight-only: no comment dialog on creation (double-click to add later)
-- [x] ENTER without highlight mode still creates a highlight (legacy path)
-- [x] Coexists with PDFKit's native text selection handling
-- [x] Prerequisite satisfied: dual-write eliminates reload, canvas is stable
-- [x] Bugfix: isShowingDialog was not reset to false after dialog dismissed
-
----
-
 ## Known Issues
 
 - [!] **Highlight color/opacity mismatch between viewers**
-      This is the most visible cosmetic issue. Highlights created by Anima
-      (or any fitz-written highlight) render with different saturation/color
-      in PDFKit vs PDF-XChange Viewer vs PDF-XChange Editor. The underlying
-      stored values (color, opacity) are identical — the difference is in
-      how each viewer interprets them. Needs investigation:
-      — Compare raw annotation attributes across viewers
-      — Determine if appearance streams override stored color values
-      — If unfixable at the data level, consider runtime color adjustment
-        in PDFKit (intercept rendering, modify annotation display properties)
-
-- [x] **In-memory highlight has no popup indicator (yellow square)**
-      The fitz-written annotation includes a popup annotation; the in-memory
-      PDFAnnotation does not. After app restart, the popup appears (loaded
-      from disk). Low priority — the sidebar replaces this indicator entirely...
-
-- [!] ... BUT: It seems it's really difficult to reduce the size of the the
-      popup indicators, and it's also impossible to remove them without
-      removing the comments. Hacks like trying to position the popup somewhere
-      outside the visible screen area doesn't work either.
+      Highlights render with different saturation in PDFKit vs PDF-XChange
+      Viewer vs PDF-XChange Editor. Stored values are identical — difference
+      is in viewer interpretation. Needs investigation: compare raw annotation
+      attributes, check if appearance streams override stored color, consider
+      runtime color adjustment in PDFKit.
 
 - [!] **annot.update() regenerates appearance stream**
-      When fitz calls `annot.update()`, it regenerates the annotation's
-      appearance stream. Highlights edited by fitz may render slightly
-      differently in PDF-XChange Viewer. Underlying data is preserved.
+      fitz's `annot.update()` regenerates the appearance stream. Highlights
+      edited by fitz may render slightly differently in PDF-XChange Viewer.
       PDFKit renders consistently regardless. Known fitz behavior.
 
 - [!] **Hardcoded absolute paths**
-      `AppDelegate.swift` and `AnimaPDFView.swift` use hardcoded paths
-      (`/Users/fschuhi/Projects/anima/...`) for the PDF file, Python
-      executable, and helper script. Works for development; needs proper
-      path resolution for a distributable .app bundle (Milestone 1).
+      `AppDelegate.swift`, `AnimaPDFView.swift`, and `FitzBridge.swift` use
+      hardcoded paths (`/Users/fschuhi/Projects/anima/...`). Works for
+      development; needs proper path resolution for distributable .app bundle.
 
 - [!] **Clip Tools Launcher.workflow clipboard corruption**
-      A macOS Service called "Clip Tools Launcher.workflow" appears to
-      corrupt clipboard contents during paste, injecting `rm -rf` fragments
-      into pasted text. Observed when pasting Python f-strings containing
-      `!r` format specifiers into Terminal. Needs investigation:
-      — Check ~/Library/Services/ for this workflow
-      — Determine if it's a clipboard manager or a macOS Automator service
-      — Remove or disable if confirmed as the source of corruption
-      — Potentially related to Karabiner-Elements or another input tool
+      macOS Service injects `rm -rf` fragments into pasted text containing
+      `!r` format specifiers. Check ~/Library/Services/, determine source,
+      remove or disable.
+
+---
+
+## Refactoring
+
+- [ ] **Extract `AnnotationManager` from `AnimaPDFView`**
+      Pull highlight creation (quad math + dual-write), comment editing,
+      and deletion into a dedicated class. AnimaPDFView becomes purely
+      about event handling and delegates to AnnotationManager for CRUD.
+
+- [ ] **Extract `PopupController`**
+      Consolidate all popup suppression logic (scrubbing on load, X-Ray
+      toggle, conditional popup handling in edit/create) into one type.
+      Currently spread across AnimaPDFView and MainViewController.
+
+- [ ] **Extract `EmphasisManager` from `MainViewController`**
+      The emphasis state machine (apply/clear/preserve-through-rebuild,
+      ~100 lines) becomes its own type. MainViewController focuses on
+      layout and scroll physics.
 
 ---
 
 ## Cosmetic / UX Improvements
 
-- [ ] **Resize Yellow Squares** — Smaller, closer to the highlight.
-      - - might be not possible at all, see above.
-- [ ] **Sidebar Card Polish** — Tweak internal/external padding, reduce title font size to ~9pt, adjust comment font to ~11pt, and experiment with custom absolute grayscale background colors (e.g., `white: 0.15`) for better contrast against the sidebar background in Dark Mode.
+- [ ] **Sidebar Card Polish** — Tweak padding, reduce title font to ~9pt,
+      adjust comment font to ~11pt, experiment with custom grayscale
+      background colors for Dark Mode contrast.
 - [ ] **Status bar indicator** — Replace window title suffix with a proper
-      bottom status bar (thin NSTextField below the PDF view). Shows
-      "Highlight Mode" when active, hidden/empty when not. The window title
-      suffix works but a status bar is the conventional macOS location.
+      bottom status bar (thin NSTextField below the PDF view).
 - [ ] **Emphasis color tuning** — Light yellow (#FFFFE0) at 0.7 opacity
-      works but may need adjustment for different PDF backgrounds or
-      dark mode. Experiment when more PDFs are in daily use.
+      may need adjustment for different PDF backgrounds or dark mode.
 
 ---
 
 ## Testing
 
-### Python (anima_helper.py) — pytest (DONE)
-
-High value, protects the annotation contract that the whole app depends on.
-- [x] Round-trip test: create highlight → verify with fitz → edit comment →
-      verify → delete → verify gone (use test PDF in `data/`)
-- [x] Edge cases: invalid page number, missing file, nonexistent UUID
-- [x] Verify incremental save preserves existing annotations
-- [x] Verify UUID is correctly written to /NM field (xref-level check)
-- [x] Verify coordinate values in stored QuadPoints match input (multi-quad)
-- [x] Verify comment clearing works (empty string via xref_set_key)
-- [x] Verify opacity survives edit (annot.update() regression guard)
-- [x] Bug discovered and fixed: fitz set_info() ignores empty content strings
-
-Test infrastructure:
-- [x] `tests/conftest.py` — fixtures for test_pdf, run_helper
-- [x] `tests/test_anima_helper.py` — 11 tests, all passing
-- [x] `pyproject.toml` — pytest config, warning filters for SWIG deprecations
-- [x] `ANIMA_KEEP_TEST_OUTPUT=1` — optional flag to copy test PDFs to tmp/tests/
-
-### Swift — Swift Testing (XCTest for UI)
-- [x] SidebarExtractor: golden JSON test against sidebar_basic.pdf
-- [x] SidebarExtractor: multi-page extraction against sidebar_page_extract.pdf
-- [x] SidebarExtractor: per-page extraction (page 0, page 1, empty page 2)
-- [x] Consistency: per-page reassembly matches document-level extraction
-- [x] In-memory annotation round-trip: create in-memory → extract → verify
-      all fields (UUID, author, text, anchorY) match fitz-written original.
-      Guards against dual-write field omissions (/NM, /T gotchas).
+### Swift — remaining
 - [ ] Coordinate conversion: y-flip math for known page heights and points
 - [ ] QuadPoints construction: verify PDFKit-space quad geometry
 - [ ] Integration: FitzBridge round-trip against test PDF (requires venv)
-
----
-
-## Milestone 1: Usable Daily Driver
-
-### Sidebar (comment cards)
-- [x] Right-side fixed-width panel showing annotation cards
-- [x] Each card: title bar + comment text below
-- [x] Cards sorted by vertical position on visible page(s)
-- [x] Perfect vertical alignment with corresponding highlight (`PageSidebarView`)
-- [x] Scrolls in sync with PDF
-- [x] Cards shown for all highlights with non-empty comments
-- [x] Empty-comment highlights: no card (or minimal indicator)
-- [x] Implement Collision Avoidance (greedy algorithm to prevent overlapping cards)
-- [x] Live sidebar updates: cards appear/update/disappear on comment add/edit/delete
-- [x] SidebarUpdateDelegate protocol (AnimaPDFView → MainViewController)
-- [x] Per-page re-extraction (SidebarExtractor.extractCards(from:at:))
-- [x] Card click → highlight emphasis (light yellow + card active border)
-- [x] Click highlight → emphasize highlight + activate card (bidirectional)
-- [x] Double-click → ensure emphasis + open dialog, emphasis survives rebuild
-- [x] Emphasis unified with selectedAnnotation (Delete targets emphasized highlight)
-- [x] Scroll card into view when emphasized via highlight-click (if not visible)
-- [x] Clear comment text = remove comment (keep highlight) — backend done, needs UX wiring
-- [x] Input form: custom NSPanel replacing NSAlert (CommentInputPanel.swift)
-
-### Navigation
-- [x] Jump to beginning: Cmd+Home or Home
-- [x] Jump to end: Cmd+End or End
-- [x] Page Up / Page Down (Windows-style: one screenful)
 
 ---
 
@@ -179,7 +91,6 @@ Test infrastructure:
 - [ ] Eliminate need for Windows PDF server + Parallels bridge
 
 ### pdf-annot compatibility
-- [x] Standard annotation format (verified in both PoCs)
 - [ ] Test with full extract.py pipeline (not just round_trip_test.py)
 - [ ] Verify comment extraction with actual Obsidian bibnote generation
 - [ ] Match PDF-XChange Viewer's annotation structure as closely as possible
@@ -188,10 +99,10 @@ Test infrastructure:
 
 ## Milestone 3: Nice to Have (Backlog)
 
-### Sidebar (comment cards)
-- [x] Input form: session-remembered geometry (deferred — needs NSPanel frame lifecycle investigation)
-- [ ] review remove highlight (now emphasized; which keys)
-- [ ] Undo (i.e. remove) last highlight
+### Sidebar
+- [ ] Review remove-highlight UX (which keys, confirmation?)
+- [ ] Undo (remove) last highlight
+- [ ] Empty-comment confirmation before clearing
 
 ### Navigation
 - [ ] Cmd+F find (PDFKit native — may come free)
@@ -199,7 +110,7 @@ Test infrastructure:
 
 ### Find
 - [ ] Regex search
-- [ ] "Find all" — highlight all matches, list in sidebar (like Excel)
+- [ ] "Find all" — highlight all matches, list in sidebar
 
 ### Performance
 - [ ] Test with large IA PDFs (~20MB)
@@ -212,14 +123,8 @@ Test infrastructure:
 - [ ] Browser-style tabs in single window
 - [ ] Each tab: independent PDF + sidebar
 - [ ] Cmd+Shift+] / Cmd+Shift+[ to switch tabs
-- [ ] Ctrl+Tab mapping (for Windows muscle memory, via app or Karabiner)
 - [ ] Tab shows filename
 - [ ] Open new tab: Cmd+O or drag-drop
 
----
-
-## Housekeeping
-
-- [x] Add .editorconfig (LF line endings, indentation rules)
-- [x] Add `make format` target (SwiftFormat + black)
+### Housekeeping
 - [ ] Review and clean up MainMenu.xib (remove unused Font/Format/Text menus)

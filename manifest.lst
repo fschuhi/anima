@@ -13,6 +13,7 @@ tmp/project-tree.txt
 README.md
 SIDEBAR_DESIGN.md
 TODO.md
+# CHANGELOG.md
 
 ### --- Build & Configuration ---
 Makefile

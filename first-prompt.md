@@ -34,8 +34,7 @@ The filesdump contains the complete project enclosed in `<document>` tags.
 - **`LLM-instructions.md`** - Full collaboration guidelines (references CRITICAL_RULES.md)
 - **`README.md`** - Bird's eye view of the project architecture
 - **`TODO.md`** - Priorities for this conversation (including quick wins) and long-term directions
-- **`HANDOVER.md`** (might be missing) - Detailed implementation guidance for next LLM conversation
-- **`SIDEBAR_DESIGN.md`** (example) - Some markdown files in the root are focused backlogs
+- **`SIDEBAR_DESIGN.md`** - Design overview, current goals, further ideas and backlog focused on the app's sidebar.
 
 ---
 

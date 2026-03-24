@@ -7,6 +7,7 @@
 //  Current capabilities:
 //    - ENTER with selection → create highlight (dual-write: fitz + in-memory)
 //    - H key → toggle persistent highlight mode (mouseUp creates highlight)
+//    - P key → toggle X-Ray mode (reveals native popups for comments)
 //    - Double-click on highlight (or card via delegate) → edit comment via CommentInputPanel
 //    - Single-click highlight → toggle emphasis
 //    - Delete key → remove the currently emphasized highlight
@@ -73,10 +74,14 @@ class AnimaPDFView: PDFView {
     // --- Sidebar delegate ---
     weak var sidebarDelegate: SidebarUpdateDelegate?
 
-    // --- Persistent Highlight Mode ---
+    // --- Display Modes ---
     // When active, releasing the mouse after a text selection immediately
     // creates a highlight (no ENTER needed). Toggle with H key.
     var isHighlightMode = false
+
+    // When active, populates standard `.contents` from our custom `/AnimaComment`
+    // key, which forces PDFKit to render native yellow popup indicators. Toggle with P key.
+    var isXRayMode = false
 
     // --- Highlight color/opacity constants (must match anima_helper.py) ---
     // anima_helper.py: HIGHLIGHT_COLOR = [1.0, 0.75, 0.80], HIGHLIGHT_OPACITY = 0.4
@@ -113,6 +118,13 @@ class AnimaPDFView: PDFView {
             return true
         }
 
+        // P = toggle X-Ray mode (show popups)
+        if event.keyCode == 35 { // keyCode 35 = P
+            toggleXRayMode()
+            lastHandledEvent = event
+            return true
+        }
+
         // ENTER = create highlight from current selection
         if event.keyCode == 36 || event.keyCode == 76 {
             if createHighlightFromSelection() {
@@ -133,7 +145,7 @@ class AnimaPDFView: PDFView {
         return false
     }
 
-    // --- Persistent Highlight Mode ---
+    // --- Modes ---
 
     func toggleHighlightMode() {
         isHighlightMode.toggle()
@@ -141,12 +153,81 @@ class AnimaPDFView: PDFView {
         Swift.print(isHighlightMode ? "🟡 Highlight mode ON" : "⚪ Highlight mode OFF")
     }
 
+    func toggleXRayMode() {
+        isXRayMode.toggle()
+        updateWindowTitle()
+        applyXRayModeToDocument()
+        Swift.print(isXRayMode ? "🦴 X-Ray mode ON (Popups visible)" : "🦴 X-Ray mode OFF (Popups hidden)")
+    }
+
     func updateWindowTitle() {
         let base = "Anima"
-        if isHighlightMode {
-            self.window?.title = "\(base) — [H] Highlight Mode"
-        } else {
+        var modes: [String] = []
+        if isHighlightMode { modes.append("[H] Highlight") }
+        if isXRayMode { modes.append("[P] X-Ray") }
+
+        if modes.isEmpty {
             self.window?.title = base
+        } else {
+            self.window?.title = "\(base) — \(modes.joined(separator: " ")) Mode"
+        }
+    }
+
+    /// Iterates the document to instantly show or hide the native PDFKit popup indicators.
+    private func applyXRayModeToDocument() {
+        guard let document = self.document else { return }
+
+        for pageIndex in 0..<document.pageCount {
+            guard let page = document.page(at: pageIndex) else { continue }
+            var popupsToRemove: [PDFAnnotation] = []
+
+            for annot in page.annotations {
+                if annot.type == "Highlight" {
+                    let animaComment = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment")) as? String ?? ""
+
+                    if isXRayMode {
+                        // Restore standard contents and manually rebuild the missing popup object
+                        if !animaComment.isEmpty {
+                            annot.contents = animaComment
+                            ensurePopupExists(for: annot, on: page)
+                        }
+                    } else {
+                        // Wipe standard contents to kill popups
+                        annot.contents = ""
+                        if let popup = annot.popup {
+                            popupsToRemove.append(popup)
+                            annot.popup = nil
+                        }
+                        annot.removeValue(forAnnotationKey: PDFAnnotationKey(rawValue: "/Popup"))
+                    }
+                } else if !isXRayMode && annot.type == "Popup" {
+                    // Catch explicit popups when turning X-Ray OFF
+                    popupsToRemove.append(annot)
+                }
+            }
+
+            // Purge the collected popups from the page
+            if !isXRayMode {
+                for popup in popupsToRemove {
+                    page.removeAnnotation(popup)
+                }
+            }
+        }
+        // Force visual update
+        self.setNeedsDisplay(self.bounds)
+    }
+
+    /// Manually rebuilds a PDFAnnotationPopup and links it to the highlight.
+    /// Because we aggressively destroy popups on load to prevent them from rendering,
+    /// setting `.contents` later isn't enough; PDFKit requires the actual object to exist.
+    private func ensurePopupExists(for annot: PDFAnnotation, on page: PDFPage) {
+        if annot.popup == nil {
+            // Provide a sensible default size/location. PDFKit handles the yellow icon
+            // placement automatically, but this dictates where the actual text box opens if clicked.
+            let popupBounds = NSRect(x: annot.bounds.maxX, y: annot.bounds.maxY, width: 200, height: 150)
+            let popup = PDFAnnotation(bounds: popupBounds, forType: .popup, withProperties: nil)
+            annot.popup = popup
+            page.addAnnotation(popup)
         }
     }
 
@@ -294,9 +375,24 @@ class AnimaPDFView: PDFView {
         )
 
         if success {
-            // Dual-write: update the custom key and ensure standard contents is empty
+            // Dual-write: update the custom key.
             annot.setValue(newComment, forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment"))
-            annot.contents = "" // Keeps popups suppressed
+
+            // Sync standard contents based on active X-Ray Mode
+            if isXRayMode {
+                annot.contents = newComment
+                if !newComment.isEmpty {
+                    ensurePopupExists(for: annot, on: page)
+                }
+            } else {
+                annot.contents = ""
+                // Destroy popup if PDFKit aggressively re-spawned one
+                if let popup = annot.popup {
+                    page.removeAnnotation(popup)
+                    annot.popup = nil
+                }
+                annot.removeValue(forAnnotationKey: PDFAnnotationKey(rawValue: "/Popup"))
+            }
 
             Swift.print("✅ Comment updated on \(uuid)")
             Swift.print("   New comment: \(newComment.isEmpty ? "(removed)" : newComment)")
@@ -525,10 +621,10 @@ class AnimaPDFView: PDFView {
         annot.color = AnimaPDFView.highlightColor
         annot.setValue(AnimaPDFView.highlightOpacity, forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
 
-        // Set comment into our custom key to suppress native popups
+        // Handle comment based on X-Ray mode
         if !comment.isEmpty {
             annot.setValue(comment, forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment"))
-            annot.contents = ""
+            annot.contents = isXRayMode ? comment : ""
         }
 
         // Set UUID — both via /NM (primary, used by annotationUUID) and
@@ -564,6 +660,11 @@ class AnimaPDFView: PDFView {
 
         // Add to the page — PDFKit renders it immediately
         page.addAnnotation(annot)
+
+        // Now that it's on the page, link the popup if necessary
+        if isXRayMode && !comment.isEmpty {
+            ensurePopupExists(for: annot, on: page)
+        }
 
         Swift.print("🔧 In-memory annotation added: \(uuid) (\(bounds.count) quads, bounds=\(overallBounds))")
     }
