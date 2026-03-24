@@ -263,7 +263,11 @@ class AnimaPDFView: PDFView {
     /// by double-clicks on the PDF canvas, and externally by the sidebar when
     /// a card is double-clicked.
     func editComment(for annot: PDFAnnotation, uuid: String, on page: PDFPage) {
-        let existingComment = annot.contents ?? ""
+        // Read from our custom key first, fallback to .contents
+        var existingComment = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment")) as? String ?? ""
+        if existingComment.isEmpty {
+            existingComment = annot.contents ?? ""
+        }
 
         Swift.print("🖱️  Editing comment: \(uuid)")
         Swift.print("   Existing comment: \(existingComment.isEmpty ? "(none)" : existingComment)")
@@ -290,8 +294,10 @@ class AnimaPDFView: PDFView {
         )
 
         if success {
-            // Dual-write: update the in-memory annotation's comment directly
-            annot.contents = newComment
+            // Dual-write: update the custom key and ensure standard contents is empty
+            annot.setValue(newComment, forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment"))
+            annot.contents = "" // Keeps popups suppressed
+
             Swift.print("✅ Comment updated on \(uuid)")
             Swift.print("   New comment: \(newComment.isEmpty ? "(removed)" : newComment)")
 
@@ -487,7 +493,7 @@ class AnimaPDFView: PDFView {
     ///   - /NM                                  (UUID for identification)
     ///   - userName                             (backup UUID for hit-testing)
     ///   - /T                                   (author for sidebar cards)
-    ///   - contents                             (comment text)
+    ///   - /AnimaComment                        (custom comment text key to suppress popups)
     ///
     /// IMPORTANT: /NM must be set explicitly. PDFKit maps userName to /T
     /// internally, so relying on userName alone for UUID storage causes /T
@@ -519,9 +525,10 @@ class AnimaPDFView: PDFView {
         annot.color = AnimaPDFView.highlightColor
         annot.setValue(AnimaPDFView.highlightOpacity, forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
 
-        // Set comment
+        // Set comment into our custom key to suppress native popups
         if !comment.isEmpty {
-            annot.contents = comment
+            annot.setValue(comment, forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment"))
+            annot.contents = ""
         }
 
         // Set UUID — both via /NM (primary, used by annotationUUID) and

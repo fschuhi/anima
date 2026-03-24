@@ -96,6 +96,7 @@ class PageSidebarView: NSScrollView {
 // --- Custom Sidebar Scroll View ---
 class SidebarScrollView: NSScrollView {
     weak var targetScrollView: NSScrollView?
+
     override func scrollWheel(with event: NSEvent) {
         if let target = targetScrollView {
             target.scrollWheel(with: event)
@@ -121,6 +122,7 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     private var emphasizedOriginalColor: NSColor?
     private var emphasizedOriginalOpacity: CGFloat?
     private var activeCardView: CommentCardView?
+
     // UUID of the currently emphasized annotation. Used to re-apply emphasis
     // after sidebar rebuilds (the card views are torn down and recreated,
     // so activeCardView becomes stale — but the UUID survives).
@@ -179,6 +181,9 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     // --- Data Loading ---
 
     func loadPDF(document: PDFDocument) {
+        // 1. Scrub comments into our custom key to suppress native popups BEFORE rendering
+        scrubCommentsForPopupSuppression(in: document)
+
         pdfView.document = document
 
         // Wire up the sidebar delegate so annotation mutations trigger rebuilds
@@ -209,6 +214,48 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
 
         pdfView.layoutDocumentView()
         updateSidebarLayout()
+    }
+
+    /// Iterates through the document and moves standard `.contents` text into our
+    /// custom `/AnimaComment` dictionary key, then clears `.contents`.
+    /// Crucially, it aggressively severs all links to Popup annotations to force
+    /// PDFKit to drop them from the rendering tree.
+    private func scrubCommentsForPopupSuppression(in document: PDFDocument) {
+        for pageIndex in 0..<document.pageCount {
+            guard let page = document.page(at: pageIndex) else { continue }
+
+            var popupsToRemove: [PDFAnnotation] = []
+
+            for annot in page.annotations {
+                if annot.type == "Highlight" {
+
+                    // 1. Migrate the text
+                    if let text = annot.contents, !text.isEmpty {
+                        annot.setValue(text, forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment"))
+                        annot.contents = "" // Wipe standard contents
+                    }
+
+                    // 2. Aggressively sever the Popup connection
+                    if let popup = annot.popup {
+                        popupsToRemove.append(popup)
+                        annot.popup = nil // Break the PDFKit property link
+                    }
+
+                    // Break the low-level PDF dictionary link just to be sure
+                    annot.removeValue(forAnnotationKey: PDFAnnotationKey(rawValue: "/Popup"))
+
+                } else if annot.type == "Popup" {
+                    // Catch any orphan Popup annotations on the page
+                    popupsToRemove.append(annot)
+                }
+            }
+
+            // 3. Purge the popups from the in-memory page
+            for popup in popupsToRemove {
+                page.removeAnnotation(popup)
+            }
+        }
+        Swift.print("🧹 Scrubbed PDFKit popup contents and aggressively severed /Popup links")
     }
 
     // --- SidebarUpdateDelegate ---

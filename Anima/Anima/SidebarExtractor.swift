@@ -46,8 +46,16 @@ class SidebarExtractor {
             // 1. Must be a highlight
             guard annot.type == "Highlight" else { continue }
 
-            // 2. Must have a non-empty comment
-            guard let text = annot.contents?.trimmingCharacters(in: .whitespacesAndNewlines),
+            // 2. Must have a non-empty comment.
+            // Check our custom /AnimaComment key first (from popup suppression scrub),
+            // then fall back to standard .contents.
+            var rawText = annot.value(forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment")) as? String
+
+            if rawText == nil || rawText!.isEmpty {
+                rawText = annot.contents
+            }
+
+            guard let text = rawText?.trimmingCharacters(in: .whitespacesAndNewlines),
                   !text.isEmpty else { continue }
 
             // 3. Must have a UUID
