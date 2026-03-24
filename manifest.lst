@@ -26,6 +26,7 @@ tools/requirements.txt
 
 ### --- Swift ---
 Anima/Anima/AnimaPDFView.swift
+Anima/Anima/AnnotationManager.swift
 Anima/Anima/AppDelegate.swift
 Anima/Anima/CommentCardView.swift
 Anima/Anima/CommentInputPanel.swift

@@ -47,9 +47,10 @@ Anima uses a hybrid approach: **PDFKit for rendering**, **fitz for writing**.
 ```mermaid
 graph TB
     subgraph "Anima (Swift / macOS)"
-        UI[PDFView Subclass]
-        DW[Dual-Write Controller]
+        UI[AnimaPDFView]
+        AM[AnnotationManager]
         FB[FitzBridge]
+        MVC[MainViewController]
         SB[Sidebar + Cards]
     end
 
@@ -60,15 +61,16 @@ graph TB
 
     PDF[(PDF File)]
 
-    UI -->|user action| DW
-    DW -->|in-memory PDFAnnotation| UI
-    DW -->|subprocess call| FB
-    DW -->|SidebarUpdateDelegate| SB
+    UI -->|user action| AM
+    AM -->|in-memory PDFAnnotation| UI
+    AM -->|subprocess call| FB
+    UI -->|SidebarUpdateDelegate| MVC
+    MVC -->|emphasis, layout| SB
     FB -->|CLI args + JSON| AH
     AH -->|incremental save| FZ
     FZ -->|read/write| PDF
     UI -->|read for display| PDF
-    SB -->|card click → emphasis| UI
+    SB -->|card click → emphasis| MVC
 ```
 
 ### Why Hybrid?
@@ -85,16 +87,22 @@ rendering, scrolling, text selection, zoom, and hit-testing.
 
 ### Dual-Write Pattern
 
-When creating, editing, or deleting highlights during a session:
+`AnnotationManager` owns the dual-write sequence. When creating, editing, or
+deleting highlights during a session:
 
-1. **Persist to disk** — call `anima_helper.py` via subprocess, which uses fitz
-   to write the annotation with incremental save.
-2. **Update in-memory** — add, modify, or remove a `PDFAnnotation` in PDFKit's
-   in-memory document for immediate display.
-3. **Notify sidebar** — call `sidebarDelegate.annotationsDidChange(onPageIndex:)`
+1. **Persist to disk** — `AnnotationManager` calls `anima_helper.py` via
+   `FitzBridge`, which uses fitz to write the annotation with incremental save.
+2. **Update in-memory** — `AnnotationManager` adds, modifies, or removes a
+   `PDFAnnotation` in PDFKit's in-memory document for immediate display.
+3. **Notify sidebar** — `AnimaPDFView` calls
+   `sidebarDelegate.annotationsDidChange(onPageIndex:)` after the manager returns,
    so the sidebar rebuilds the affected page's cards.
 4. **No reload** — the document is never reloaded during a session, eliminating
    the scroll drift that plagued both PoCs.
+
+`AnnotationManager` is a toolbox class: it holds no references to the view or
+document, receiving all context (document, page, annotation, isXRayMode) per-call.
+This keeps it testable and safe for future multi-document support.
 
 On next app launch, PDFKit loads the fitz-written file from disk. The file is
 the single source of truth.
@@ -126,46 +134,25 @@ field), not to `/NM`. Relying on `userName` alone for UUID storage causes the
 author field to overwrite the UUID. See SIDEBAR_DESIGN.md "Known Gotchas" for
 full details.
 
-### Popup Suppression (`/AnimaComment` Contract)
-
-PDFKit renders native yellow popup indicators for any annotation with non-empty
-`.contents`. These popups cannot be resized, repositioned off-screen, or hidden
-through standard PDFKit APIs. Anima suppresses them entirely:
-
-- **On document load**, `scrubCommentsForPopupSuppression()` (in MainViewController)
-  migrates each highlight's `.contents` into a custom `/AnimaComment` dictionary key,
-  clears `.contents`, and removes all `/Popup` annotation objects from every page.
-- **During the session**, all comment reads and writes go through `/AnimaComment`.
-  The standard `.contents` field stays empty, preventing popup rendering.
-- **X-Ray mode** (P key toggle) temporarily restores `.contents` and rebuilds popup
-  objects, allowing inspection of native popup behavior for debugging. Toggling off
-  re-scrubs the document.
-
-The `/AnimaComment` key is read by `SidebarExtractor` (with `.contents` fallback),
-by `editComment()` in AnimaPDFView, and by `addInMemoryHighlight()`. The fitz-written
-file on disk always uses standard `/Contents` — the custom key exists only in PDFKit's
-in-memory representation.
-
 ---
 
 ## Current Status
 
 | Feature                  | Status      | Notes                                              |
-|--------------------------|-------------|----------------------------------------------------|
-| **PDF Rendering**        | ✅ Complete  | PDFKit, including Internet Archive layered PDFs    |
-| **Continuous Scroll**    | ✅ Complete  | Native trackpad scrolling                          |
-| **Text Selection**       | ✅ Complete  | Drag to select, per-line quad extraction           |
-| **Highlight Creation**   | ✅ Complete  | ENTER with selection, dual-write, no reload        |
+|--------------------------|-------------|-----------------------------------------------------|
+| **PDF Rendering** | ✅ Complete  | PDFKit, including Internet Archive layered PDFs    |
+| **Continuous Scroll** | ✅ Complete  | Native trackpad scrolling                          |
+| **Text Selection** | ✅ Complete  | Drag to select, per-line quad extraction           |
+| **Highlight Creation** | ✅ Complete  | ENTER with selection, dual-write, no reload        |
 | **Persistent Highlight** | ✅ Complete  | H key toggles mode; mouseUp = instant highlight    |
-| **Comment Editing**      | ✅ Complete  | Modal input panel (CommentInputPanel), card-styled |
-| **Highlight Deletion**   | ✅ Complete  | Click + Delete key, dual-write removal             |
-| **Incremental Save**     | ✅ Complete  | fitz preserves all existing annotations            |
+| **Comment Editing** | ✅ Complete  | Modal input panel (CommentInputPanel), card-styled |
+| **Highlight Deletion** | ✅ Complete  | Click + Delete key, dual-write removal             |
+| **Incremental Save** | ✅ Complete  | fitz preserves all existing annotations            |
 | **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
-| **Xcode Project**        | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
-| **Sidebar**              | ✅ Complete  | Live cards, bidirectional emphasis, scroll sync    |
-| **Popup Suppression**    | ✅ Complete  | Yellow squares in x-ray mode, toggle with P        |
-| **Tabs**                 | 🚧 Planned  | Multi-PDF in single window (Milestone 1)           |
-| **pdf:// URL Handler**   | 🚧 Planned  | Open PDFs from Obsidian links (Milestone 2)        |
+| **Xcode Project** | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
+| **Sidebar** | ✅ Complete  | Live cards, bidirectional emphasis, scroll sync    |
+| **Tabs** | 🚧 Planned  | Multi-PDF in single window (Milestone 1)           |
+| **pdf:// URL Handler** | 🚧 Planned  | Open PDFs from Obsidian links (Milestone 2)        |
 
 ### Highlight Workflow
 
@@ -233,8 +220,9 @@ Zettelkasten: idea notes, workbenches, Folgezettel sequences
 anima/
 ├── Anima/                          ← Xcode project container
 │   ├── Anima/                      ← Swift source files (app target)
-│   │   ├── AnimaPDFView.swift      ← PDFView subclass: keyboard, mouse, dual-write
-│   │   ├── AppDelegate.swift       ← Window setup, PDF loading, event monitor
+│   │   ├── AnimaPDFView.swift      ← PDFView subclass: keyboard, mouse, hit-testing
+│   │   ├── AnnotationManager.swift ← Annotation CRUD: create, edit, delete (dual-write)
+│   │   ├── AppDelegate.swift       ← Window setup, PDF loading, manager wiring
 │   │   ├── FitzBridge.swift        ← Subprocess bridge to Python helper
 │   │   ├── MainViewController.swift← NSSplitView layout, sidebar sync & emphasis
 │   │   ├── SidebarExtractor.swift  ← Parses annotations into sidebar CommentCard structs
@@ -256,6 +244,7 @@ anima/
 │   └── input_original.pdf         ← Test PDF (unmodified backup)
 ├── .venv/                         ← Python virtual environment
 ├── CRITICAL_RULES.md              ← Non-negotiable collaboration rules
+├── CHANGELOG.md                   ← Historical record of accomplishments
 ├── LLM-instructions.md            ← AI session context and conventions
 ├── SIDEBAR_DESIGN.md              ← Sidebar design document
 ├── TODO.md                        ← Task list with milestones
@@ -269,18 +258,26 @@ anima/
 
 ### Module Overview
 
-**`AnimaPDFView.swift`** — The core of the app. Subclasses `PDFView` to intercept
-keyboard and mouse events. Handles highlight creation (with dual-write), persistent
-highlight mode (H key toggle, mouseUp auto-highlight), comment editing via
-double-click (delegating to `CommentInputPanel`), highlight deletion, hit-testing,
-and coordinate conversion from
-PDFKit space to fitz space. Defines the `SidebarUpdateDelegate` protocol and
-notifies its delegate after every annotation mutation and highlight click so the
-sidebar stays in sync and emphasis is applied.
+**`AnimaPDFView.swift`** — Subclasses `PDFView` to intercept keyboard and mouse
+events. Handles persistent highlight mode (H key toggle, mouseUp auto-highlight),
+X-Ray mode (P key toggle for popup visibility), hit-testing for highlight clicks,
+and emphasis/selection coordination via `SidebarUpdateDelegate`. All annotation
+CRUD (create, edit, delete) is delegated to `AnnotationManager`. Defines the
+`SidebarUpdateDelegate` protocol and notifies its delegate after every annotation
+mutation and highlight click so the sidebar stays in sync.
 
-**`AppDelegate.swift`** — Creates the window, loads the PDF, sets up the NSEvent
-monitor as a fallback for keyboard events (PDFKit's internal `PDFDocumentView`
-sometimes captures keyboard focus).
+**`AnnotationManager.swift`** — Toolbox class that owns all annotation CRUD
+operations and the dual-write pattern. Creates highlights (with quad math and
+coordinate conversion from PDFKit to fitz space), edits comments (showing the
+modal `CommentInputPanel`, writing via fitz, updating in-memory `/AnimaComment`),
+and deletes highlights. Holds no references to the view or document — all context
+is passed per-call, keeping the class testable and safe for multi-document (tabs)
+support. Also owns shared constants (`authorName`, `highlightColor`,
+`highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`).
+
+**`AppDelegate.swift`** — Creates the window, loads the PDF, creates and wires the
+`AnnotationManager`, and sets up the NSEvent monitor as a fallback for keyboard
+events (PDFKit's internal `PDFDocumentView` sometimes captures keyboard focus).
 
 **`MainViewController.swift`** — Manages the dual-pane layout (`NSSplitView`),
 instantiates the `SidebarScrollView`, and coordinates the complex scrolling math

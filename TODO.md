@@ -36,9 +36,8 @@
 ## Refactoring
 
 - [ ] **Extract `AnnotationManager` from `AnimaPDFView`**
-      Pull highlight creation (quad math + dual-write), comment editing,
-      and deletion into a dedicated class. AnimaPDFView becomes purely
-      about event handling and delegates to AnnotationManager for CRUD.
+      Done. `AnimaPDFView` delegates all CRUD to `AnnotationManager`.
+      See CHANGELOG.md for details.
 
 - [ ] **Extract `PopupController`**
       Consolidate all popup suppression logic (scrubbing on load, X-Ray

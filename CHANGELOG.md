@@ -86,3 +86,17 @@ This file serves as the historical record — TODO.md stays forward-looking.
 - SidebarExtractor: per-page extraction (page 0, page 1, empty page 2)
 - Per-page reassembly matches document-level extraction
 - In-memory annotation round-trip (guards dual-write field omissions)
+
+## Refactoring
+
+- Extracted AnnotationManager from AnimaPDFView — All annotation CRUD
+  operations (highlight creation with quad math and dual-write, comment editing
+  via CommentInputPanel, highlight deletion) moved to a dedicated class.
+  AnimaPDFView is now purely event handling, hit-testing, and mode management.
+  AnnotationManager is a toolbox: it holds no references to the view or document,
+  receiving all context per-call. This keeps it testable and safe for future
+  multi-document (tabs) support. Constants (authorName, highlightColor,
+  highlightOpacity) and helpers (annotationUUID, ensurePopupExists) also
+  moved. AppDelegate creates and wires the manager. Four files changed:
+  AnnotationManager.swift (new, 397 lines), AnimaPDFView.swift (700→463),
+  MainViewController.swift (1 reference updated), AppDelegate.swift (wiring).
