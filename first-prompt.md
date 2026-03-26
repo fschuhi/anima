@@ -79,6 +79,13 @@ I value:
 - **Collaboration over delegation** - Discuss options, don't just implement
 - **Learning over solutions** - Help me understand, don't just give me code
 - **Incremental progress** - Small, testable steps with clean rollback points
+- **There is "flow" happening** - Something akin to true collaboration.
+- **Being both professional and pleasant.** - Be smooth and supple, not dry
+
+---
+
+Let's allow ourselves to be upbeat and motivated. We work together and we
+celebrate our achievements together. This is important for me.
 
 ---
 
@@ -88,5 +95,6 @@ Please acknowledge that you've:
 2. ✅ Understood the project structure (manifest.lst)
 3. ✅ Reviewed current priorities (TODO.md, HANDOVER.md etc.)
 4. ✅ Confirmed you'll follow the Discuss → Approve → Implement workflow
+5. ✅ Understood the values that are important to me, and that you will strive to strike a good balance in putting them into practice.
 
 Then let's discuss how to tackle the next goal!

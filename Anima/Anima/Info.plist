@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- === Document Types === -->
+    <!-- Tells macOS that Anima can open PDF files.                         -->
+    <!-- This enables: Finder double-click, "Open With" menu, drag-to-dock. -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <!-- Display name shown in Finder's "Open With" menu -->
+            <key>CFBundleTypeName</key>
+            <string>PDF Document</string>
+
+            <!-- Role: Viewer (read-only from Finder's perspective;           -->
+            <!-- actual annotation writes go through fitz, not PDFKit save)   -->
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+
+            <!-- Modern UTI-based type declaration (macOS 11+) -->
+            <key>LSItemContentTypes</key>
+            <array>
+                <string>com.adobe.pdf</string>
+            </array>
+
+            <!-- Handler rank: Alternate means Anima appears in "Open With"   -->
+            <!-- but doesn't fight Preview for the default. The user can      -->
+            <!-- promote Anima to default via Finder → Get Info → "Open With" -->
+            <!-- → Change All.                                                -->
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+        </dict>
+    </array>
+</dict>
+</plist>
