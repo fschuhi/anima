@@ -4,8 +4,12 @@
 // All annotation writing goes through this bridge to fitz, keeping PDFKit
 // as a read-only renderer.
 //
-// The Python executable is resolved from .venv/bin/python3 relative to the
-// current working directory. Run ./anima from the project folder.
+// Path resolution:
+//   The Python executable is derived from the helperPath passed in each call.
+//   helperPath points to tools/anima_helper.py; the project root is two levels
+//   up, and the venv Python lives at .venv/bin/python3 relative to that root.
+//   This means FitzBridge has no hardcoded paths of its own — everything flows
+//   from the helperPath that AppDelegate sets on AnnotationManager.
 
 import Foundation
 
@@ -14,7 +18,7 @@ struct FitzBridge {
     /// Create a highlight annotation via anima_helper.py.
     ///
     /// - Parameters:
-    ///   - helperPath: Path to anima_helper.py (relative or absolute)
+    ///   - helperPath: Path to anima_helper.py (absolute)
     ///   - filePath: Path to the PDF file
     ///   - page: Page number (0-indexed)
     ///   - uuid: UUID for the annotation
@@ -77,16 +81,27 @@ struct FitzBridge {
         return runPython(arguments: arguments)
     }
 
-    // --- Internal: run a Python process ---
+    // MARK: - Internal: run a Python process
 
+    /// Resolves the venv Python path from the helperPath and runs the process.
+    ///
+    /// Path derivation:
+    ///   helperPath = .../projects/anima/tools/anima_helper.py
+    ///                                  ^^^^^^ project root is 2 levels up
+    ///   pythonPath = .../projects/anima/.venv/bin/python3
     private static func runPython(arguments: [String]) -> Bool {
         let process = Process()
 
-        // Use the venv Python so fitz/PyMuPDF is available.
-        // Process() needs an absolute path for executableURL.
-		let projectRoot = "/Users/fschuhi/Projects/anima"	
-		let pythonPath = "\(projectRoot)/.venv/bin/python3"
-		
+        // Derive the venv Python path from the helper script location.
+        // helperPath is the first element of arguments.
+        let helperURL = URL(fileURLWithPath: arguments[0])
+        let projectRoot = helperURL
+            .deletingLastPathComponent()   // .../tools/
+            .deletingLastPathComponent()   // .../anima/
+        let pythonPath = projectRoot
+            .appendingPathComponent(".venv/bin/python3")
+            .path
+
         process.executableURL = URL(fileURLWithPath: pythonPath)
         process.arguments = arguments
 

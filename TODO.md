@@ -2,6 +2,7 @@
 
 ## Status Key
 - `[ ]` To do
+- `[x]` Done (see also `CHANGELOG.md`)
 - `[~]` Partially done / workaround exists
 - `[!]` Known issue, needs investigation
 
@@ -21,11 +22,6 @@
       edited by fitz may render slightly differently in PDF-XChange Viewer.
       PDFKit renders consistently regardless. Known fitz behavior.
 
-- [!] **Hardcoded absolute paths**
-      `AppDelegate.swift`, `AnimaPDFView.swift`, and `FitzBridge.swift` use
-      hardcoded paths (`/Users/fschuhi/Projects/anima/...`). Works for
-      development; needs proper path resolution for distributable .app bundle.
-
 - [!] **Clip Tools Launcher.workflow clipboard corruption**
       macOS Service injects `rm -rf` fragments into pasted text containing
       `!r` format specifiers. Check ~/Library/Services/, determine source,
@@ -35,7 +31,7 @@
 
 ## Refactoring
 
-- [ ] **Extract `AnnotationManager` from `AnimaPDFView`**
+- [x] **Extract `AnnotationManager` from `AnimaPDFView`**
       Done. `AnimaPDFView` delegates all CRUD to `AnnotationManager`.
       See CHANGELOG.md for details.
 
@@ -60,6 +56,9 @@
       bottom status bar (thin NSTextField below the PDF view).
 - [ ] **Emphasis color tuning** — Light yellow (#FFFFE0) at 0.7 opacity
       may need adjustment for different PDF backgrounds or dark mode.
+- [ ] **CommentInputPanel geometry persistence** — Use UserDefaults to
+      remember panel position/size across launches (currently session-only
+      via static var). Works across `open -n` instances too.
 
 ---
 
@@ -75,11 +74,7 @@
 ## Milestone 2: Toolchain Integration
 
 ### macOS Integration
-- [ ] Register as default PDF viewer (Info.plist CFBundleDocumentTypes)
-- [ ] Accept file open via double-click in Finder
-- [ ] Accept file open via command line argument
 - [ ] Proper .app bundle with icon
-- [ ] Resolve helper/venv paths relative to bundle (eliminate hardcoded paths)
 
 ### pdf:// URL handler (macOS native)
 - [ ] Register custom `pdf://` URL scheme

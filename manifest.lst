@@ -16,6 +16,7 @@ TODO.md
 # CHANGELOG.md
 
 ### --- Build & Configuration ---
+Anima/Anima/Info.plist
 Makefile
 pyproject.toml
 tools/requirements.txt

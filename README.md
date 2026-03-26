@@ -374,6 +374,55 @@ Current Swift test suite:
 - `testInMemoryAnnotationRoundTrip` — Verifies in-memory annotations produce
   correct `CommentCard` data, guarding against dual-write field omissions
 
+### Opening PDFs
+
+Anima accepts PDFs through three entry points, checked in this order:
+
+1. **Finder** — Double-click a PDF (or right-click → Open With → Anima).
+   Requires the Info.plist `CFBundleDocumentTypes` registration. To make Anima
+   the default viewer: right-click any PDF → Get Info → Open With → Anima →
+   Change All.
+
+2. **Command line** — Pass a PDF path as an argument:
+   ```bash
+   open -a Anima --args ~/Papers/some-paper.pdf
+   ```
+
+3. **Dev fallback** — If neither of the above provides a file, Anima opens
+   `projectRoot/data/input.pdf` automatically. If that doesn't exist either,
+   Anima prints an error and exits.
+
+**Multiple instances:** Anima is single-window by design. To open several PDFs
+simultaneously, launch separate processes with `open -n`:
+
+```bash
+open -n -a Anima --args ~/Papers/paper-a.pdf
+open -n -a Anima --args ~/Papers/paper-b.pdf
+```
+
+Each instance is fully independent (separate window, sidebar, annotation state,
+comment panel geometry). This is also how the future `pdf://` URL server will
+open PDFs from Obsidian links.
+
+**Shell alias** (optional convenience for `~/.zshrc`):
+
+```bash
+alias anima='open /Users/fschuhi/Library/Developer/Xcode/DerivedData/Anima-esbrhbulontpfabyujxyeppsbgua/Build/Products/Debug/Anima.app'
+```
+
+### Path Resolution
+
+All derived paths flow from a single `projectRoot` constant in `AppDelegate.swift`:
+
+```
+projectRoot  = /Users/fschuhi/Projects/anima
+helperPath   = projectRoot + /tools/anima_helper.py      (passed to AnnotationManager)
+dev fallback = projectRoot + /data/input.pdf
+venv python  = derived by FitzBridge from helperPath      (two levels up + .venv/bin/python3)
+```
+
+To move the project, change `projectRoot` in AppDelegate — nothing else.
+
 ### Code Formatting
 
 ```bash

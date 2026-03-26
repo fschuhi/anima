@@ -10,7 +10,7 @@
 //  PDF loading priority:
 //    1. Finder double-click / "Open With" (pendingFileURL, set before launch completes)
 //    2. Command-line argument (first argument ending in .pdf)
-//    3. Dev fallback: ~/Projects/anima/data/input.pdf
+//    3. Dev fallback: projectRoot/data/input.pdf
 //    4. Error message + exit if neither resolves
 //
 //  AppKit timing note:
@@ -23,12 +23,23 @@
 //    when a second file arrives, open fires with the window fully ready —
 //    but since we're single-window, we log a hint about `open -n` instead.
 //
+//  Path resolution:
+//    A single projectRoot constant is the source of truth for all derived
+//    paths (helper script, dev fallback PDF). FitzBridge independently
+//    derives the venv Python path from the helperPath it receives.
+//    To move the project, change projectRoot here — nothing else.
+//
 
 import Cocoa
 import Quartz
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {
+
+    // --- Single source of truth for project location ---
+    // Change this one constant if the project moves.
+    // FitzBridge derives the venv Python path from the helperPath.
+    private let projectRoot = "/Users/fschuhi/Projects/anima"
 
     @IBOutlet var window: NSWindow!
 
@@ -49,7 +60,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentViewController = mainViewController
 
         // --- Wire up the annotation manager ---
-        let helperPath = "/Users/fschuhi/Projects/anima/tools/anima_helper.py"
+        let helperPath = "\(projectRoot)/tools/anima_helper.py"
         mainViewController.pdfView.annotationManager = AnnotationManager(helperPath: helperPath)
 
         // --- Determine which PDF to open ---
@@ -120,7 +131,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Resolves the PDF to open, checking (in order):
     ///   1. pendingFileURL (from Finder double-click during cold launch)
     ///   2. Command-line arguments (first .pdf path found)
-    ///   3. Dev fallback: ~/Projects/anima/data/input.pdf
+    ///   3. Dev fallback: projectRoot/data/input.pdf
     ///
     /// Returns nil if no valid PDF file is found.
     private func resolvePDFURL() -> URL? {
@@ -154,8 +165,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // --- 3. Dev fallback ---
-        let fallbackPath = NSString(string: "~/Projects/anima/data/input.pdf").expandingTildeInPath
-        let fallbackURL = URL(fileURLWithPath: fallbackPath)
+        let fallbackURL = URL(fileURLWithPath: "\(projectRoot)/data/input.pdf")
 
         if fileManager.fileExists(atPath: fallbackURL.path) {
             return fallbackURL
@@ -180,4 +190,3 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 }
-r

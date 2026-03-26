@@ -69,6 +69,14 @@ This file serves as the historical record — TODO.md stays forward-looking.
 - Jump to beginning/end (Cmd+Home, Cmd+End, Home, End)
 - Page Up / Page Down (one screenful, Windows-style)
 
+## macOS Integration
+
+- Accept file open via command line argument
+- Register as PDF viewer (Info.plist CFBundleDocumentTypes)
+- Accept file open via double-click in Finder (`application(_:open:)`)
+- Resolve helper/venv paths from single `projectRoot` constant
+  (AppDelegate owns projectRoot; FitzBridge derives venv from helperPath)
+
 ## Testing
 
 ### Python (pytest) — 11 tests passing
