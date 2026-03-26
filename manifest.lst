@@ -11,9 +11,11 @@ manifest.lst
 tmp/project-tree.txt
 
 README.md
-SIDEBAR_DESIGN.md
 TODO.md
 # CHANGELOG.md
+
+# Historical design notes from the sidebar build-out. Not actively maintained.
+# SIDEBAR_DESIGN.md
 
 ### --- Build & Configuration ---
 Anima/Anima/Info.plist

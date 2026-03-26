@@ -1,3 +1,8 @@
+**Historical design notes from the sidebar build-out. Not actively maintained.
+Authoritative sources: README.md (architecture), TODO.md (backlog).**
+
+---
+
 # Anima — Sidebar Design Document
 
 **Status:** Phases 1–4 Implemented (Phase 4 session geometry deferred)

@@ -44,9 +44,7 @@ The filesdump contains the complete project enclosed in `<document>` tags.
 
 **Step 2:** Review the filesdump structure via `manifest.lst`.
 
-**Step 3a:** Read `HANDOVER.md` and focused backlogs (if any).
-
-**Step 3b:** Check `TODO.md` for current priorities. The first TODO listed is typically where I want to start.
+**Step 3:** Check `TODO.md` for current priorities. The first TODO listed is typically where I want to start.
 
 **Step 4:** Acknowledge that you understand:
 
