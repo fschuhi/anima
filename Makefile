@@ -2,6 +2,16 @@
 #
 # Build and tooling targets for the Anima PDF reader.
 # Swift UI + Python annotation backend (fitz/PyMuPDF).
+#
+# Note on macOS app copies:
+# Having multiple Anima.app copies with the same bundle identifier
+# (for example on Desktop, in Downloads, or from older builds) can confuse
+# Launch Services / Finder "Open With" behavior.
+#
+# If PDF opening via Finder behaves strangely, inspect Launch Services with:
+#   make ls-anima
+# or manually:
+#   /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -dump | grep -A 6 -B 6 "com.fschuhi.Anima"
 
 # --- Variables ---
 VENV_DIR = .venv
@@ -10,12 +20,18 @@ ACTIVATE = . $(VENV_ACTIVATE)
 PIP = $(ACTIVATE) && pip
 SETUP_STAMP = $(VENV_DIR)/.setup_stamp
 
+PROJECT = Anima/Anima.xcodeproj
+SCHEME = Anima
+CONFIGURATION = Debug
+APP_NAME = Anima.app
+BUNDLE_ID = com.fschuhi.Anima
+
 # Swift source files (for swiftc command-line builds)
 SWIFT_SRC = Anima/Anima/AppDelegate.swift Anima/Anima/AnimaPDFView.swift Anima/Anima/FitzBridge.swift
 SWIFT_FRAMEWORKS = -framework Cocoa -framework Quartz
 
 # --- Phony targets ---
-.PHONY: all setup build run clean format showtree gentree filesdump help test test-verbose
+.PHONY: all setup build run clean format showtree gentree filesdump help test test-verbose print-app-path open-app open-pdf ls-anima
 
 # Default target
 all: setup
@@ -52,6 +68,50 @@ format: ## Format Swift (SwiftFormat) and Python (black) files
 	swiftformat Anima/Anima/ --swiftversion 6.0
 	@echo "--- Formatting Python ---"
 	$(ACTIVATE) && black tools/
+
+# --- App helpers ---
+
+print-app-path: ## Print the current Xcode-built app path
+	@TARGET_BUILD_DIR=$$(xcodebuild -project "$(PROJECT)" -scheme "$(SCHEME)" -configuration "$(CONFIGURATION)" -showBuildSettings 2>/dev/null | sed -n 's/^[[:space:]]*TARGET_BUILD_DIR = //p' | head -n 1); \
+	if [ -z "$$TARGET_BUILD_DIR" ]; then \
+		echo "Could not determine TARGET_BUILD_DIR."; \
+		echo "Check PROJECT and SCHEME in the Makefile."; \
+		exit 1; \
+	fi; \
+	echo "$$TARGET_BUILD_DIR/$(APP_NAME)"
+
+open-app: ## Open the current Xcode-built Anima.app
+	@TARGET_BUILD_DIR=$$(xcodebuild -project "$(PROJECT)" -scheme "$(SCHEME)" -configuration "$(CONFIGURATION)" -showBuildSettings 2>/dev/null | sed -n 's/^[[:space:]]*TARGET_BUILD_DIR = //p' | head -n 1); \
+	if [ -z "$$TARGET_BUILD_DIR" ]; then \
+		echo "Could not determine TARGET_BUILD_DIR."; \
+		echo "Check PROJECT and SCHEME in the Makefile."; \
+		exit 1; \
+	fi; \
+	APP_PATH="$$TARGET_BUILD_DIR/$(APP_NAME)"; \
+	if [ ! -d "$$APP_PATH" ]; then \
+		echo "App not found at: $$APP_PATH"; \
+		echo "Build and run Anima once in Xcode first."; \
+		exit 1; \
+	fi; \
+	open "$$APP_PATH"
+
+open-pdf: ## Open the dev PDF with the current Xcode-built app
+	@TARGET_BUILD_DIR=$$(xcodebuild -project "$(PROJECT)" -scheme "$(SCHEME)" -configuration "$(CONFIGURATION)" -showBuildSettings 2>/dev/null | sed -n 's/^[[:space:]]*TARGET_BUILD_DIR = //p' | head -n 1); \
+	if [ -z "$$TARGET_BUILD_DIR" ]; then \
+		echo "Could not determine TARGET_BUILD_DIR."; \
+		echo "Check PROJECT and SCHEME in the Makefile."; \
+		exit 1; \
+	fi; \
+	APP_PATH="$$TARGET_BUILD_DIR/$(APP_NAME)"; \
+	if [ ! -d "$$APP_PATH" ]; then \
+		echo "App not found at: $$APP_PATH"; \
+		echo "Build and run Anima once in Xcode first."; \
+		exit 1; \
+	fi; \
+	open -a "$$APP_PATH" "data/input.pdf"
+
+ls-anima: ## Show Launch Services registrations for Anima
+	@/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -dump | grep -A 6 -B 6 "$(BUNDLE_ID)" || true
 
 # --- Utility Targets ---
 
