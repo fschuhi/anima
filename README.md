@@ -2,41 +2,28 @@
 
 **A minimal, no-frills PDF reader for annotation work.**
 
-Latin *anima* — "soul": what's left when you strip everything else away.
+Latin *anima* -- "soul": what's left when you strip everything else away.
 
 ---
 
 ## Vision
 
-Anima exists to serve one workflow: reading academic papers and wisdom tradition
-texts, highlighting passages, and adding comments. It replaces PDF-XChange Viewer
-in a macOS-native toolchain that flows from PDF → highlights → Obsidian notes.
+Anima exists to serve one workflow: reading academic papers and wisdom tradition texts, highlighting passages, and adding comments. It replaces PDF-XChange Viewer in a macOS-native toolchain that flows from PDF -> highlights -> Obsidian notes.
 
 **Core Philosophy:**
 
 - **Minimalism**: Open. Read. Highlight. Comment. Save. That's it.
 - **Non-destructive**: Incremental save via fitz preserves all existing annotations.
-- **Toolchain-native**: Annotations are fully compatible with the `pdf-annotations`
-  extraction pipeline and the `pdf://` URL scheme for Obsidian integration.
+- **Toolchain-native**: Annotations are fully compatible with the `pdf-annotations` extraction pipeline and the `pdf://` URL scheme for Obsidian integration.
 - **Single user**: Built for Frank. Configuration in code, not preferences dialogs.
 
-**Design Philosophy — Modality and Focus:**
+**Design Philosophy -- Modality and Focus:**
 
-Anima treats modality as a feature, not a limitation. When the user edits a
-comment, a modal input panel enforces focus on that single annotation. There is
-no cancel — Escape always saves. This reflects a deeper principle: PDF annotations
-in Anima are a *scratchpad*. The real intellectual work happens outside the PDF,
-in Obsidian's Zettelkasten ("The Studio"). Highlights and comments are raw
-material to be developed into idea notes, not polished artifacts in their own
-right. This means Anima can and should force simplicity — one highlight, one
-comment, one action at a time. Complexity belongs in the knowledge management
-layer, not in the reading layer.
+Anima treats modality as a feature, not a limitation. When the user edits a comment, a modal input panel enforces focus on that single annotation. There is no cancel -- Escape always saves. This reflects a deeper principle: PDF annotations in Anima are a *scratchpad*. The real intellectual work happens outside the PDF, in Obsidian's Zettelkasten ("The Studio"). Highlights and comments are raw material to be developed into idea notes, not polished artifacts in their own right. This means Anima can and should force simplicity -- one highlight, one comment, one action at a time. Complexity belongs in the knowledge management layer, not in the reading layer.
 
 **What Anima Does NOT Do:**
 
-Print, sign, fill forms, edit PDF content, draw, stamp, redact, PDF/A compliance,
-thumbnail panels, bookmarks, touch-optimized UI, preferences dialog, or anything
-that adds complexity without serving the highlight+comment workflow.
+Print, sign, fill forms, edit PDF content, draw, stamp, redact, PDF/A compliance, thumbnail panels, bookmarks, touch-optimized UI, preferences dialog, or anything that adds complexity without serving the highlight+comment workflow.
 
 ---
 
@@ -70,7 +57,7 @@ graph TB
     AH -->|incremental save| FZ
     FZ -->|read/write| PDF
     UI -->|read for display| PDF
-    SB -->|card click → emphasis| MVC
+    SB -->|card click -> emphasis| MVC
 ```
 
 ### Why Hybrid?
@@ -90,22 +77,14 @@ rendering, scrolling, text selection, zoom, and hit-testing.
 `AnnotationManager` owns the dual-write sequence. When creating, editing, or
 deleting highlights during a session:
 
-1. **Persist to disk** — `AnnotationManager` calls `anima_helper.py` via
-   `FitzBridge`, which uses fitz to write the annotation with incremental save.
-2. **Update in-memory** — `AnnotationManager` adds, modifies, or removes a
-   `PDFAnnotation` in PDFKit's in-memory document for immediate display.
-3. **Notify sidebar** — `AnimaPDFView` calls
-   `sidebarDelegate.annotationsDidChange(onPageIndex:)` after the manager returns,
-   so the sidebar rebuilds the affected page's cards.
-4. **No reload** — the document is never reloaded during a session, eliminating
-   the scroll drift that plagued both PoCs.
+1. **Persist to disk** -- `AnnotationManager` calls `anima_helper.py` via `FitzBridge`, which uses fitz to write the annotation with incremental save.
+2. **Update in-memory** -- `AnnotationManager` adds, modifies, or removes a `PDFAnnotation` in PDFKit's in-memory document for immediate display.
+3. **Notify sidebar** -- `AnimaPDFView` calls `sidebarDelegate.annotationsDidChange(onPageIndex:)` after the manager returns, so the sidebar rebuilds the affected page's cards.
+4. **No reload** -- the document is never reloaded during a session, eliminating the scroll drift that plagued both PoCs.
 
-`AnnotationManager` is a toolbox class: it holds no references to the view or
-document, receiving all context (document, page, annotation, isXRayMode) per-call.
-This keeps it testable and safe for future multi-document support.
+`AnnotationManager` is a toolbox class: it holds no references to the view or document, receiving all context (document, page, annotation, isXRayMode) per-call. This keeps it testable and safe for future multi-document support.
 
-On next app launch, PDFKit loads the fitz-written file from disk. The file is
-the single source of truth.
+On next app launch, PDFKit loads the fitz-written file from disk. The file is the single source of truth.
 
 ### Coordinate Systems
 
@@ -115,24 +94,15 @@ This is the critical cross-language contract:
 - **fitz**: origin at **top-left**, y increases downward
 - **Conversion**: `y_fitz = page_height - y_pdfkit`
 
-The coordinate flip happens in Swift (`AnimaPDFView`) before calling the helper.
-The helper receives fitz-native coordinates only — it has no knowledge of PDFKit.
+The coordinate flip happens in Swift (`AnimaPDFView`) before calling the helper. The helper receives fitz-native coordinates only -- it has no knowledge of PDFKit.
 
-**Note:** PDFKit's `annot.bounds` does not directly match the raw PDF `/Rect`
-values. PDFKit transforms the coordinates internally. When building test fixtures,
-always use the values reported by PDFKit, not the raw PDF rect.
+**Note:** PDFKit's `annot.bounds` does not directly match the raw PDF `/Rect` values. PDFKit transforms the coordinates internally. When building test fixtures, always use the values reported by PDFKit, not the raw PDF rect.
 
 ### UUID Contract
 
-Every annotation gets a UUID stored in the PDF `/NM` field. Swift generates UUIDs,
-passes them to the helper via CLI arguments, and uses them for hit-testing and
-identification. The helper sets `/NM` via fitz's xref API (`doc.xref_set_key`).
+Every annotation gets a UUID stored in the PDF `/NM` field. Swift generates UUIDs, passes them to the helper via CLI arguments, and uses them for hit-testing and identification. The helper sets `/NM` via fitz's xref API (`doc.xref_set_key`).
 
-**Important:** On in-memory annotations, `/NM` must be set explicitly via
-`setValue(_:forAnnotationKey:)`. PDFKit maps `userName` to `/T` (the author
-field), not to `/NM`. Relying on `userName` alone for UUID storage causes the
-author field to overwrite the UUID. See SIDEBAR_DESIGN.md "Known Gotchas" for
-full details.
+**Important:** On in-memory annotations, `/NM` must be set explicitly via `setValue(_:forAnnotationKey:)`. PDFKit maps `userName` to `/T` (the author field), not to `/NM`. Relying on `userName` alone for UUID storage causes the author field to overwrite the UUID. See SIDEBAR_DESIGN.md "Known Gotchas" for full details.
 
 ---
 
@@ -156,29 +126,17 @@ full details.
 
 ### Highlight Workflow
 
-Highlights are created **without a comment**. This keeps the flow fast —
-especially in persistent highlight mode where mouseUp instantly highlights.
-To add or edit a comment after the fact, double-click the highlight. This matches
-the PDF-XChange Viewer workflow where highlighting and commenting are separate
-actions.
+Highlights are created **without a comment**. This keeps the flow fast -- especially in persistent highlight mode where mouseUp instantly highlights. To add or edit a comment after the fact, double-click the highlight. This matches the PDF-XChange Viewer workflow where highlighting and commenting are separate actions.
 
 ### Sidebar
 
-The sidebar is a fixed-width panel on the right showing **comment cards** — one
-per annotation with a non-empty comment. Cards are positioned vertically to
-align with their corresponding highlights in the PDF, using anchor-based layout
-with collision avoidance.
+The sidebar is a fixed-width panel on the right showing **comment cards** -- one per annotation with a non-empty comment. Cards are positioned vertically to align with their corresponding highlights in the PDF, using anchor-based layout with collision avoidance.
 
 Key capabilities:
-- **Live updates**: Cards appear, update, or disappear immediately when comments
-  are added, edited, or deleted during a session.
-- **Bidirectional emphasis**: Clicking a card emphasizes the corresponding highlight
-  in the PDF (light yellow), and clicking a highlight emphasizes the corresponding
-  card. Both directions use the same visual treatment. Emphasis is unified with
-  the Delete key target, so the user always sees which highlight will be affected.
+- **Live updates**: Cards appear, update, or disappear immediately when comments are added, edited, or deleted during a session.
+- **Bidirectional emphasis**: Clicking a card emphasizes the corresponding highlight in the PDF (light yellow), and clicking a highlight emphasizes the corresponding card. Both directions use the same visual treatment. Emphasis is unified with the Delete key target, so the user always sees which highlight will be affected.
 - **Scroll sync**: The sidebar scrolls in lockstep with the PDF.
-- **Per-page architecture**: Each PDF page has its own page-sidebar container,
-  enabling efficient per-page rebuilds on mutation.
+- **Per-page architecture**: Each PDF page has its own page-sidebar container, enabling efficient per-page rebuilds on mutation.
 
 See `SIDEBAR_DESIGN.md` for the full design document.
 
@@ -198,19 +156,11 @@ Obsidian bibnotes with highlights + comments
 Zettelkasten: idea notes, workbenches, Folgezettel sequences
 ```
 
-- **`pdf-annotations`**: Extracts highlights and comments from PDFs into Obsidian
-  Markdown notes. Uses fitz — Anima's annotations are fully compatible. Standard
-  `/Annot` with `/Subtype /Highlight`, `/Contents` for comments, `QuadPoints`
-  for precise multi-line highlighting.
+- **`pdf-annotations`**: Extracts highlights and comments from PDFs into Obsidian Markdown notes. Uses fitz -- Anima's annotations are fully compatible. Standard `/Annot` with `/Subtype /Highlight`, `/Contents` for comments, `QuadPoints` for precise multi-line highlighting.
 
-- **`pdf://` URL scheme**: Obsidian bibnotes reference PDFs via `pdf://HASH?page=N`.
-  Currently routes through a Windows Parallels bridge to PDF-XChange Viewer.
-  Milestone 2 registers Anima as the native macOS handler, eliminating the
-  Parallels dependency entirely.
+- **`pdf://` URL scheme**: Obsidian bibnotes reference PDFs via `pdf://HASH?page=N`. Currently routes through a Windows Parallels bridge to PDF-XChange Viewer. Milestone 2 registers Anima as the native macOS handler, eliminating the Parallels dependency entirely.
 
-- **Obsidian "The Studio"**: The Zettelkasten knowledge management system where
-  bibnotes, idea notes, and workbenches live. Anima serves as the PDF reading
-  layer that feeds this system.
+- **Obsidian "The Studio"**: The Zettelkasten knowledge management system where bibnotes, idea notes, and workbenches live. Anima serves as the PDF reading layer that feeds this system.
 
 ---
 
@@ -258,67 +208,23 @@ anima/
 
 ### Module Overview
 
-**`AnimaPDFView.swift`** — Subclasses `PDFView` to intercept keyboard and mouse
-events. Handles persistent highlight mode (H key toggle, mouseUp auto-highlight),
-X-Ray mode (P key toggle for popup visibility), hit-testing for highlight clicks,
-and emphasis/selection coordination via `SidebarUpdateDelegate`. All annotation
-CRUD (create, edit, delete) is delegated to `AnnotationManager`. Defines the
-`SidebarUpdateDelegate` protocol and notifies its delegate after every annotation
-mutation and highlight click so the sidebar stays in sync.
+**`AnimaPDFView.swift`** -- Subclasses `PDFView` to intercept keyboard and mouse events. Handles persistent highlight mode (H key toggle, mouseUp auto-highlight), X-Ray mode (P key toggle for popup visibility), hit-testing for highlight clicks, and emphasis/selection coordination via `SidebarUpdateDelegate`. All annotation CRUD (create, edit, delete) is delegated to `AnnotationManager`. Defines the`SidebarUpdateDelegate` protocol and notifies its delegate after every annotation mutation and highlight click so the sidebar stays in sync.
 
-**`AnnotationManager.swift`** — Toolbox class that owns all annotation CRUD
-operations and the dual-write pattern. Creates highlights (with quad math and
-coordinate conversion from PDFKit to fitz space), edits comments (showing the
-modal `CommentInputPanel`, writing via fitz, updating in-memory `/AnimaComment`),
-and deletes highlights. Holds no references to the view or document — all context
-is passed per-call, keeping the class testable and safe for multi-document (tabs)
-support. Also owns shared constants (`authorName`, `highlightColor`,
-`highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`).
+**`AnnotationManager.swift`** -- Toolbox class that owns all annotation CRUD operations and the dual-write pattern. Creates highlights (with quad math and coordinate conversion from PDFKit to fitz space), edits comments (showing the modal `CommentInputPanel`, writing via fitz, updating in-memory `/AnimaComment`), and deletes highlights. Holds no references to the view or document -- all context is passed per-call, keeping the class testable and safe for multi-document (tabs) support. Also owns shared constants (`authorName`, `highlightColor`, `highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`).
 
-**`AppDelegate.swift`** — Creates the window, loads the PDF, creates and wires the
-`AnnotationManager`, and sets up the NSEvent monitor as a fallback for keyboard
-events (PDFKit's internal `PDFDocumentView` sometimes captures keyboard focus).
+**`AppDelegate.swift`** -- Creates the window, loads the PDF, creates and wires the `AnnotationManager`, and sets up the NSEvent monitor as a fallback for keyboard events (PDFKit's internal `PDFDocumentView` sometimes captures keyboard focus).
 
-**`MainViewController.swift`** — Manages the dual-pane layout (`NSSplitView`),
-instantiates the `SidebarScrollView`, and coordinates the complex scrolling math
-and `scaleFactor` logic required to keep the sidebar perfectly synchronized with
-the PDF. Conforms to `SidebarUpdateDelegate` to handle live sidebar rebuilds on
-annotation mutation. Manages bidirectional highlight emphasis: clicking a sidebar
-card or a highlight in the PDF triggers the same shared emphasis logic, with
-toggle behavior on single-click and ensure-on behavior on double-click. Emphasis
-is unified with `selectedAnnotation` so the Delete key targets the visually
-emphasized highlight.
+**`MainViewController.swift`** -- Manages the dual-pane layout (`NSSplitView`), instantiates the `SidebarScrollView`, and coordinates the complex scrolling math and `scaleFactor` logic required to keep the sidebar perfectly synchronized with the PDF. Conforms to `SidebarUpdateDelegate` to handle live sidebar rebuilds on annotation mutation. Manages bidirectional highlight emphasis: clicking a sidebar card or a highlight in the PDF triggers the same shared emphasis logic, with toggle behavior on single-click and ensure-on behavior on double-click. Emphasis is unified with `selectedAnnotation` so the Delete key targets the visually emphasized highlight.
 
-**`SidebarExtractor.swift`** — The pure data layer for the sidebar. Scans the
-PDFDocument for highlight annotations and safely extracts their text, UUID (/NM),
-author (/T), modification date, and vertical anchor points. Converts this raw PDFKit
-data into sorted `CommentCard` structs, keeping the extraction logic completely
-decoupled from the UI. Supports both document-level and per-page extraction (the
-latter used by the live-update path to rebuild a single page efficiently).
-Tested with `AnimaTests.swift`.
+**`SidebarExtractor.swift`** -- The pure data layer for the sidebar. Scans the PDFDocument for highlight annotations and safely extracts their text, UUID (/NM), author (/T), modification date, and vertical anchor points. Converts this raw PDFKit data into sorted `CommentCard` structs, keeping the extraction logic completely decoupled from the UI. Supports both document-level and per-page extraction (the latter used by the live-update path to rebuild a single page efficiently). Tested with `AnimaTests.swift`.
 
-**`FitzBridge.swift`** — Static methods that call `anima_helper.py` via `Process()`
-(Swift's subprocess equivalent). Captures stdout/stderr, checks exit codes, and
-resolves the Python executable from the project's `.venv`.
+**`FitzBridge.swift`** -- Static methods that call `anima_helper.py` via `Process()` (Swift's subprocess equivalent). Captures stdout/stderr, checks exit codes, and resolves the Python executable from the project's `.venv`.
 
-**`anima_helper.py`** — Standalone CLI tool with three subcommands: `add-highlight`,
-`edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save
-preserves existing annotations. Tested with 11 pytest tests covering round-trips,
-contract verification (UUID in /NM, opacity survival), and error handling.
+**`anima_helper.py`** -- Standalone CLI tool with three subcommands: `add-highlight`, `edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save preserves existing annotations. Tested with 11 pytest tests covering round-trips, contract verification (UUID in /NM, opacity survival), and error handling.
 
-**`CommentCardView.swift`** — The visual representation of a single annotation in
-the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based
-on the length of the comment text. Handles all visual styling, including the muted
-typography applied to structural pipeline commands (e.g., `link` or `H2`). Reports
-clicks via an `onClicked` closure and supports active/inactive visual states for
-the emphasis feature.
+**`CommentCardView.swift`** -- The visual representation of a single annotation in the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based on the length of the comment text. Handles all visual styling, including the muted typography applied to structural pipeline commands (e.g., `link` or `H2`). Reports clicks via an `onClicked` closure and supports active/inactive visual states for the emphasis feature.
 
-**`CommentInputPanel.swift`** — A modal `NSPanel` for adding and editing highlight
-comments. Replaces the previous `NSAlert`-based dialog with a proper multi-line
-text editor (`NSTextView`). Styled to match `CommentCardView` — same background
-color, corner radius, fonts, and color palette. Escape saves and closes (no cancel),
-Enter inserts newlines. The panel is resizable and draggable. Each invocation
-creates a fresh instance; the panel is not reused across calls.
+**`CommentInputPanel.swift`** -- A modal `NSPanel` for adding and editing highlight comments. Replaces the previous `NSAlert`-based dialog with a proper multi-line text editor (`NSTextView`). Styled to match `CommentCardView` -- same background color, corner radius, fonts, and color palette. Escape saves and closes (no cancel), Enter inserts newlines. The panel is resizable and draggable. Each invocation creates a fresh instance; the panel is not reused across calls.
 
 ---
 
@@ -328,7 +234,7 @@ creates a fresh instance; the panel is not reused across calls.
 
 - **Xcode** (macOS, with macOS SDK)
 - **Python 3** with venv support
-- **SwiftFormat** (`brew install swiftformat`) — Swift code formatting
+- **SwiftFormat** (`brew install swiftformat`) -- Swift code formatting
 
 ### Setup
 
@@ -354,55 +260,46 @@ make test-verbose   # Run Python tests with output
 ```
 
 Python test suite (`tests/test_anima_helper.py`):
-- `TestAddHighlight` — basic round-trip, with-comment, multi-quad
-- `TestEditComment` — add-then-edit (with opacity survival check), clear-comment
-- `TestDeleteHighlight` — create-then-delete round-trip
-- `TestUUIDContract` — xref-level /NM verification
-- `TestIncrementalSavePreservation` — pre-existing annotations survive new writes
-- `TestErrorHandling` — invalid page, missing file, nonexistent UUID
+- `TestAddHighlight` -- basic round-trip, with-comment, multi-quad
+- `TestEditComment` -- add-then-edit (with opacity survival check), clear-comment
+- `TestDeleteHighlight` -- create-then-delete round-trip
+- `TestUUIDContract` -- xref-level /NM verification
+- `TestIncrementalSavePreservation` -- pre-existing annotations survive new writes
+- `TestErrorHandling` -- invalid page, missing file, nonexistent UUID
 
-To inspect test output PDFs: `ANIMA_KEEP_TEST_OUTPUT=1 make test`
-(copies modified PDFs to `tmp/tests/` for manual inspection).
+To inspect test output PDFs: `ANIMA_KEEP_TEST_OUTPUT=1 make test` (copies modified PDFs to `tmp/tests/` for manual inspection).
 
-Swift tests run via Xcode: **Cmd+U** or **Product → Test**.
+Swift tests run via Xcode: **Cmd+U** or **Product -> Test**.
 
 Current Swift test suite:
-- `testSidebarExtraction` — Golden JSON test against `sidebar_basic.pdf`
-- `testMultiPageExtraction` — Multi-page extraction against `sidebar_page_extract.pdf`
-- `testPerPageExtraction` — Per-page extraction (page 0, page 1, empty page 2)
-- `testPerPageConsistencyWithDocumentLevel` — Reassembly matches document-level
-- `testInMemoryAnnotationRoundTrip` — Verifies in-memory annotations produce
+- `testSidebarExtraction` -- Golden JSON test against `sidebar_basic.pdf`
+- `testMultiPageExtraction` -- Multi-page extraction against `sidebar_page_extract.pdf`
+- `testPerPageExtraction` -- Per-page extraction (page 0, page 1, empty page 2)
+- `testPerPageConsistencyWithDocumentLevel` -- Reassembly matches document-level
+- `testInMemoryAnnotationRoundTrip` -- Verifies in-memory annotations produce
   correct `CommentCard` data, guarding against dual-write field omissions
 
 ### Opening PDFs
 
 Anima accepts PDFs through three entry points, checked in this order:
 
-1. **Finder** — Double-click a PDF (or right-click → Open With → Anima).
-   Requires the Info.plist `CFBundleDocumentTypes` registration. To make Anima
-   the default viewer: right-click any PDF → Get Info → Open With → Anima →
-   Change All.
+1. **Finder** -- Double-click a PDF (or right-click -> Open With -> Anima). Requires the Info.plist `CFBundleDocumentTypes` registration. To make Anima the default viewer: right-click any PDF -> Get Info -> Open With -> Anima -> Change All.
 
-2. **Command line** — Pass a PDF path as an argument:
+2. **Command line** -- Pass a PDF path as an argument:
    ```bash
    open -a Anima --args ~/Papers/some-paper.pdf
    ```
 
-3. **Dev fallback** — If neither of the above provides a file, Anima opens
-   `projectRoot/data/input.pdf` automatically. If that doesn't exist either,
-   Anima prints an error and exits.
+3. **Dev fallback** -- If neither of the above provides a file, Anima opens `projectRoot/data/input.pdf` automatically. If that doesn't exist either, Anima prints an error and exits.
 
-**Multiple instances:** Anima is single-window by design. To open several PDFs
-simultaneously, launch separate processes with `open -n`:
+**Multiple instances:** Anima is single-window by design. To open several PDFs simultaneously, launch separate processes with `open -n`:
 
 ```bash
 open -n -a Anima --args ~/Papers/paper-a.pdf
 open -n -a Anima --args ~/Papers/paper-b.pdf
 ```
 
-Each instance is fully independent (separate window, sidebar, annotation state,
-comment panel geometry). This is also how the future `pdf://` URL server will
-open PDFs from Obsidian links.
+Each instance is fully independent (separate window, sidebar, annotation state, comment panel geometry). This is also how the future `pdf://` URL server will open PDFs from Obsidian links.
 
 **Shell alias** (optional convenience for `~/.zshrc`):
 
@@ -421,7 +318,7 @@ dev fallback = projectRoot + /data/input.pdf
 venv python  = derived by FitzBridge from helperPath      (two levels up + .venv/bin/python3)
 ```
 
-To move the project, change `projectRoot` in AppDelegate — nothing else.
+To move the project, change `projectRoot` in AppDelegate -- nothing else.
 
 ### Code Formatting
 
@@ -444,41 +341,24 @@ make clean        # Remove build output, venv, cache
 
 ### Swift Gotchas
 
-- `print()` inside `NSView` subclasses is ambiguous (NSView.print = "send to
-  printer"). Use `Swift.print()` for console output.
-- `selectionsByLine()` returns `[PDFSelection]`, not Optional — don't `guard let`.
-- `document.index(for:)` returns `Int`, not Optional — same issue.
-- Command-line GUI apps need `setActivationPolicy(.regular)` for keyboard focus.
-  Not needed in Xcode .app bundles.
-- PDFKit maps `userName` to `/T` (author), not `/NM` (unique name). Set `/NM`
-  explicitly via `setValue(_:forAnnotationKey:)` for UUID storage. Set `/T`
-  after `userName` to avoid the mapping overwriting the author with the UUID.
+- `print()` inside `NSView` subclasses is ambiguous (NSView.print = "send to printer"). Use `Swift.print()` for console output.
+- `selectionsByLine()` returns `[PDFSelection]`, not Optional -- don't `guard let`.
+- `document.index(for:)` returns `Int`, not Optional -- same issue.
+- Command-line GUI apps need `setActivationPolicy(.regular)` for keyboard focus. Not needed in Xcode .app bundles.
+- PDFKit maps `userName` to `/T` (author), not `/NM` (unique name). Set `/NM` explicitly via `setValue(_:forAnnotationKey:)` for UUID storage. Set `/T` after `userName` to avoid the mapping overwriting the author with the UUID.
 
 ### PDFKit Coordinate Note
 
-PDFKit's `annot.bounds` values do not match the raw PDF `/Rect` midpoints.
-PDFKit applies an internal coordinate transformation. When comparing with fitz
-or raw PDF data, always verify against actual PDFKit-reported values. The test
-fixtures contain PDFKit values, not raw PDF values.
+PDFKit's `annot.bounds` values do not match the raw PDF `/Rect` midpoints. PDFKit applies an internal coordinate transformation. When comparing with fitz or raw PDF data, always verify against actual PDFKit-reported values. The test fixtures contain PDFKit values, not raw PDF values.
 
 ### Appearance Stream Caveat
 
-When fitz calls `annot.update()`, it regenerates the annotation's appearance stream
-(the low-level PDF drawing instructions). Highlights edited by fitz may render
-slightly differently in PDF-XChange Viewer compared to annotations originally
-created by Viewer, even though the underlying data (color, opacity, coordinates)
-is identical. PDFKit renders them consistently regardless.
+When fitz calls `annot.update()`, it regenerates the annotation's appearance stream (the low-level PDF drawing instructions). Highlights edited by fitz may render slightly differently in PDF-XChange Viewer compared to annotations originally created by Viewer, even though the underlying data (color, opacity, coordinates) is identical. PDFKit renders them consistently regardless.
 
 ### fitz Empty Content Quirk
 
-`annot.set_info()` with `info["content"] = ""` is silently ignored by fitz — the
-previous content value survives. To clear a comment, use
-`doc.xref_set_key(annot.xref, "Contents", "()")` to write an empty PDF string
-directly at the xref level. This is handled in `anima_helper.py`'s `cmd_edit_comment`.
+`annot.set_info()` with `info["content"] = ""` is silently ignored by fitz -- the previous content value survives. To clear a comment, use `doc.xref_set_key(annot.xref, "Contents", "()")` to write an empty PDF string directly at the xref level. This is handled in `anima_helper.py`'s `cmd_edit_comment`.
 
 ### Background
 
-Frank is learning Swift from scratch for this project. Python and PDF annotation
-internals are his area of expertise. The hybrid Swift+Python architecture
-leverages both: Swift for native macOS UI, Python for the annotation backend
-where fitz knowledge is essential.
+Frank is learning Swift from scratch for this project. Python and PDF annotation internals are his area of expertise. The hybrid Swift+Python architecture leverages both: Swift for native macOS UI, Python for the annotation backend where fitz knowledge is essential.
