@@ -8,6 +8,13 @@ FILE_TEMPLATE = """<document path="{path}">
 </document>
 """
 
+# XML Template for error markers (unreadable or missing files)
+ERROR_TEMPLATE = """<error path="{path}">{reason}</error>
+"""
+
+# Rough heuristic: ~4 characters per token for typical code/prose mixes
+CHARS_PER_TOKEN = 4
+
 
 def concat(list_file: Path, out):
     if not list_file.exists():
@@ -20,6 +27,10 @@ def concat(list_file: Path, out):
     except (OSError, UnicodeDecodeError) as e:
         out.write(f"Error: Cannot read file '{list_file}': {e}\n")
         return 1
+
+    included = 0
+    errors = []  # (path, reason) tuples
+    total_chars = 0
 
     # Write the opening root tag
     out.write("<documents>\n")
@@ -40,13 +51,30 @@ def concat(list_file: Path, out):
                 # For strict correctness, one might wrap content in CDATA,
                 # but simple tag wrapping is the current standard for prompts.
                 out.write(FILE_TEMPLATE.format(path=name, content=content))
+                included += 1
+                total_chars += len(content)
             except (OSError, UnicodeDecodeError) as e:
-                out.write(f"\n")
+                reason = f"Cannot read file: {e}"
+                out.write(ERROR_TEMPLATE.format(path=name, reason=reason))
+                errors.append((name, reason))
         else:
-            out.write(f"\n")
+            reason = "File not found"
+            out.write(ERROR_TEMPLATE.format(path=name, reason=reason))
+            errors.append((name, reason))
 
     # Write the closing root tag
     out.write("</documents>\n")
+
+    # Summary to stderr (keeps stdout clean for redirection)
+    est_tokens = total_chars // CHARS_PER_TOKEN
+    sys.stderr.write(
+        f"concat_files: {included} file(s) included, "
+        f"{len(errors)} error(s), "
+        f"~{est_tokens:,} tokens ({total_chars:,} chars)\n"
+    )
+    for path, reason in errors:
+        sys.stderr.write(f"  ERROR {path}: {reason}\n")
+
     return 0
 
 
