@@ -1,5 +1,7 @@
 # TODO
 
+(Note: "I" in the following paragraphs refer to the user, "you" to you as the AI model.)
+
 **Charter:** Forward-looking only -- concrete, startable work: tasks specified well enough that next-session-me can begin within ten minutes, plus investigation items, test specs, and scratchpad ideas awaiting promotion or deletion. Items are unordered within their theme sections; open questions are marked _Needs investigation_ in the bullet. Completed items are struck through (~~like this~~) until they move to `HISTORY.md` (on the heap, out of the per-session dump) at session end. Strategic direction, ordering, and milestones live in `GOALS.md` -- anything that needs a strategy discussion before it is actionable goes there. Architecture, contract, and settled decisions live in `README.md`.
 
 ---
