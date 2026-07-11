@@ -169,45 +169,39 @@ Zettelkasten: idea notes, workbenches, Folgezettel sequences
 
 ## Project Structure
 
+The authoritative file inventory is `project_tree.txt` (generated via `make gentree`, included in every filesdump). This section is the annotated map of what matters -- curated and selective; skeleton details may lag behind the generated tree by design.
+
 ```
 anima/
-├── Anima/                          ← Xcode project container
-│   ├── Anima/                      ← Swift source files (app target)
-│   │   ├── AnimaPDFView.swift      ← PDFView subclass: keyboard, mouse, hit-testing
-│   │   ├── AnnotationManager.swift ← Annotation CRUD: create, edit, delete (dual-write)
-│   │   ├── AppDelegate.swift       ← Window setup, PDF loading, manager wiring
-│   │   ├── FitzBridge.swift        ← Subprocess bridge to Python helper
-│   │   ├── MainViewController.swift← NSSplitView layout, sidebar sync & emphasis
-│   │   ├── SidebarExtractor.swift  ← Parses annotations into sidebar CommentCard structs
-│   │   ├── CommentCardView.swift   ← Custom NSView for rendering sidebar cards
-│   │   ├── CommentInputPanel.swift ← Modal comment editor (replaces NSAlert)
-│   │   ├── Assets.xcassets/        ← App icon and colors
-│   │   └── Base.lproj/            ← MainMenu.xib (menu bar)
-│   ├── Anima.xcodeproj/           ← Xcode project file
-│   ├── AnimaTests/                ← Swift Testing unit tests (SidebarExtractor)
-│   └── AnimaUITests/              ← UI tests (unused)
+├── Anima/Anima/                    ← Swift source files (app target)
+│   ├── AnimaPDFView.swift          ← PDFView subclass: keyboard, mouse, hit-testing
+│   ├── AnnotationManager.swift     ← Annotation CRUD: create, edit, delete (dual-write)
+│   ├── AppDelegate.swift           ← Window setup, PDF loading, manager wiring
+│   ├── FitzBridge.swift            ← Subprocess bridge to Python helper
+│   ├── MainViewController.swift    ← NSSplitView layout, sidebar sync & emphasis
+│   ├── SidebarExtractor.swift      ← Parses annotations into sidebar CommentCard structs
+│   ├── CommentCardView.swift       ← Custom NSView for rendering sidebar cards
+│   └── CommentInputPanel.swift     ← Modal comment editor (replaces NSAlert)
+├── Anima/AnimaTests/               ← Swift Testing unit tests (SidebarExtractor)
 ├── tools/
-│   ├── anima_helper.py            ← CLI: add-highlight, edit-comment, delete-highlight
-│   ├── concat_files.py            ← Filesdump generator for LLM sessions
-│   └── requirements.txt           ← Python dependencies (PyMuPDF)
-├── tests/                         ← Python tests (pytest)
-│   ├── conftest.py                ← Fixtures: test_pdf, run_helper
-│   └── test_anima_helper.py       ← 11 tests: round-trip, contracts, edge cases
+│   ├── anima_helper.py             ← CLI: add-highlight, edit-comment, delete-highlight
+│   ├── concat_files.py             ← Filesdump generator for LLM sessions
+│   └── requirements.txt            ← Python dependencies (PyMuPDF)
+├── tests/                          ← Python tests (pytest)
+│   ├── conftest.py                 ← Fixtures: test_pdf, run_helper
+│   └── test_anima_helper.py        ← 11 tests: round-trip, contracts, edge cases
 ├── data/
-│   └── input_original.pdf         ← Test PDF (unmodified backup)
-├── .venv/                         ← Python virtual environment
-├── CRITICAL_RULES.md              ← Non-negotiable collaboration rules
-├── GOALS.md                       ← Strategic direction & roadmap
-├── HISTORY.md                     ← Resolved-work record (on the heap)
-├── LLM_INSTRUCTIONS.md            ← AI session context and conventions
-├── SIDEBAR_DESIGN.md              ← Sidebar design document
-├── TODO.md                        ← Forward-looking task scratchpad
-├── HANDOVER.md                    ← Session handover notes
-├── Makefile                       ← Build, setup, and utility targets
-├── pyproject.toml                 ← Project metadata, pytest & black config
-├── manifest.lst                   ← File list for filesdump generation
-├── .editorconfig                  ← Editor settings (LF line endings, indentation)
-└── .gitignore
+│   └── input_original.pdf          ← Test PDF (unmodified backup)
+├── CRITICAL_RULES.md               ← Non-negotiable collaboration rules
+├── GOALS.md                        ← Strategic direction & roadmap
+├── HISTORY.md                      ← Resolved-work record (on the heap)
+├── LLM_INSTRUCTIONS.md             ← AI session context and conventions
+├── SIDEBAR_DESIGN.md               ← Sidebar design document (historical)
+├── TODO.md                         ← Forward-looking task scratchpad
+├── HANDOVER.md                     ← Session handover notes
+├── Makefile                        ← Build, setup, and utility targets
+├── pyproject.toml                  ← Project metadata, pytest & black config
+└── manifest.lst                    ← File list for filesdump generation
 ```
 
 ### Module Overview
