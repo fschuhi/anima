@@ -92,12 +92,26 @@ before 2026-07-11 predate that convention.
 - Comment clearing works (empty string via xref_set_key)
 - Opacity survives edit (annot.update() regression guard)
 
-### Swift (Swift Testing) — 5 tests passing
+### Swift (Swift Testing) — 7 tests passing
 - SidebarExtractor: golden JSON test (sidebar_basic.pdf)
 - SidebarExtractor: multi-page extraction (sidebar_page_extract.pdf)
 - SidebarExtractor: per-page extraction (page 0, page 1, empty page 2)
 - Per-page reassembly matches document-level extraction
 - In-memory annotation round-trip (guards dual-write field omissions)
+- `testFitzQuadYFlip` -- pins the PDFKit→fitz y-flip contract (known
+  page/rect, round-trip identity, non-standard page height, x unaffected)
+  (2026-07-11)
+- `testQuadPointsConstruction` -- pins QuadPoints corner order and count
+  (single rect, multi-rect flattening, degenerate zero-width/height rects)
+  (2026-07-11)
+
+### Fixes found along the way (2026-07-11)
+- Fixed stale test reference: `testInMemoryAnnotationRoundTrip` referenced
+  `AnimaPDFView.highlightColor`/`highlightOpacity`, which live on
+  `AnnotationManager` -- predated this session, caught by a clean build
+- Added `nonisolated` to `CommentCard` (`SidebarExtractor.swift`) to resolve
+  a Default Actor Isolation compile error that appeared after an Xcode
+  update to 26.3
 
 ## Refactoring
 
@@ -112,6 +126,11 @@ before 2026-07-11 predate that convention.
   moved. AppDelegate creates and wires the manager. Four files changed:
   AnnotationManager.swift (new, 397 lines), AnimaPDFView.swift (700→463),
   MainViewController.swift (1 reference updated), AppDelegate.swift (wiring).
+- Extracted `AnnotationManager.fitzQuad(from:pageHeight:)` and
+  `AnnotationManager.quadPoints(for:)` as pure static functions, replacing
+  inline math in `createHighlight`/`addInMemoryHighlight` and removing a
+  hand-copied duplicate of the QuadPoints corner construction in
+  `testInMemoryAnnotationRoundTrip` (2026-07-11)
 
 ## Documentation & Process
 

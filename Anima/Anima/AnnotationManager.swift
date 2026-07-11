@@ -48,6 +48,57 @@ class AnnotationManager {
         self.helperPath = helperPath
     }
 
+    // MARK: - Coordinate Conversion
+
+    /// Convert a PDFKit-space rect (origin bottom-left) into a fitz-space quad
+    /// dictionary (origin top-left), for one selection line.
+    ///
+    /// Coordinate contract (must match anima_helper.py's docstring):
+    ///     y_fitz = page_height - y_pdfkit
+    ///
+    /// x is unaffected by the flip — only y inverts, because fitz measures
+    /// from the top of the page and PDFKit measures from the bottom.
+    ///
+    /// - Parameters:
+    ///   - bounds: A single selection line's bounding rect, in PDFKit space.
+    ///   - pageHeight: The page's media-box height, in points.
+    /// - Returns: A dictionary with x0/y0/x1/y1 keys, in fitz space, ready for
+    ///   JSON serialization to anima_helper.py's --quads argument.
+    static func fitzQuad(from bounds: NSRect, pageHeight: CGFloat) -> [String: Double] {
+        let x0 = Double(bounds.origin.x)
+        let x1 = Double(bounds.origin.x + bounds.size.width)
+        let y0_fitz = Double(pageHeight - (bounds.origin.y + bounds.size.height))
+        let y1_fitz = Double(pageHeight - bounds.origin.y)
+
+        return ["x0": x0, "y0": y0_fitz, "x1": x1, "y1": y1_fitz]
+    }
+
+    /// Build the four QuadPoints corners for a single PDFKit-space rect.
+    ///
+    /// PDFKit expects QuadPoints as a flat array of NSValue-wrapped NSPoints,
+    /// four points per quad (one quad per selection line). Order: bottom-left,
+    /// bottom-right, top-left, top-right (the PDF spec order for QuadPoints).
+    ///
+    /// This is a pure geometry function — it does not filter degenerate
+    /// (zero-width or zero-height) rects. That filtering is a policy decision
+    /// made upstream, in `createHighlight`.
+    ///
+    /// - Parameter rect: A single selection line's bounding rect, in PDFKit space.
+    /// - Returns: Four NSValue-wrapped NSPoints, in QuadPoints order.
+    static func quadPoints(for rect: NSRect) -> [NSValue] {
+        let bottomLeft  = NSPoint(x: rect.minX, y: rect.minY)
+        let bottomRight = NSPoint(x: rect.maxX, y: rect.minY)
+        let topLeft     = NSPoint(x: rect.minX, y: rect.maxY)
+        let topRight    = NSPoint(x: rect.maxX, y: rect.maxY)
+
+        return [
+            NSValue(point: bottomLeft),
+            NSValue(point: bottomRight),
+            NSValue(point: topLeft),
+            NSValue(point: topRight),
+        ]
+    }
+
     // MARK: - Create Highlight
 
     /// Create a highlight from PDFKit selection line bounds.
@@ -88,13 +139,8 @@ class AnnotationManager {
             // PDFKit-space bounds — keep as-is for in-memory annotation
             pdfkitBounds.append(bounds)
 
-            // Fitz-space quads — flip y for the helper
-            let x0 = Double(bounds.origin.x)
-            let x1 = Double(bounds.origin.x + bounds.size.width)
-            let y0_fitz = Double(pageHeight - (bounds.origin.y + bounds.size.height))
-            let y1_fitz = Double(pageHeight - bounds.origin.y)
-
-            fitzQuads.append(["x0": x0, "y0": y0_fitz, "x1": x1, "y1": y1_fitz])
+            // Fitz-space quad — see fitzQuad(from:pageHeight:) for the y-flip contract
+            fitzQuads.append(AnnotationManager.fitzQuad(from: bounds, pageHeight: pageHeight))
         }
 
         if fitzQuads.isEmpty {
@@ -330,21 +376,11 @@ class AnnotationManager {
         // userName ↔ /T mapping from overwriting the author with the UUID.
         annot.setValue(AnnotationManager.authorName, forAnnotationKey: PDFAnnotationKey(rawValue: "/T"))
 
-        // Build QuadPoints — PDFKit expects an array of NSValue-wrapped NSPoints,
-        // four points per quad (one quad per selection line).
-        // Order: bottom-left, bottom-right, top-left, top-right
-        // (This is the PDF spec order for QuadPoints)
+        // Build QuadPoints — one quad (4 points) per selection line.
+        // See quadPoints(for:) for the corner-order contract.
         var quadPoints: [NSValue] = []
         for rect in bounds {
-            let bottomLeft  = NSPoint(x: rect.minX, y: rect.minY)
-            let bottomRight = NSPoint(x: rect.maxX, y: rect.minY)
-            let topLeft     = NSPoint(x: rect.minX, y: rect.maxY)
-            let topRight    = NSPoint(x: rect.maxX, y: rect.maxY)
-
-            quadPoints.append(NSValue(point: bottomLeft))
-            quadPoints.append(NSValue(point: bottomRight))
-            quadPoints.append(NSValue(point: topLeft))
-            quadPoints.append(NSValue(point: topRight))
+            quadPoints.append(contentsOf: AnnotationManager.quadPoints(for: rect))
         }
 
         // Set QuadPoints via the annotation key

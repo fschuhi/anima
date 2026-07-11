@@ -9,7 +9,7 @@ import Foundation
 import Quartz
 
 /// Represents the data backing a single card in the sidebar.
-struct CommentCard: Codable, Equatable {
+nonisolated struct CommentCard: Codable, Equatable {
     let uuid: String
     let text: String
     let pageIndex: Int

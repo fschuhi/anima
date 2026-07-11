@@ -8,13 +8,14 @@
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Documentation and direction overhauled (2026-07-11). Full no-code architecture review: dual-write / coordinate / popup-suppression design confirmed sound; findings triaged into `TODO.md` and the deferred goals below. `TODO.md` restructured (charter, theme sections, UX priorities from first sustained daily-use feedback), `CHANGELOG.md` renamed to `HISTORY.md`, `GOALS.md` established, `Makefile` cleaned. No code changed; 16 tests green (11 Python + 5 Swift).
+**Where we are:** Swift test gaps 1 and 2 closed (2026-07-11 cont'd) -- `fitzQuad(from:pageHeight:)` and `quadPoints(for:)` extracted as pure, tested functions on `AnnotationManager`; both were previously untestable inline math. Incidental fixes along the way: a stale `AnimaPDFView.highlightColor`/`highlightOpacity` test reference (predated this session), and a `nonisolated` annotation on `CommentCard` to clear a Default Actor Isolation build error that surfaced after an Xcode update to 26.3. 18 tests green (11 Python + 7 Swift).
 
 **What's next (in order):**
 
-1. Close the Swift test gaps -- coordinate y-flip, QuadPoints geometry, FitzBridge round-trip, cross-page pin. See `TODO.md` -> Testing / Swift.
-2. Close the Python test gap -- the edit-comment clear-ordering pin. See `TODO.md` -> Testing / Python.
-3. The UX priority list, in its listed order (resize -> window persistence -> colors -> status bar -> page indicator -> goto page -> jump stack). See `TODO.md` -> UX Priorities.
+1. FitzBridge round-trip test -- two open decisions first: how the test resolves the venv/helper path, and how it verifies the write (no read-side command exists in `anima_helper.py`; likely route is opening the mutated PDF via PDFKit, mirroring the `SidebarExtractor` tests). See `TODO.md` -> Testing / Swift.
+2. Cross-page selection pin -- needs a fixture check first: unclear whether `sidebar_page_extract.pdf` has selectable text spanning the page break, or whether a small new fixture is needed. See `TODO.md` -> Testing / Swift.
+3. Close the Python test gap -- the edit-comment clear-ordering pin. See `TODO.md` -> Testing / Python.
+4. The UX priority list, in its listed order (resize -> window persistence -> colors -> status bar -> page indicator -> goto page -> jump stack). See `TODO.md` -> UX Priorities.
 
 Everything else sits in `TODO.md` until it earns a place here.
 

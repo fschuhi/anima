@@ -48,10 +48,12 @@
 
 ### Swift -- remaining
 
-- Coordinate conversion: y-flip math for known page heights and points.
-- QuadPoints construction: verify PDFKit-space quad geometry.
+- ~~Coordinate conversion: y-flip math for known page heights and points.~~
+- ~~QuadPoints construction: verify PDFKit-space quad geometry.~~
 - Integration: FitzBridge round-trip against test PDF (requires venv).
 - Cross-page selection: pin the page-scoped behavior -- only first-page lines produce quads, second-page lines are dropped (intended: highlights are per-page; continuation via `link` comment convention).
+
+_Pattern established for the two closed items: extract the inline math as a pure `static func` on `AnnotationManager`, test it standalone (no PDF fixture needed), then have call sites (including existing tests) use it instead of duplicating. Worth the same treatment if either remaining item turns out to have similar inline logic._
 
 ### Python -- remaining
 
