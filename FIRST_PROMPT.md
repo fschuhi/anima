@@ -43,6 +43,7 @@ The attached `CRITICAL_RULES.md` defines non-negotiable rules for how we work to
 - **`GOALS.md`** -- Strategic priorities; the _Current Session Pointer_ at its head is where we are and what's next
 - **`TODO.md`** -- Scratchpad for ideas, open decisions, and quick wins
 - **`Makefile`** -- Build, test, and run commands (check if OS-aware: macOS and the Windows VM)
+- **`HISTORY.md`** -- Items ticked off from `TODO.md` and `GOALS.md`; usually not included in the `filesdump.txt` to save tokens. Ask if you want to understand the genesis of architecture, design, implementation.
 
 ---
 

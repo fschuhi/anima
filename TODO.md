@@ -2,48 +2,99 @@
 
 ## Status Key
 - `[ ]` To do
-- `[x]` Done (see also `CHANGELOG.md`)
+- `[x]` Done (see also `HISTORY.md`)
 - `[~]` Partially done / workaround exists
 - `[!]` Known issue, needs investigation
 
 ---
 
-## Known Issues
+## UX Priorities (Session 2026-07-11 — order is initial ranking, final prios pending review)
 
-- [!] **Highlight color/opacity mismatch between viewers**
-      Highlights render with different saturation in PDFKit vs PDF-XChange
-      Viewer vs PDF-XChange Editor. Stored values are identical — difference
-      is in viewer interpretation. Needs investigation: compare raw annotation
-      attributes, check if appearance streams override stored color, consider
-      runtime color adjustment in PDFKit.
+- [ ] **Jittery resize at startup**
+      Symptom: resize is jagged after launch, sidebar ends up too wide/narrow;
+      becomes smooth "after a while". Hypothesis (verify before fixing): the
+      NSSplitView has only minimum-width constraints and hugging priorities —
+      nothing determines which pane absorbs a live resize, so width
+      distribution is ambiguous. `autoScales` amplifies: every PDF-pane width
+      change rescales the document → `frameDidChange` → full
+      `updateSidebarLayout()` recompute per jitter step. Likely fix: divider
+      `autosaveName` + holding priorities (sidebar keeps width, PDF pane
+      absorbs).
+
+- [ ] **Remember main window size/position**
+      No frame autosave name is set; the window gets the xib frame every
+      launch. `window.setFrameAutosaveName(...)` is the built-in mechanism
+      (UserDefaults-backed). Do together with the split-divider autosave from
+      the resize item. Same mechanism family as "CommentInputPanel geometry
+      persistence" below — consider one pass for all three.
+
+- [!] **Highlight colors too saturated (Apple renderers)**
+      Evidence (2026-07-11): Brave/PDFium and all non-Apple viewers render
+      the reference highlight lighter; PDFKit (Anima) and Preview both render
+      saturated — the outliers are the two Apple renderers. Stored values are
+      correct (pinned by Python tests). Hypothesis: highlight appearance
+      streams use the Multiply blend mode (`/BM /Multiply` in the ExtGState);
+      PDFium honors it, Apple composites with plain alpha instead. Next step
+      is an experiment, not a fix: inspect a highlight's appearance stream
+      via fitz, compare rendering of a blend-mode-free variant. Then decide
+      on display-side compensation in PDFKit. Add a fixture for whatever the
+      experiment establishes.
+
+- [ ] **Status bar**
+      Thin bar below the PDF view. Carries: mode indicators (moves them out
+      of the window title — also fixes the title losing the PDF filename
+      after the first H/P toggle, since `updateWindowTitle()` hardcodes
+      "Anima" as base), page display, and later the goto-page entry point.
+      Window title then shows the filename, permanently.
+
+- [ ] **Page indicator.** Show "page N of M" in the status bar. PDFKit provides `PDFViewPageChanged` notification + `currentPage` — nothing in the code observes these yet. Depends on: status bar.
+
+- [ ] **Goto page**
+      Jump to a page number via Cmd+G (or click on the page display).
+      `pdfView.go(to:)` does the navigation. Depends on: status bar,
+      page indicator.
+
+- [ ] **Bookmarks with jump stack**
+      JumpStation-style navigation (reference: Frank's Excel VBA
+      JumpStation.bas / UserFormSelector.frm): a back-stack of jump targets
+      (push current page on jump, pop with a shortcut) plus a keyboard-driven
+      type-to-filter selector panel for named targets (e.g. "endnotes").
+      UI precedent in Anima: CommentInputPanel (modal, keyboard-first).
+      Primary use case: main text ↔ endnotes round trips.
+
+---
+
+## Known Issues
 
 - [!] **annot.update() regenerates appearance stream**
       fitz's `annot.update()` regenerates the appearance stream. Highlights
       edited by fitz may render slightly differently in PDF-XChange Viewer.
       PDFKit renders consistently regardless. Known fitz behavior.
 
-- [!] **Clip Tools Launcher.workflow clipboard corruption**
-      macOS Service injects `rm -rf` fragments into pasted text containing
-      `!r` format specifiers. Check ~/Library/Services/, determine source,
-      remove or disable.
-
 ---
 
 ## Refactoring
-
-- [x] **Extract `AnnotationManager` from `AnimaPDFView`**
-      Done. `AnimaPDFView` delegates all CRUD to `AnnotationManager`.
-      See CHANGELOG.md for details.
 
 - [ ] **Extract `PopupController`**
       Consolidate all popup suppression logic (scrubbing on load, X-Ray
       toggle, conditional popup handling in edit/create) into one type.
       Currently spread across AnimaPDFView and MainViewController.
+      Review 2026-07-11 confirmed: `scrubCommentsForPopupSuppression` and
+      `applyXRayModeToDocument`'s OFF-branch are near-duplicates.
 
 - [ ] **Extract `EmphasisManager` from `MainViewController`**
       The emphasis state machine (apply/clear/preserve-through-rebuild,
       ~100 lines) becomes its own type. MainViewController focuses on
       layout and scroll physics.
+      While extracting: consolidate the triplicated UUID lookup
+      (/NM-then-userName fallback exists in AnnotationManager.annotationUUID,
+      SidebarExtractor.getUUID, MainViewController.findAnnotation) into one
+      shared helper.
+
+- [ ] **Delete `reloadDocument()` dead code in AnimaPDFView**
+      Nothing calls it, and it predates the sidebar: if it were ever called,
+      pageSidebarViews would desync from the new document. Delete (git
+      remembers); a future reload path must go through `loadPDF`.
 
 ---
 
@@ -52,13 +103,12 @@
 - [ ] **Sidebar Card Polish** — Tweak padding, reduce title font to ~9pt,
       adjust comment font to ~11pt, experiment with custom grayscale
       background colors for Dark Mode contrast.
-- [ ] **Status bar indicator** — Replace window title suffix with a proper
-      bottom status bar (thin NSTextField below the PDF view).
 - [ ] **Emphasis color tuning** — Light yellow (#FFFFE0) at 0.7 opacity
       may need adjustment for different PDF backgrounds or dark mode.
 - [ ] **CommentInputPanel geometry persistence** — Use UserDefaults to
       remember panel position/size across launches (currently session-only
-      via static var). Works across `open -n` instances too.
+      via static var). Works across `open -n` instances too. Same mechanism
+      family as main-window frame autosave (see UX Priorities).
 
 ---
 
@@ -68,6 +118,16 @@
 - [ ] Coordinate conversion: y-flip math for known page heights and points
 - [ ] QuadPoints construction: verify PDFKit-space quad geometry
 - [ ] Integration: FitzBridge round-trip against test PDF (requires venv)
+- [ ] Cross-page selection: pin the page-scoped behavior — only first-page
+      lines produce quads, second-page lines are dropped (intended:
+      highlights are per-page; continuation via `link` comment convention)
+
+### Python — remaining
+- [ ] edit-comment clear on a popup-less annotation: clear a comment
+      (`--comment ""`) on an annotation without a popup, save, reopen with
+      fitz, assert `/Contents` is empty. Pins the xref-clear ordering in
+      `cmd_edit_comment` (the second `annot.update()` after the xref write
+      must not resurrect the old text).
 
 ---
 
@@ -75,6 +135,9 @@
 
 ### macOS Integration
 - [ ] Proper .app bundle with icon
+- [ ] Make target to regenerate AppIcon.appiconset from a source PNG
+      (sips + iconutil) — enables icon experiments without touching Xcode.
+      Caveat: Launch Services may need a nudge before Finder shows changes.
 
 ### pdf:// URL handler (macOS native)
 - [ ] Register custom `pdf://` URL scheme

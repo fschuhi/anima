@@ -1,7 +1,9 @@
-# Changelog
+# History
 
 All notable accomplishments in Anima, organized by feature area.
 This file serves as the historical record — TODO.md stays forward-looking.
+Completed TODO.md items move here. New entries carry a date; entries
+before 2026-07-11 predate that convention.
 
 ---
 
@@ -13,6 +15,8 @@ This file serves as the historical record — TODO.md stays forward-looking.
 - Git repo on GitHub (private), PyCharm for Git operations
 - `.editorconfig` (LF line endings, indentation rules)
 - `make format` target (SwiftFormat + black)
+- Makefile cleanup: `black` now covers `tests/` alongside `tools/`;
+  dead swiftc variables (SWIFT_SRC, SWIFT_FRAMEWORKS) removed (2026-07-11)
 
 ## Dual-Write Architecture
 
@@ -108,3 +112,20 @@ This file serves as the historical record — TODO.md stays forward-looking.
   moved. AppDelegate creates and wires the manager. Four files changed:
   AnnotationManager.swift (new, 397 lines), AnimaPDFView.swift (700→463),
   MainViewController.swift (1 reference updated), AppDelegate.swift (wiring).
+
+## Documentation & Process
+
+- Architecture review, no-code session: full read-through of all Swift and
+  Python sources. Confirmed dual-write/coordinate/popup-suppression design;
+  surfaced FitzBridge subprocess seam (pipe deadlock risk, per-operation
+  latency), comment set/clear lifecycle fragility in cmd_edit_comment,
+  cross-page selection truncation (accepted as intended page-scoped
+  behavior), and window-title/mode-indicator conflict. Findings triaged
+  into TODO.md and GOALS.md (2026-07-11)
+- GOALS.md established: Current Session Pointer + strategic vision,
+  added to manifest.lst (2026-07-11)
+- TODO.md restructured: new UX Priorities section from first sustained
+  daily-use feedback; review findings folded in; test specs for the
+  comment-clear ordering and cross-page behavior added (2026-07-11)
+- CHANGELOG.md renamed to HISTORY.md — resolved-work archive, matching
+  the session workflow in LLM_INSTRUCTIONS.md (2026-07-11)

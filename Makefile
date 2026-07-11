@@ -26,10 +26,6 @@ CONFIGURATION = Debug
 APP_NAME = Anima.app
 BUNDLE_ID = com.fschuhi.Anima
 
-# Swift source files (for swiftc command-line builds)
-SWIFT_SRC = Anima/Anima/AppDelegate.swift Anima/Anima/AnimaPDFView.swift Anima/Anima/FitzBridge.swift
-SWIFT_FRAMEWORKS = -framework Cocoa -framework Quartz
-
 # --- Phony targets ---
 .PHONY: all setup build run clean format showtree gentree filesdump help test test-verbose print-app-path open-app open-pdf ls-anima
 
@@ -67,7 +63,7 @@ format: ## Format Swift (SwiftFormat) and Python (black) files
 	@echo "--- Formatting Swift ---"
 	swiftformat Anima/Anima/ --swiftversion 6.0
 	@echo "--- Formatting Python ---"
-	$(ACTIVATE) && black tools/
+	$(ACTIVATE) && black tools/ tests/
 
 # --- App helpers ---
 
