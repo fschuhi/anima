@@ -121,12 +121,15 @@ Every annotation gets a UUID stored in the PDF `/NM` field. Swift generates UUID
 | **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
 | **Xcode Project** | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
 | **Sidebar** | ✅ Complete  | Live cards, bidirectional emphasis, scroll sync    |
-| **Tabs** | 🚧 Planned  | Multi-PDF in single window (Milestone 1)           |
-| **pdf:// URL Handler** | 🚧 Planned  | Open PDFs from Obsidian links (Milestone 2)        |
+| **Reading ergonomics** | 🚧 In progress | UX priority list in `TODO.md`                   |
+| **Tabs** | 🚧 Planned  | Backlog (see `TODO.md`)                            |
+| **pdf:// URL Handler** | 🚧 Planned  | Phase 2 (see `GOALS.md`)                           |
 
 ### Highlight Workflow
 
 Highlights are created **without a comment**. This keeps the flow fast -- especially in persistent highlight mode where mouseUp instantly highlights. To add or edit a comment after the fact, double-click the highlight. This matches the PDF-XChange Viewer workflow where highlighting and commenting are separate actions.
+
+Highlights are **page-scoped by design**: a selection that spans a page break creates the highlight only on the first page -- lines on the following page are dropped. This is intended behavior, not a limitation. Highlights should be specific; a continuation on the next page is its own highlight, connected via the `link` command comment per the existing annotation conventions.
 
 ### Sidebar
 
@@ -194,10 +197,11 @@ anima/
 │   └── input_original.pdf         ← Test PDF (unmodified backup)
 ├── .venv/                         ← Python virtual environment
 ├── CRITICAL_RULES.md              ← Non-negotiable collaboration rules
-├── CHANGELOG.md                   ← Historical record of accomplishments
-├── LLM-instructions.md            ← AI session context and conventions
+├── GOALS.md                       ← Strategic direction & roadmap
+├── HISTORY.md                     ← Resolved-work record (on the heap)
+├── LLM_INSTRUCTIONS.md            ← AI session context and conventions
 ├── SIDEBAR_DESIGN.md              ← Sidebar design document
-├── TODO.md                        ← Task list with milestones
+├── TODO.md                        ← Forward-looking task scratchpad
 ├── HANDOVER.md                    ← Session handover notes
 ├── Makefile                       ← Build, setup, and utility targets
 ├── pyproject.toml                 ← Project metadata, pytest & black config
@@ -245,12 +249,6 @@ make setup    # Create Python venv, install PyMuPDF
 ### Build & Run
 
 Open `Anima/Anima.xcodeproj` in Xcode, then **Cmd+R** to build and run.
-
-For command-line Swift builds (without Xcode):
-```bash
-make build    # Compile via swiftc
-make run      # Build + run
-```
 
 ### Testing
 
@@ -350,6 +348,10 @@ make clean        # Remove build output, venv, cache
 ### PDFKit Coordinate Note
 
 PDFKit's `annot.bounds` values do not match the raw PDF `/Rect` midpoints. PDFKit applies an internal coordinate transformation. When comparing with fitz or raw PDF data, always verify against actual PDFKit-reported values. The test fixtures contain PDFKit values, not raw PDF values.
+
+### Hit-Testing Note
+
+Clicking a highlight is resolved via `PDFPage.annotation(at:)` first, with a fallback that tests the annotation's bounding rect (`annot.bounds.contains(point)`). For a multi-line highlight the bounds are the union rectangle of all quads, so a click in the visually empty area inside that union (e.g. right of a short last line) still hits the highlight. Accepted as a forgiving hit target: clicking anywhere in the highlighted range emphasizes it, and near-misses often do too.
 
 ### Appearance Stream Caveat
 
