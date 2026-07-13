@@ -347,6 +347,15 @@ PDFKit's `annot.bounds` values do not match the raw PDF `/Rect` midpoints. PDFKi
 
 Clicking a highlight is resolved via `PDFPage.annotation(at:)` first, with a fallback that tests the annotation's bounding rect (`annot.bounds.contains(point)`). For a multi-line highlight the bounds are the union rectangle of all quads, so a click in the visually empty area inside that union (e.g. right of a short last line) still hits the highlight. Accepted as a forgiving hit target: clicking anywhere in the highlighted range emphasizes it, and near-misses often do too.
 
+### Highlight Rendering Compatibility
+
+PDF-XChange Viewer and Chromium-based PDF renderers honor fitz's generated highlight appearance stream, while Apple PDFKit renders markup highlights from their high-level annotation properties and displays the same stored pink more saturated. Anima therefore deliberately maintains two representations:
+
+- **Persisted PDF representation:** `anima_helper.py` writes the established pink `[1.0, 0.75, 0.80]` at opacity `0.4`; fitz generates the corresponding appearance stream. This remains the compatibility contract for PDF-XChange Viewer, browsers, and the downstream `pdf-annotations` workflow.
+- **In-memory PDFKit display representation:** after loading, Anima changes highlight `PDFAnnotation.color` to pale `#FFE6EA`; newly created in-memory annotations use the same display color immediately. Anima never saves through PDFKit, so this display-only override does not modify the PDF file.
+
+Do not collapse these values into one shared constant without re-running the cross-renderer comparison. The distinction is intentional renderer compatibility, not a persistence mismatch.
+
 ### Appearance Stream Caveat
 
 When fitz calls `annot.update()`, it regenerates the annotation's appearance stream (the low-level PDF drawing instructions). Highlights edited by fitz may render slightly differently in PDF-XChange Viewer compared to annotations originally created by Viewer, even though the underlying data (color, opacity, coordinates) is identical. PDFKit renders them consistently regardless.

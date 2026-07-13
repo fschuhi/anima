@@ -44,6 +44,17 @@ class AnnotationManager {
     static let highlightColor = NSColor(red: 1.0, green: 0.75, blue: 0.80, alpha: 1.0)
     static let highlightOpacity: CGFloat = 0.4
 
+    // PDFKit renders highlight annotations more saturated than PDF-XChange
+    // Viewer and Chromium-based browsers. This display-only color is applied
+    // to PDFKit's in-memory annotations; fitz continues to persist
+    // highlightColor so the on-disk PDF contract remains unchanged.
+    static let pdfKitDisplayHighlightColor = NSColor(
+        red: 1.0,
+        green: 230.0 / 255.0,
+        blue: 234.0 / 255.0,
+        alpha: 1.0
+    )
+
     init(helperPath: String) {
         self.helperPath = helperPath
     }
@@ -355,8 +366,9 @@ class AnnotationManager {
             withProperties: nil
         )
 
-        // Set color and opacity to match anima_helper.py constants
-        annot.color = AnnotationManager.highlightColor
+        // Keep the persisted fitz color unchanged, but compensate PDFKit's
+        // in-memory rendering so Anima matches the trusted pale appearance.
+        annot.color = AnnotationManager.pdfKitDisplayHighlightColor
         annot.setValue(AnnotationManager.highlightOpacity, forAnnotationKey: PDFAnnotationKey(rawValue: "/CA"))
 
         // Handle comment based on X-Ray mode

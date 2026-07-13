@@ -229,6 +229,12 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
             for annot in page.annotations {
                 if annot.type == "Highlight" {
 
+                    // PDFKit ignores the fitz-generated appearance stream and renders
+                    // highlights more saturated than PDF-XChange Viewer and Chromium-based
+                    // browsers. This affects in-memory display only; Anima never saves
+                    // through PDFKit, so the persisted PDF annotation remains unchanged.
+                    annot.color = AnnotationManager.pdfKitDisplayHighlightColor
+
                     // 1. Migrate the text
                     if let text = annot.contents, !text.isEmpty {
                         annot.setValue(text, forAnnotationKey: PDFAnnotationKey(rawValue: "/AnimaComment"))

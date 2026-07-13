@@ -1,9 +1,11 @@
 # History
 
-All notable accomplishments in Anima, organized by feature area.
-This file serves as the historical record — TODO.md stays forward-looking.
-Completed TODO.md items move here. New entries carry a date; entries
-before 2026-07-11 predate that convention.
+(Note: "I" in the following paragraphs refer to the user, "you" to you as the AI model.)
+
+- The resolved-work record: what was built and when (note date, or have the points in roughly reverse-chronological order).
+- This is the trophy case -- kept in the repo, **out of the per-session filesdump** (so it no longer rides along every session).
+- For *forward* work see `TODO.md`; for direction see `GOALS.md`; for the architecture as it stands see `README.md`.
+- See "Workflow for the Whole Session (CRITICAL)" in `LLM_INSTRUCTIONS.md` for the interplay between `TODO.md` and this file.
 
 ---
 
@@ -92,7 +94,7 @@ before 2026-07-11 predate that convention.
 - Comment clearing works (empty string via xref_set_key)
 - Opacity survives edit (annot.update() regression guard)
 
-### Swift (Swift Testing) — 7 tests passing
+### Swift (Swift Testing) — 9 tests passing
 - SidebarExtractor: golden JSON test (sidebar_basic.pdf)
 - SidebarExtractor: multi-page extraction (sidebar_page_extract.pdf)
 - SidebarExtractor: per-page extraction (page 0, page 1, empty page 2)

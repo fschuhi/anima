@@ -2,7 +2,12 @@
 
 (Note: "I" in the following paragraphs refer to the user, "you" to you as the AI model.)
 
-**Charter:** Forward-looking only -- concrete, startable work: tasks specified well enough that next-session-me can begin within ten minutes, plus investigation items, test specs, and scratchpad ideas awaiting promotion or deletion. Items are unordered within their theme sections; open questions are marked _Needs investigation_ in the bullet. Completed items are struck through (~~like this~~) until they move to `HISTORY.md` (on the heap, out of the per-session dump) at session end. Strategic direction, ordering, and milestones live in `GOALS.md` -- anything that needs a strategy discussion before it is actionable goes there. Architecture, contract, and settled decisions live in `README.md`.
+## Charter
+- Forward-looking only -- concrete, startable work: tasks specified well enough that next-session-me can begin within ten minutes, plus investigation items, test specs, and scratchpad ideas awaiting promotion or deletion.
+- Items are unordered within their theme sections; open questions are marked _Needs investigation_ in the bullet.
+- When an item is completed, record its durable outcome in `HISTORY.md` during the same session while the evidence and rationale are fresh, then strike it through in `TODO.md` with a concise handover note.
+- Retain struck-through items through the next session because `TODO.md` is included in the standard filesdump while `HISTORY.md` normally is not; at the end of that next session, remove the already-archived items from `TODO.md`. Strategic direction, ordering, and milestones live in `GOALS.md` -- anything that needs a strategy discussion before it is actionable goes there.
+- Architecture, contract, and settled decisions live in `README.md`.
 
 ---
 
@@ -12,7 +17,7 @@
 
 - **Remember main window size/position.** No frame autosave name is set; the window gets the xib frame every launch. `window.setFrameAutosaveName(...)` is the built-in mechanism (UserDefaults-backed). Do together with the split-divider autosave from the resize item. Same mechanism family as "CommentInputPanel geometry persistence" below -- consider one pass for all three.
 
-- **Highlight colors too saturated (Apple renderers).** _Needs investigation._ Evidence (2026-07-11): Brave/PDFium and all non-Apple viewers render the reference highlight lighter; PDFKit (Anima) and Preview both render saturated -- the outliers are the two Apple renderers. Stored values are correct (pinned by Python tests). Hypothesis: highlight appearance streams use the Multiply blend mode (`/BM /Multiply` in the ExtGState); PDFium honors it, Apple composites with plain alpha instead. Next step is an experiment, not a fix: inspect a highlight's appearance stream via fitz, compare rendering of a blend-mode-free variant. Then decide on display-side compensation in PDFKit. Add a fixture for whatever the experiment establishes.
+- ~~**Highlight colors too saturated (Apple renderers).** Resolved 2026-07-13: PDF-XChange/Chromium render fitz's appearance stream, while PDFKit renders highlight annotations from their high-level properties and appeared more saturated. Persisted fitz color/opacity remain unchanged; Anima applies a PDFKit-only in-memory display color (`#FFE6EA`) to loaded and newly created highlights. Verified in Anima, PDF-XChange Viewer, Chrome, Preview, and X-Ray mode.~~
 
 - **Status bar.** Thin bar below the PDF view. Carries: mode indicators (moves them out of the window title -- also fixes the title losing the PDF filename after the first H/P toggle, since `updateWindowTitle()` hardcodes "Anima" as base), page display, and later the goto-page entry point. Window title then shows the filename, permanently.
 
@@ -48,8 +53,6 @@
 
 ### Swift -- remaining
 
-- ~~Coordinate conversion: y-flip math for known page heights and points.~~
-- ~~QuadPoints construction: verify PDFKit-space quad geometry.~~
 - Integration: FitzBridge round-trip against test PDF (requires venv).
 - Cross-page selection: pin the page-scoped behavior -- only first-page lines produce quads, second-page lines are dropped (intended: highlights are per-page; continuation via `link` comment convention).
 
