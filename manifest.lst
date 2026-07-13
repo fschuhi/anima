@@ -59,3 +59,7 @@ tests/test_anima_helper.py
 
 ### --- Data ---
 # data/input_original.pdf
+
+### --- Documentation ---
+# experiments to determine the highlight color rendering behavior for Preview/Anima, PDF-Xchange-Viewer, Chrome, Edge
+# docs/Anima_16_(GPT-5.6-Terra).md
