@@ -115,6 +115,22 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     private var pdfScrollView: NSScrollView?
     private var pageSidebarViews: [PageSidebarView] = []
 
+    // --- Split-view persistence and sizing policy ---
+    // AppKit persists the actual divider configuration under this name.
+    private static let splitViewAutosaveName = "AnimaMainSplitView"
+
+    // On the very first launch there is no AppKit divider state to restore.
+    // This marker ensures the 300-point first-run default is not applied again
+    // over a divider position restored from splitViewAutosaveName.
+    private static let hasInitializedDefaultDividerKey = "Anima.hasInitializedMainSplitViewDivider"
+
+    private static let initialSidebarWidth: CGFloat = 300
+
+    // This remains below AppKit's drag-related threshold, while being higher
+    // than the PDF pane's default-low priority. Therefore ordinary window
+    // resizes preserve the sidebar width and let the PDF pane absorb change.
+    private static let sidebarHoldingPriority = NSLayoutConstraint.Priority(rawValue: 500)
+
     // --- Highlight emphasis state ---
     // Tracks the currently emphasized annotation and card so we can restore
     // their original appearance when emphasis moves or clears.
@@ -152,6 +168,14 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         splitView.addArrangedSubview(pdfView)
         splitView.addArrangedSubview(sidebarScrollView)
 
+        // The PDF pane should absorb ordinary window-width changes. The
+        // sidebar still remains draggable and retains its existing minimum.
+        splitView.setHoldingPriority(.defaultLow, forSubviewAt: 0)
+        splitView.setHoldingPriority(MainViewController.sidebarHoldingPriority, forSubviewAt: 1)
+
+        // AppKit owns persistence of the divider after this point.
+        splitView.autosaveName = MainViewController.splitViewAutosaveName
+
         pdfView.setContentHuggingPriority(.defaultLow, for: .horizontal)
         sidebarScrollView.setContentHuggingPriority(.defaultHigh, for: .horizontal)
 
@@ -170,12 +194,38 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        let initialSidebarWidth: CGFloat = 300
-        let totalWidth = self.view.bounds.width
-        splitView.setPosition(totalWidth - initialSidebarWidth, ofDividerAt: 0)
-
+        applyInitialSidebarWidthIfNeeded()
         setupScrollSynchronization()
         setupResizeObserver()
+    }
+
+    /// Applies Anima's 300-point sidebar default only for a truly new install.
+    ///
+    /// The asynchronous turn is deliberate: AppKit needs to finish laying out
+    /// the split view before minPossiblePositionOfDivider(at:) and
+    /// maxPossiblePositionOfDivider(at:) are meaningful. On later launches,
+    /// the marker leaves AppKit's autosaved divider configuration untouched.
+    private func applyInitialSidebarWidthIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: MainViewController.hasInitializedDefaultDividerKey) else {
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self,
+                  !UserDefaults.standard.bool(forKey: MainViewController.hasInitializedDefaultDividerKey) else {
+                return
+            }
+
+            self.splitView.layoutSubtreeIfNeeded()
+
+            let requestedPosition = self.splitView.bounds.width - MainViewController.initialSidebarWidth
+            let minimumPosition = self.splitView.minPossiblePositionOfDivider(at: 0)
+            let maximumPosition = self.splitView.maxPossiblePositionOfDivider(at: 0)
+            let initialPosition = min(max(requestedPosition, minimumPosition), maximumPosition)
+
+            self.splitView.setPosition(initialPosition, ofDividerAt: 0)
+            UserDefaults.standard.set(true, forKey: MainViewController.hasInitializedDefaultDividerKey)
+        }
     }
 
     // --- Data Loading ---

@@ -41,6 +41,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // FitzBridge derives the venv Python path from the helperPath.
     private let projectRoot = "/Users/fschuhi/Projects/anima"
 
+    // Stable UserDefaults key used by AppKit to persist the main window's
+    // frame between launches.
+    private let mainWindowFrameAutosaveName = "AnimaMainWindow"
+
     @IBOutlet var window: NSWindow!
 
     var mainViewController: MainViewController!
@@ -55,6 +59,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var didFinishLaunching = false
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+
+        // Assigning this stable name makes AppKit restore the previously saved
+        // frame if one exists, then keep saving later moves and resizes.
+        if !window.setFrameAutosaveName(mainWindowFrameAutosaveName) {
+            Swift.print("⚠️ Could not enable main-window frame autosave")
+        }
 
         mainViewController = MainViewController()
         window.contentViewController = mainViewController
