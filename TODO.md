@@ -13,9 +13,7 @@
 
 ## UX Priorities (Session 2026-07-11 -- order is initial ranking, final prios pending review)
 
-- ~~**Page indicator.** Show "N of M" page indicator in the caption.~~
-
-- **Goto page.** Jump to a page number with Cmd+G (or just "G", in line with "H" for auto-highlight and P for X-Ray). First version: a small native modal input field, not a custom panel; validate that the entered page is within `1...pageCount`, then navigate with `pdfView.go(to:)`. Decide after daily use whether the standard interaction is sufficient or whether Anima earns a custom keyboard-first panel. The existing window caption already provides the live `N of M` page context.
+- ~~**Goto page.** Bare `G` now opens a native modal page-number input. A valid 1-based number in `1...pageCount` navigates with `pdfView.go(to:)`; invalid or non-numeric input fails fast with an error showing the valid range, then returns to the reader without navigation. `Cmd+G` remains unclaimed for future Find Next behavior. Completed YYYY-MM-DD; manually verified and the existing 20-test baseline remains green.~~
 
  **Bookmarks with jump stack.** JumpStation-style navigation (reference: Frank's Excel VBA JumpStation.bas / UserFormSelector.frm): a back-stack of jump targets (push current page on jump, pop with a shortcut) plus a keyboard-driven type-to-filter selector panel for named targets (e.g. "endnotes"). UI precedent in Anima: CommentInputPanel (modal, keyboard-first). Primary use case: main text <-> endnotes round trips.
 

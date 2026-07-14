@@ -8,6 +8,7 @@
 //    - ENTER with selection → create highlight (via AnnotationManager)
 //    - H key → toggle persistent highlight mode (mouseUp creates highlight)
 //    - P key → toggle X-Ray mode (reveals native popups for comments)
+//    - G key → go to a page through a native modal input field
 //    - Double-click on highlight (or card via delegate) → edit comment (via AnnotationManager)
 //    - Single-click highlight → toggle emphasis
 //    - Delete key → remove the currently emphasized highlight (via AnnotationManager)
@@ -116,6 +117,14 @@ class AnimaPDFView: PDFView {
         // P = toggle X-Ray mode (show popups)
         if event.keyCode == 35 { // keyCode 35 = P
             toggleXRayMode()
+            lastHandledEvent = event
+            return true
+        }
+
+        // G = go to page. Cmd+G remains available for future Find Next behavior.
+        if event.keyCode == 5,
+           event.modifierFlags.intersection([.command, .control, .option]).isEmpty {
+            showGotoPageDialog()
             lastHandledEvent = event
             return true
         }
@@ -251,6 +260,64 @@ class AnimaPDFView: PDFView {
         }
         // Force visual update
         self.setNeedsDisplay(self.bounds)
+    }
+
+    // MARK: - Navigation
+
+    /// Shows the smallest useful native page-navigation interaction.
+    /// The user enters a 1-based page number. Invalid input fails fast:
+    /// the input alert closes, an error reports the valid range, and the
+    /// PDF view remains on its current page.
+    private func showGotoPageDialog() {
+        guard let document = document else { return }
+
+        let pageCount = document.pageCount
+        let pageField = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        pageField.placeholderString = "Page number"
+
+        let alert = NSAlert()
+        alert.messageText = "Go to Page"
+        alert.informativeText = "Enter a page from 1 to \(pageCount)."
+        alert.addButton(withTitle: "Go")
+        alert.addButton(withTitle: "Cancel")
+        alert.accessoryView = pageField
+        alert.layout()
+        alert.window.initialFirstResponder = pageField
+        alert.window.makeFirstResponder(pageField)
+
+        isShowingDialog = true
+        let response = alert.runModal()
+        isShowingDialog = false
+
+        guard response == .alertFirstButtonReturn else {
+            return
+        }
+
+        let pageText = pageField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let pageNumber = Int(pageText),
+              (1...pageCount).contains(pageNumber),
+              let page = document.page(at: pageNumber - 1) else {
+            showGotoPageError(validPageRange: 1...pageCount)
+            return
+        }
+
+        go(to: page)
+        Swift.print("📖 Navigated to page \(pageNumber) of \(pageCount)")
+    }
+
+    /// Reports invalid goto-page input after the input dialog has already
+    /// closed, returning the user directly to the reader after dismissal.
+    private func showGotoPageError(validPageRange: ClosedRange<Int>) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Invalid page number"
+        alert.informativeText = "Enter a page from \(validPageRange.lowerBound) to \(validPageRange.upperBound)."
+        alert.addButton(withTitle: "OK")
+
+        isShowingDialog = true
+        alert.runModal()
+        isShowingDialog = false
     }
 
     // MARK: - Mouse Handling

@@ -115,6 +115,7 @@ Every annotation gets a UUID stored in the PDF `/NM` field. Swift generates UUID
 | **Text Selection** | ✅ Complete  | Drag to select, per-line quad extraction           |
 | **Highlight Creation** | ✅ Complete  | ENTER with selection, dual-write, no reload        |
 | **Persistent Highlight** | ✅ Complete  | H key toggles mode; mouseUp = instant highlight    |
+| **Goto Page** | ✅ Complete | Bare `G`, native modal input, fail-fast range validation |
 | **Comment Editing** | ✅ Complete  | Modal input panel (CommentInputPanel), card-styled |
 | **Highlight Deletion** | ✅ Complete  | Click + Delete key, dual-write removal             |
 | **Incremental Save** | ✅ Complete  | fitz preserves all existing annotations            |
