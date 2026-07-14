@@ -8,14 +8,13 @@
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Reader-first recovery is underway. The Apple/PDFKit highlight-color trust blocker is closed (2026-07-13): fitz continues to persist the established annotation representation for PDF-XChange/Chromium compatibility, while Anima applies a pale `#FFE6EA` color only to PDFKit's in-memory highlights. Verified for existing and newly created highlights, reopen, emphasis restoration, external rendering, and X-Ray mode. The remaining test gaps are consciously parked; the recorded baseline remains 18 green tests (11 Python + 7 Swift).
+**Where we are:** Reader-first recovery has cleared its first usability pass. The Apple/PDFKit highlight-color trust blocker closed on 2026-07-14: fitz continues to persist the established annotation representation for PDF-XChange/Chromium compatibility, while Anima applies a pale `#FFE6EA` color only to PDFKit's in-memory highlights. Main-window frame persistence and split-divider persistence/holding behavior also closed on 2026-07-14: the window restores position and size, the sidebar retains its width during ordinary resizing, and the startup resize jitter is gone. The recorded baseline is now 20 green tests (11 Python + 9 Swift).
 
 **What's next (in order):**
 
-1. Civilize launch and resizing: main-window frame persistence plus split-divider persistence/holding behavior. See `TODO.md` -> UX Priorities.
-2. Reader navigation: retain a sensible document handle in the window caption, add current-page display there, then add goto page.
-3. Investigate the smallest useful native PDFKit document-search interaction before designing custom search UI.
-4. Return to the parked Swift/Python test gaps after the core reader loop feels pleasant enough for daily use.
+1. Reader navigation: retain a sensible document handle in the window caption, add current-page display there, then add goto page.
+2. Investigate the smallest useful native PDFKit document-search interaction before designing custom search UI.
+3. Return to the parked Swift/Python test gaps after the core reader loop feels pleasant enough for daily use.
 
 Tabs remain deferred; separate `open -n` instances are the accepted multi-document workflow for now.
 

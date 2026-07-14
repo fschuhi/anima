@@ -13,9 +13,9 @@
 
 ## UX Priorities (Session 2026-07-11 -- order is initial ranking, final prios pending review)
 
-- **Jittery resize at startup.** Symptom: resize is jagged after launch, sidebar ends up too wide/narrow; becomes smooth "after a while". Hypothesis (verify before fixing): the NSSplitView has only minimum-width constraints and hugging priorities -- nothing determines which pane absorbs a live resize, so width distribution is ambiguous. `autoScales` amplifies: every PDF-pane width change rescales the document -> `frameDidChange` -> full `updateSidebarLayout()` recompute per jitter step. Likely fix: divider `autosaveName` + holding priorities (sidebar keeps width, PDF pane absorbs).
+- ~~**Jittery resize at startup.** Resolved 2026-07-14: assigned an `NSSplitView` autosave name, gave the sidebar a higher holding priority than the PDF pane, and deferred the first-run 300-point sidebar default until layout had settled. The sidebar now retains its width during ordinary resizing, the PDF pane absorbs width changes, divider position persists, and the launch-time jitter disappeared. Tests remain green: 11 Python + 9 Swift.~~
 
-- **Remember main window size/position.** No frame autosave name is set; the window gets the xib frame every launch. `window.setFrameAutosaveName(...)` is the built-in mechanism (UserDefaults-backed). Do together with the split-divider autosave from the resize item. Same mechanism family as "CommentInputPanel geometry persistence" below -- consider one pass for all three.
+- ~~**Remember main window size/position.** Resolved 2026-07-14: `NSWindow` frame autosave now restores the main window's position, width, and height between launches. The autosave name is assigned after the main content view controller is installed, so later split-view layout does not overwrite the restored size.~~
 
 - ~~**Highlight colors too saturated (Apple renderers).** Resolved 2026-07-13: PDF-XChange/Chromium render fitz's appearance stream, while PDFKit renders highlight annotations from their high-level properties and appeared more saturated. Persisted fitz color/opacity remain unchanged; Anima applies a PDFKit-only in-memory display color (`#FFE6EA`) to loaded and newly created highlights. Verified in Anima, PDF-XChange Viewer, Chrome, Preview, and X-Ray mode.~~
 

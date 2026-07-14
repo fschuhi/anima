@@ -17,8 +17,7 @@
 - Git repo on GitHub (private), PyCharm for Git operations
 - `.editorconfig` (LF line endings, indentation rules)
 - `make format` target (SwiftFormat + black)
-- Makefile cleanup: `black` now covers `tests/` alongside `tools/`;
-  dead swiftc variables (SWIFT_SRC, SWIFT_FRAMEWORKS) removed (2026-07-11)
+- Makefile cleanup: `black` now covers `tests/` alongside `tools/`; dead swiftc variables (SWIFT_SRC, SWIFT_FRAMEWORKS) removed (2026-07-11)
 
 ## Dual-Write Architecture
 
@@ -70,7 +69,11 @@
 - Dual-key contract threaded through SidebarExtractor, editComment,
   addInMemoryHighlight
 
-## Navigation
+## Reading Ergonomics
+
+- Civilized main-window and split-view behavior (2026-07-14): main-window frame now persists across launches through AppKit frame autosave; split-divider position also persists through split-view autosave. The sidebar holds its current width during ordinary live window resizing while the PDF pane absorbs the change, subject to the existing minimum widths. The first-run 300-point sidebar default is applied only after layout has settled and never overwrites a restored divider position. This removed the launch-time resize/sidebar-width jitter. Existing tests remained green: 11 Python + 9 Swift.
+-
+- ## Navigation
 
 - Jump to beginning/end (Cmd+Home, Cmd+End, Home, End)
 - Page Up / Page Down (one screenful, Windows-style)
@@ -100,53 +103,21 @@
 - SidebarExtractor: per-page extraction (page 0, page 1, empty page 2)
 - Per-page reassembly matches document-level extraction
 - In-memory annotation round-trip (guards dual-write field omissions)
-- `testFitzQuadYFlip` -- pins the PDFKit→fitz y-flip contract (known
-  page/rect, round-trip identity, non-standard page height, x unaffected)
-  (2026-07-11)
-- `testQuadPointsConstruction` -- pins QuadPoints corner order and count
-  (single rect, multi-rect flattening, degenerate zero-width/height rects)
-  (2026-07-11)
+- `testFitzQuadYFlip` -- pins the PDFKit→fitz y-flip contract (known page/rect, round-trip identity, non-standard page height, x unaffected) (2026-07-11)
+- `testQuadPointsConstruction` -- pins QuadPoints corner order and count (single rect, multi-rect flattening, degenerate zero-width/height rects) (2026-07-11)
 
 ### Fixes found along the way (2026-07-11)
-- Fixed stale test reference: `testInMemoryAnnotationRoundTrip` referenced
-  `AnimaPDFView.highlightColor`/`highlightOpacity`, which live on
-  `AnnotationManager` -- predated this session, caught by a clean build
-- Added `nonisolated` to `CommentCard` (`SidebarExtractor.swift`) to resolve
-  a Default Actor Isolation compile error that appeared after an Xcode
-  update to 26.3
+- Fixed stale test reference: `testInMemoryAnnotationRoundTrip` referenced `AnimaPDFView.highlightColor`/`highlightOpacity`, which live on `AnnotationManager` -- predated this session, caught by a clean build
+- Added `nonisolated` to `CommentCard` (`SidebarExtractor.swift`) to resolve a Default Actor Isolation compile error that appeared after an Xcode update to 26.3
 
 ## Refactoring
 
-- Extracted AnnotationManager from AnimaPDFView — All annotation CRUD
-  operations (highlight creation with quad math and dual-write, comment editing
-  via CommentInputPanel, highlight deletion) moved to a dedicated class.
-  AnimaPDFView is now purely event handling, hit-testing, and mode management.
-  AnnotationManager is a toolbox: it holds no references to the view or document,
-  receiving all context per-call. This keeps it testable and safe for future
-  multi-document (tabs) support. Constants (authorName, highlightColor,
-  highlightOpacity) and helpers (annotationUUID, ensurePopupExists) also
-  moved. AppDelegate creates and wires the manager. Four files changed:
-  AnnotationManager.swift (new, 397 lines), AnimaPDFView.swift (700→463),
-  MainViewController.swift (1 reference updated), AppDelegate.swift (wiring).
-- Extracted `AnnotationManager.fitzQuad(from:pageHeight:)` and
-  `AnnotationManager.quadPoints(for:)` as pure static functions, replacing
-  inline math in `createHighlight`/`addInMemoryHighlight` and removing a
-  hand-copied duplicate of the QuadPoints corner construction in
-  `testInMemoryAnnotationRoundTrip` (2026-07-11)
+- Extracted `AnnotationManager` from `AnimaPDFView` — All annotation CRUD operations (highlight creation with quad math and dual-write, comment editing via `CommentInputPanel`, highlight deletion) moved to a dedicated class. `AnimaPDFView` is now purely event handling, hit-testing, and mode management. `AnnotationManager` is a toolbox: it holds no references to the view or document, receiving all context per-call. This keeps it testable and safe for future multi-document (tabs) support. Constants (`authorName`, `highlightColor`, `highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`) also moved. `AppDelegate` creates and wires the manager. Four files changed: `AnnotationManager.swift` (new, 397 lines), `AnimaPDFView.swift` (700→463), `MainViewController.swift` (1 reference updated), `AppDelegate.swift` (wiring).
+- Extracted `AnnotationManager.fitzQuad(from:pageHeight:)` and `AnnotationManager.quadPoints(for:)` as pure static functions, replacing inline math in `createHighlight`/`addInMemoryHighlight` and removing a hand-copied duplicate of the QuadPoints corner construction in `testInMemoryAnnotationRoundTrip` (2026-07-11)
 
 ## Documentation & Process
 
-- Architecture review, no-code session: full read-through of all Swift and
-  Python sources. Confirmed dual-write/coordinate/popup-suppression design;
-  surfaced FitzBridge subprocess seam (pipe deadlock risk, per-operation
-  latency), comment set/clear lifecycle fragility in cmd_edit_comment,
-  cross-page selection truncation (accepted as intended page-scoped
-  behavior), and window-title/mode-indicator conflict. Findings triaged
-  into TODO.md and GOALS.md (2026-07-11)
-- GOALS.md established: Current Session Pointer + strategic vision,
-  added to manifest.lst (2026-07-11)
-- TODO.md restructured: new UX Priorities section from first sustained
-  daily-use feedback; review findings folded in; test specs for the
-  comment-clear ordering and cross-page behavior added (2026-07-11)
-- CHANGELOG.md renamed to HISTORY.md — resolved-work archive, matching
-  the session workflow in LLM_INSTRUCTIONS.md (2026-07-11)
+- Architecture review, no-code session: full read-through of all Swift and Python sources. Confirmed dual-write/coordinate/popup-suppression design; surfaced FitzBridge subprocess seam (pipe deadlock risk, per-operation latency), comment set/clear lifecycle fragility in cmd_edit_comment, cross-page selection truncation (accepted as intended page-scoped behavior), and window-title/mode-indicator conflict. Findings triaged into TODO.md and GOALS.md (2026-07-11)
+- GOALS.md established: Current Session Pointer + strategic vision, added to manifest.lst (2026-07-11)
+- TODO.md restructured: new UX Priorities section from first sustained daily-use feedback; review findings folded in; test specs for the comment-clear ordering and cross-page behavior added (2026-07-11)
+- CHANGELOG.md renamed to HISTORY.md — resolved-work archive, matching the session workflow in LLM_INSTRUCTIONS.md (2026-07-11)
