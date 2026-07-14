@@ -9,6 +9,9 @@
 //    - H key → toggle persistent highlight mode (mouseUp creates highlight)
 //    - P key → toggle X-Ray mode (reveals native popups for comments)
 //    - G key → go to a page through a native modal input field
+//    - Cmd+F → find text forward from the current page
+//    - F3 → advance to the next active find hit
+//    - Esc → clear the active find hit
 //    - Double-click on highlight (or card via delegate) → edit comment (via AnnotationManager)
 //    - Single-click highlight → toggle emphasis
 //    - Delete key → remove the currently emphasized highlight (via AnnotationManager)
@@ -84,6 +87,23 @@ class AnimaPDFView: PDFView {
     // Keep this easy to tune while experimenting with different window sizes.
     static let uncontrolledDocumentHandleMaximumLength = 40
 
+    // --- Find state ---
+    // Find hits deliberately use PDFView.highlightedSelections rather than
+    // currentSelection. This keeps temporary reader navigation separate from
+    // text selection used to create persisted highlight annotations.
+    private static let findHitColor = NSColor(
+        red: 220.0 / 255.0,
+        green: 1.0,
+        blue: 220.0 / 255.0,
+        alpha: 1.0
+    )
+
+    private static let findOptions: NSString.CompareOptions = [.caseInsensitive]
+
+    private var activeFindQuery: String?
+    private var findResults: [PDFSelection] = []
+    private var activeFindResultIndex: Int?
+
     // --- Keyboard handling ---
 
     private var lastHandledEvent: NSEvent?
@@ -105,6 +125,41 @@ class AnimaPDFView: PDFView {
         // dismisses the dialog would otherwise trigger a new highlight
         if isShowingDialog {
             return false
+        }
+
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+        // Cmd+F = start a new document search. A new search always clears
+        // the previous temporary find-hit selection before prompting.
+        if event.keyCode == 3,
+           modifiers.contains(.command),
+           !modifiers.contains(.control),
+           !modifiers.contains(.option) {
+            showFindDialog()
+            lastHandledEvent = event
+            return true
+        }
+
+        // F3 = find next occurrence of the active query. With no active
+        // find hit, beep and otherwise leave the reader untouched.
+        if event.keyCode == 99 {
+            if advanceToNextFindHit() {
+                lastHandledEvent = event
+                return true
+            }
+
+            NSSound.beep()
+            lastHandledEvent = event
+            return true
+        }
+
+        // Escape = clear the temporary find-hit selection. Do not consume
+        // Escape when no find result exists, so PDFKit retains its normal
+        // behavior in all unrelated situations.
+        if event.keyCode == 53, activeFindResultIndex != nil {
+            clearFindHit()
+            lastHandledEvent = event
+            return true
         }
 
         // H = toggle persistent highlight mode
@@ -313,6 +368,154 @@ class AnimaPDFView: PDFView {
         alert.alertStyle = .warning
         alert.messageText = "Invalid page number"
         alert.informativeText = "Enter a page from \(validPageRange.lowerBound) to \(validPageRange.upperBound)."
+        alert.addButton(withTitle: "OK")
+
+        isShowingDialog = true
+        alert.runModal()
+        isShowingDialog = false
+    }
+
+    // MARK: - Find
+
+    /// Starts a new forward-only document search. The previous result is
+    /// cleared before the prompt appears, even if the user cancels the prompt.
+    private func showFindDialog() {
+        clearFindHit()
+
+        let queryField = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        queryField.placeholderString = "Text to find"
+
+        let alert = NSAlert()
+        alert.messageText = "Find"
+        alert.informativeText = "Search from the beginning of the current page forward."
+        alert.addButton(withTitle: "Find")
+        alert.addButton(withTitle: "Cancel")
+        alert.accessoryView = queryField
+        alert.layout()
+        alert.window.initialFirstResponder = queryField
+        alert.window.makeFirstResponder(queryField)
+
+        isShowingDialog = true
+        let response = alert.runModal()
+        isShowingDialog = false
+
+        guard response == .alertFirstButtonReturn else {
+            return
+        }
+
+        let query = queryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !query.isEmpty else {
+            NSSound.beep()
+            return
+        }
+
+        startFind(query: query)
+    }
+
+    /// Finds the first hit from the beginning of the current page, then
+    /// forward through later pages. Search never wraps to earlier pages.
+    private func startFind(query: String) {
+        guard let document = document else { return }
+
+        activeFindQuery = query
+        findResults = document.findString(query, withOptions: AnimaPDFView.findOptions)
+        activeFindResultIndex = nil
+
+        let currentPageIndex: Int
+        if let currentPage = currentPage {
+            currentPageIndex = document.index(for: currentPage)
+        } else {
+            currentPageIndex = 0
+        }
+
+        guard let firstForwardResultIndex = findResults.firstIndex(where: {
+            pageIndex(for: $0, in: document) >= currentPageIndex
+        }) else {
+            clearFindHit()
+            showNoHitsAlert(for: query)
+            return
+        }
+
+        showFindResult(at: firstForwardResultIndex)
+    }
+
+    /// Advances from the active find hit to the next result. Because the
+    /// result list is document ordered, reaching its end means the search
+    /// reached the end of the document -- it deliberately does not wrap.
+    private func advanceToNextFindHit() -> Bool {
+        guard activeFindQuery != nil,
+              let currentIndex = activeFindResultIndex else {
+            return false
+        }
+
+        let nextIndex = currentIndex + 1
+
+        guard nextIndex < findResults.count else {
+            showNoMoreHitsAlert()
+            return true
+        }
+
+        showFindResult(at: nextIndex)
+        return true
+    }
+
+    /// Displays one result as a temporary pale-green PDFKit highlighted
+    /// selection, then navigates to it. This intentionally does not set
+    /// currentSelection, so it cannot become a persisted annotation.
+    private func showFindResult(at resultIndex: Int) {
+        guard findResults.indices.contains(resultIndex) else { return }
+
+        let selection = findResults[resultIndex]
+        selection.color = AnimaPDFView.findHitColor
+
+        highlightedSelections = [selection]
+        activeFindResultIndex = resultIndex
+        go(to: selection)
+
+        if let document = document {
+            let pageNumber = pageIndex(for: selection, in: document) + 1
+            Swift.print("🔎 Find hit \(resultIndex + 1) of \(findResults.count) on page \(pageNumber)")
+        }
+    }
+
+    /// Clears both the temporary PDFKit visual highlight and Anima's local
+    /// find cursor. It never alters currentSelection or PDF annotations.
+    private func clearFindHit() {
+        highlightedSelections = nil
+        activeFindQuery = nil
+        findResults.removeAll()
+        activeFindResultIndex = nil
+    }
+
+    /// Returns the first page index occupied by a PDFKit search result.
+    /// Individual text hits are expected to live on one page, but treating a
+    /// selection generically keeps the forward-search filter safe.
+    private func pageIndex(for selection: PDFSelection, in document: PDFDocument) -> Int {
+        guard let page = selection.pages.first else {
+            return Int.max
+        }
+
+        return document.index(for: page)
+    }
+
+    private func showNoHitsAlert(for query: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "No hits"
+        alert.informativeText = "No matches for \"\(query)\" were found from the current page to the end of the document."
+        alert.addButton(withTitle: "OK")
+
+        isShowingDialog = true
+        alert.runModal()
+        isShowingDialog = false
+    }
+
+    private func showNoMoreHitsAlert() {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "No more hits"
+        alert.informativeText = "The active search reached the end of the document."
         alert.addButton(withTitle: "OK")
 
         isShowingDialog = true
