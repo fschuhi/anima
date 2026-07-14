@@ -6,13 +6,11 @@
 
 ---
 
-## 📍 Current Session Pointer
-
-**Where we are:** Reader-first recovery has cleared its first usability pass. The Apple/PDFKit highlight-color trust blocker closed on 2026-07-14: fitz continues to persist the established annotation representation for PDF-XChange/Chromium compatibility, while Anima applies a pale `#FFE6EA` color only to PDFKit's in-memory highlights. Main-window frame persistence and split-divider persistence/holding behavior also closed on 2026-07-14: the window restores position and size, the sidebar retains its width during ordinary resizing, and the startup resize jitter is gone. The recorded baseline is now 20 green tests (11 Python + 9 Swift).
+**Where we are:** Reader-first recovery has cleared its first navigation pass. The Apple/PDFKit highlight-color trust blocker closed on 2026-07-14: fitz continues to persist the established annotation representation for PDF-XChange/Chromium compatibility, while Anima applies a pale `#FFE6EA` color only to PDFKit's in-memory highlights. Main-window frame persistence and split-divider persistence/holding behavior also closed on 2026-07-14. On the same date, Anima gained compact page-aware window captions: controlled PDFs show their leading `(Author Year)` `pdf_id`, uncontrolled filenames use a configurable abbreviated fallback, and the caption updates as the current page changes. The startup empty-window flash is also gone: Anima now presents its single window only after frame restoration, document loading, and caption setup. The recorded baseline remains 20 green tests (11 Python + 9 Swift).
 
 **What's next (in order):**
 
-1. Reader navigation: retain a sensible document handle in the window caption, add current-page display there, then add goto page.
+1. Add goto page with the smallest useful native Cmd+G interaction -- initially a standard modal input field -- then use it in daily reading before deciding whether a custom keyboard-first panel is worth building.
 2. Investigate the smallest useful native PDFKit document-search interaction before designing custom search UI.
 3. Return to the parked Swift/Python test gaps after the core reader loop feels pleasant enough for daily use.
 

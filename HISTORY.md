@@ -71,9 +71,11 @@
 
 ## Reading Ergonomics
 
-- Civilized main-window and split-view behavior (2026-07-14): main-window frame now persists across launches through AppKit frame autosave; split-divider position also persists through split-view autosave. The sidebar holds its current width during ordinary live window resizing while the PDF pane absorbs the change, subject to the existing minimum widths. The first-run 300-point sidebar default is applied only after layout has settled and never overwrites a restored divider position. This removed the launch-time resize/sidebar-width jitter. Existing tests remained green: 11 Python + 9 Swift.
--
-- ## Navigation
+- Civilized main-window and split-view behavior (2026-07-14): main-window frame now persists across launches through AppKit frame autosave; split-divider position also persists through split-view autosave. The sidebar holds its current width during ordinary live window resizing while the PDF pane absorbs the change, subject to the existing minimum widths. The first-run 300-point sidebar default is applied only after layout has settled and never overwrites a restored divider position. This removed the launch-time resize/sidebar-width jitter.
+- Page-aware document captions (2026-07-14): the window title now uses a compact reading handle plus `current page of total pages`, for example `(Albini 2013) -- 12 of 34`. Controlled filenames use their leading parenthesized `pdf_id`; uncontrolled filenames fall back to their stem, abbreviated through the easily tunable `AnimaPDFView.uncontrolledDocumentHandleMaximumLength` constant (currently 40). `AnimaPDFView` is the single caption formatter, so H/P toggles no longer erase the document handle, and PDFKit page-change notifications keep the page number current.
+- Clean window presentation at launch (2026-07-14): the nib-created main window is hidden until its frame autosave restoration, reader view setup, PDF load, and initial caption are complete. This removes the brief empty 480 x 360 `"Anima"` window flash; the first visible window is the configured reader.
+
+## Navigation
 
 - Jump to beginning/end (Cmd+Home, Cmd+End, Home, End)
 - Page Up / Page Down (one screenful, Windows-style)

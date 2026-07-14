@@ -13,19 +13,13 @@
 
 ## UX Priorities (Session 2026-07-11 -- order is initial ranking, final prios pending review)
 
-- ~~**Jittery resize at startup.** Resolved 2026-07-14: assigned an `NSSplitView` autosave name, gave the sidebar a higher holding priority than the PDF pane, and deferred the first-run 300-point sidebar default until layout had settled. The sidebar now retains its width during ordinary resizing, the PDF pane absorbs width changes, divider position persists, and the launch-time jitter disappeared. Tests remain green: 11 Python + 9 Swift.~~
+- ~~**Page indicator.** Show "N of M" page indicator in the caption.~~
 
-- ~~**Remember main window size/position.** Resolved 2026-07-14: `NSWindow` frame autosave now restores the main window's position, width, and height between launches. The autosave name is assigned after the main content view controller is installed, so later split-view layout does not overwrite the restored size.~~
+- **Goto page.** Jump to a page number with Cmd+G (or just "G", in line with "H" for auto-highlight and P for X-Ray). First version: a small native modal input field, not a custom panel; validate that the entered page is within `1...pageCount`, then navigate with `pdfView.go(to:)`. Decide after daily use whether the standard interaction is sufficient or whether Anima earns a custom keyboard-first panel. The existing window caption already provides the live `N of M` page context.
 
-- ~~**Highlight colors too saturated (Apple renderers).** Resolved 2026-07-13: PDF-XChange/Chromium render fitz's appearance stream, while PDFKit renders highlight annotations from their high-level properties and appeared more saturated. Persisted fitz color/opacity remain unchanged; Anima applies a PDFKit-only in-memory display color (`#FFE6EA`) to loaded and newly created highlights. Verified in Anima, PDF-XChange Viewer, Chrome, Preview, and X-Ray mode.~~
+ **Bookmarks with jump stack.** JumpStation-style navigation (reference: Frank's Excel VBA JumpStation.bas / UserFormSelector.frm): a back-stack of jump targets (push current page on jump, pop with a shortcut) plus a keyboard-driven type-to-filter selector panel for named targets (e.g. "endnotes"). UI precedent in Anima: CommentInputPanel (modal, keyboard-first). Primary use case: main text <-> endnotes round trips.
 
-- **Status bar.** Thin bar below the PDF view. Carries: mode indicators (moves them out of the window title -- also fixes the title losing the PDF filename after the first H/P toggle, since `updateWindowTitle()` hardcodes "Anima" as base), page display, and later the goto-page entry point. Window title then shows the filename, permanently.
-
-- **Page indicator.** Show "page N of M" in the status bar. PDFKit provides `PDFViewPageChanged` notification + `currentPage` -- nothing in the code observes these yet. Depends on: status bar.
-
-- **Goto page.** Jump to a page number via Cmd+G (or click on the page display). `pdfView.go(to:)` does the navigation. Depends on: status bar, page indicator.
-
-- **Bookmarks with jump stack.** JumpStation-style navigation (reference: Frank's Excel VBA JumpStation.bas / UserFormSelector.frm): a back-stack of jump targets (push current page on jump, pop with a shortcut) plus a keyboard-driven type-to-filter selector panel for named targets (e.g. "endnotes"). UI precedent in Anima: CommentInputPanel (modal, keyboard-first). Primary use case: main text <-> endnotes round trips.
+- **Consider a Status bar.** Thin bar below the PDF view. Carries: mode indicators (auto-highlight, X-Ray), page display, pdf size info, maybe stats like number of highlights, maybe last bookmark target. Window title then shows the filename, permanently.
 
 ---
 
