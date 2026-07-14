@@ -47,7 +47,7 @@ protocol SidebarUpdateDelegate: AnyObject {
     /// Called when a highlight is clicked in the PDF.
     /// - Parameters:
     ///   - uuid: The annotation's UUID, or empty string if clicked outside any highlight
-    ///   - pageIndex: The page index, or -1 if clicked outside any highlight
+    ///   /// - pageIndex: The page index, or -1 if clicked outside any highlight
     ///   - toggle: If true (single-click), toggles emphasis on/off.
     ///             If false (double-click), ensures emphasis is on without toggling.
     func highlightWasClicked(uuid: String, onPageIndex pageIndex: Int, toggle: Bool)
@@ -78,6 +78,10 @@ class AnimaPDFView: PDFView {
     // When active, populates standard `.contents` from our custom `/AnimaComment`
     // key, which forces PDFKit to render native yellow popup indicators. Toggle with P key.
     var isXRayMode = false
+
+    // Uncontrolled PDF filenames can be much wider than the window caption.
+    // Keep this easy to tune while experimenting with different window sizes.
+    static let uncontrolledDocumentHandleMaximumLength = 40
 
     // --- Keyboard handling ---
 
@@ -152,16 +156,57 @@ class AnimaPDFView: PDFView {
     }
 
     func updateWindowTitle() {
-        let base = "Anima"
-        var modes: [String] = []
-        if isHighlightMode { modes.append("[H] Highlight") }
-        if isXRayMode { modes.append("[P] X-Ray") }
-
-        if modes.isEmpty {
-            self.window?.title = base
-        } else {
-            self.window?.title = "\(base) — \(modes.joined(separator: " ")) Mode"
+        guard let document = document else {
+            window?.title = "Anima"
+            return
         }
+
+        let handle = documentHandle(for: document)
+        let pageCount = document.pageCount
+
+        let currentPageNumber: Int
+        if let currentPage = currentPage {
+            currentPageNumber = document.index(for: currentPage) + 1
+        } else {
+            currentPageNumber = 1
+        }
+
+        window?.title = "\(handle) -- \(currentPageNumber) of \(pageCount)"
+    }
+
+    /// Returns the compact document identifier used in Anima's window caption.
+    ///
+    /// Controlled PDFs use the leading parenthesized pdf_id from their filename,
+    /// such as "(Albini 2013)". Uncontrolled PDFs fall back to their filename
+    /// stem, abbreviated to keep the current-page information visible.
+    private func documentHandle(for document: PDFDocument) -> String {
+        guard let documentURL = document.documentURL else {
+            return "Anima"
+        }
+
+        let filenameStem = documentURL.deletingPathExtension().lastPathComponent
+
+        if filenameStem.first == "(",
+           let closingParenthesis = filenameStem.firstIndex(of: ")"),
+           closingParenthesis > filenameStem.startIndex {
+            return String(filenameStem[...closingParenthesis])
+        }
+
+        return abbreviatedDocumentHandle(from: filenameStem)
+    }
+
+    /// Abbreviates uncontrolled filename stems while keeping the limit easy
+    /// to tune through uncontrolledDocumentHandleMaximumLength.
+    private func abbreviatedDocumentHandle(from filenameStem: String) -> String {
+        let maximumLength = AnimaPDFView.uncontrolledDocumentHandleMaximumLength
+
+        guard filenameStem.count > maximumLength else {
+            return filenameStem
+        }
+
+        let prefixLength = maximumLength - 3
+        let prefixEndIndex = filenameStem.index(filenameStem.startIndex, offsetBy: prefixLength)
+        return "\(filenameStem[..<prefixEndIndex])..."
     }
 
     /// Iterates the document to instantly show or hide the native PDFKit popup indicators.

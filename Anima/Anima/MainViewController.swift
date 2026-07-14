@@ -197,6 +197,13 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         applyInitialSidebarWidthIfNeeded()
         setupScrollSynchronization()
         setupResizeObserver()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(pdfViewPageDidChange(_:)),
+            name: .PDFViewPageChanged,
+            object: pdfView
+        )
     }
 
     /// Applies Anima's 300-point sidebar default only for a truly new install.
@@ -264,6 +271,11 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
 
         pdfView.layoutDocumentView()
         updateSidebarLayout()
+        pdfView.updateWindowTitle()
+    }
+
+    @objc private func pdfViewPageDidChange(_ notification: Notification) {
+        pdfView.updateWindowTitle()
     }
 
     /// Iterates through the document and moves standard `.contents` text into our

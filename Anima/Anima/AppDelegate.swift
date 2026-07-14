@@ -82,6 +82,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         loadDocument(url: url)
 
+        // MainMenu.xib keeps this window hidden at launch. Present it only
+        // after its restored frame, reader content, and document caption are ready.
+        window.makeKeyAndOrderFront(nil)
+
         // --- Keyboard event monitor (fallback) ---
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) {
             [weak self] event in
@@ -123,7 +127,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - PDF Loading
 
-    /// Loads a PDF document into the main view and updates the window title.
+    /// Loads a PDF document into the main view.
     private func loadDocument(url: URL) {
         guard let document = PDFDocument(url: url) else {
             Swift.print("❌ Failed to parse PDF: \(url.path)")
@@ -132,7 +136,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         mainViewController.loadPDF(document: document)
-        window.title = url.lastPathComponent
         Swift.print("✅ Loaded PDF: \(url.path)")
     }
 
