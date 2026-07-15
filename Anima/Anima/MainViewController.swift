@@ -32,6 +32,15 @@
 //    annotation is remembered, and emphasis is re-applied to the (possibly
 //    rebuilt) card after the rebuild completes.
 //
+//  Comment search:
+//    Comment-only search is coordinated here because this controller owns
+//    the sidebar card views. Matches are ordered from the current PDF page
+//    forward without wrapping. Matching cards receive thin pale-green borders;
+//    the current F3 result receives a thick pale-green border. Comment search
+//    is navigation only: it scrolls to the corresponding PDF location and
+//    fully reveals the matching card, but does not emphasize an annotation or
+//    make it the Delete-key target.
+//
 
 import Cocoa
 import Quartz
@@ -141,13 +150,32 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
 
     // UUID of the currently emphasized annotation. Used to re-apply emphasis
     // after sidebar rebuilds (the card views are torn down and recreated,
-    // so activeCardView becomes stale — but the UUID survives).
+    // so activeCardView becomes stale -- but the UUID survives).
     private var emphasizedUUID: String?
     private var emphasizedPageIndex: Int?
 
-    // Emphasis appearance — light yellow (#FFFFE0) at higher opacity
+    // Emphasis appearance -- light yellow (#FFFFE0) at higher opacity
     private static let emphasisColor = NSColor(red: 1.0, green: 1.0, blue: 0.878, alpha: 1.0)
     private static let emphasisOpacity: CGFloat = 0.7
+
+    // --- Comment-search state ---
+    // Each result identifies a card by its stable annotation UUID and page.
+    // The sidebar card views themselves are rebuilt after annotation mutation,
+    // so storing view instances here would create stale references.
+    private var activeCommentSearchQuery: String?
+    private var commentSearchResults: [(uuid: String, pageIndex: Int)] = []
+    private var activeCommentSearchResultIndex: Int?
+
+    /// Exposed for the upcoming keyboard-routing step. A comment search is
+    /// active only after it has found at least one result and displayed it.
+    var hasActiveCommentSearch: Bool {
+        activeCommentSearchResultIndex != nil
+    }
+
+    /// Exposed for the upcoming ordered-Esc behavior.
+    var hasAnnotationEmphasis: Bool {
+        emphasizedAnnotation != nil
+    }
 
     override func loadView() {
         splitView = NSSplitView()
@@ -329,13 +357,18 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     // --- SidebarUpdateDelegate ---
 
     func annotationsDidChange(onPageIndex pageIndex: Int) {
-        // Remember emphasis state before rebuild — the card views will be
+        // A sidebar rebuild invalidates the currently stored card ordering.
+        // Clear an active comment search rather than retaining stale result
+        // references or misleading green borders after a mutation.
+        clearCommentSearch()
+
+        // Remember emphasis state before rebuild -- the card views will be
         // destroyed and recreated, but the PDF annotation and UUID survive.
         let preserveUUID = emphasizedUUID
         let preservePageIndex = emphasizedPageIndex
 
         // Clear card-side emphasis (the card view is about to be torn down).
-        // Keep the PDF-side emphasis intact — the annotation object survives
+        // Keep the PDF-side emphasis intact -- the annotation object survives
         // the rebuild, so we don't need to save/restore its color.
         activeCardView?.setInactive()
         activeCardView = nil
@@ -357,7 +390,7 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     }
 
     func highlightWasClicked(uuid: String, onPageIndex pageIndex: Int, toggle: Bool) {
-        // Empty UUID means "clicked outside any highlight" — clear emphasis
+        // Empty UUID means "clicked outside any highlight" -- clear emphasis
         if uuid.isEmpty {
             clearEmphasis()
             Swift.print("⚪ Emphasis cleared (clicked outside highlight)")
@@ -391,6 +424,162 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         applyEmphasis(to: annot, on: page, uuid: uuid, pageIndex: pageIndex, cardView: cardView)
 
         Swift.print("🟡 Emphasis applied to \(uuid) on page \(pageIndex)")
+    }
+
+    // --- Comment Search ---
+
+    /// Starts a new comment-only search from the current PDF page forward.
+    ///
+    /// Results are cards, not individual substring occurrences: a card with
+    /// one match and a card with several matches each appear exactly once.
+    /// Returns false when no matching comment exists from the current page
+    /// through the end of the document.
+    @discardableResult
+    func startCommentSearch(query: String) -> Bool {
+        clearCommentSearch()
+
+        guard let document = pdfView.document else { return false }
+
+        let currentPageIndex: Int
+        if let currentPage = pdfView.currentPage {
+            currentPageIndex = document.index(for: currentPage)
+        } else {
+            currentPageIndex = 0
+        }
+
+        activeCommentSearchQuery = query
+
+        for pageIndex in currentPageIndex..<pageSidebarViews.count {
+            let pageView = pageSidebarViews[pageIndex]
+
+            for cardView in pageView.cardViews {
+                guard cardView.card.text.range(
+                    of: query,
+                    options: [.caseInsensitive, .diacriticInsensitive]
+                ) != nil else {
+                    continue
+                }
+
+                commentSearchResults.append((
+                    uuid: cardView.card.uuid,
+                    pageIndex: cardView.card.pageIndex
+                ))
+                cardView.setSearchMatch(true)
+            }
+        }
+
+        guard !commentSearchResults.isEmpty else {
+            activeCommentSearchQuery = nil
+            return false
+        }
+
+        showCommentSearchResult(at: 0)
+        return true
+    }
+
+    /// Advances to the next comment-search card without wrapping.
+    ///
+    /// Returns false only when no active comment search exists. If the active
+    /// result is already the final one, it remains selected and this returns
+    /// true so the keyboard-routing layer can show "No more hits."
+    func advanceToNextCommentSearchHit() -> Bool {
+        guard activeCommentSearchQuery != nil,
+              let currentIndex = activeCommentSearchResultIndex else {
+            return false
+        }
+
+        let nextIndex = currentIndex + 1
+
+        guard nextIndex < commentSearchResults.count else {
+            return true
+        }
+
+        showCommentSearchResult(at: nextIndex)
+        return true
+    }
+
+    /// Returns true when the active result is the last available comment hit.
+    /// Used by the future F3 routing to decide whether to present "No more hits."
+    func isAtFinalCommentSearchHit() -> Bool {
+        guard let currentIndex = activeCommentSearchResultIndex else {
+            return false
+        }
+
+        return currentIndex == commentSearchResults.count - 1
+    }
+
+    /// Removes all thin/thick pale-green comment-search borders and forgets
+    /// the query and F3 cursor. This does not touch annotation emphasis.
+    func clearCommentSearch() {
+        for pageView in pageSidebarViews {
+            for cardView in pageView.cardViews {
+                cardView.setSearchMatch(false)
+            }
+        }
+
+        activeCommentSearchQuery = nil
+        commentSearchResults.removeAll()
+        activeCommentSearchResultIndex = nil
+    }
+
+    /// Displays the requested result as the current thick-green card, moves
+    /// the PDF to the linked highlight's page, and reveals the complete card
+    /// within its local page-sidebar scroll view.
+    private func showCommentSearchResult(at resultIndex: Int) {
+        guard commentSearchResults.indices.contains(resultIndex) else { return }
+
+        if let previousIndex = activeCommentSearchResultIndex {
+            let previousResult = commentSearchResults[previousIndex]
+            findCardView(
+                uuid: previousResult.uuid,
+                onPageIndex: previousResult.pageIndex
+            )?.setCurrentSearchHit(false)
+        }
+
+        let result = commentSearchResults[resultIndex]
+
+        guard let cardView = findCardView(
+            uuid: result.uuid,
+            onPageIndex: result.pageIndex
+        ) else {
+            Swift.print("⚠️  Could not find comment-search card \(result.uuid)")
+            return
+        }
+
+        cardView.setCurrentSearchHit(true)
+        activeCommentSearchResultIndex = resultIndex
+
+        navigateToCommentSearchResult(uuid: result.uuid, onPageIndex: result.pageIndex)
+        scrollCardIntoViewIfNeeded(cardView)
+
+        Swift.print(
+            "🔎 Comment-search hit \(resultIndex + 1) of \(commentSearchResults.count) on page \(result.pageIndex + 1)"
+        )
+    }
+
+    /// Navigates to the annotation linked to a comment-search card. This is
+    /// deliberately navigation only: it does not apply yellow annotation
+    /// emphasis, set an accent card border, or alter the Delete-key target.
+    private func navigateToCommentSearchResult(uuid: String, onPageIndex pageIndex: Int) {
+        guard let document = pdfView.document,
+              let page = document.page(at: pageIndex),
+              let annotation = findAnnotation(uuid: uuid, on: page) else {
+            return
+        }
+
+        let destination = PDFDestination(
+            page: page,
+            at: NSPoint(x: annotation.bounds.midX, y: annotation.bounds.midY)
+        )
+        pdfView.go(to: destination)
+    }
+
+    /// Public seam for the approved ordered-Esc behavior. MainViewController
+    /// owns the original annotation appearance and Delete-key synchronization,
+    /// so other collaborators ask it to clear emphasis rather than resetting
+    /// PDF or card state directly.
+    func clearAnnotationEmphasis() {
+        clearEmphasis()
     }
 
     // --- Page-Sidebar Rebuild ---
@@ -437,9 +626,12 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     }
 
     /// Responds to a sidebar card being single-clicked: emphasizes the corresponding
-    /// highlight in the PDF and marks the card as active. Clicking the same
-    /// card again clears the emphasis.
+    /// highlight in the PDF and marks the card as active. Clicking any card
+    /// deliberately leaves comment-search navigation before entering normal
+    /// annotation-selection behavior.
     private func handleCardClicked(_ card: CommentCard, fromCardView cardView: CommentCardView) {
+        clearCommentSearch()
+
         guard let document = pdfView.document,
               let page = document.page(at: card.pageIndex) else { return }
 
@@ -463,8 +655,11 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
     }
 
     /// Responds to a sidebar card being double-clicked: ensures emphasis is ON,
-    /// then delegates to AnimaPDFView to open the comment editor.
+    /// then delegates to AnimaPDFView to open the comment editor. A double-click
+    /// is also an explicit exit from comment-search navigation.
     private func handleCardDoubleClicked(_ card: CommentCard, fromCardView cardView: CommentCardView) {
+        clearCommentSearch()
+
         guard let document = pdfView.document,
               let page = document.page(at: card.pageIndex) else { return }
 

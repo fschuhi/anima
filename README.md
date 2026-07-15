@@ -126,6 +126,39 @@ Every annotation gets a UUID stored in the PDF `/NM` field. Swift generates UUID
 | **Tabs** | 🚧 Planned  | Backlog (see `TODO.md`)                            |
 | **pdf:// URL Handler** | 🚧 Planned  | Phase 2 (see `GOALS.md`)                           |
 
+---
+
+## How to Use
+
+### Highlight and comment
+
+- **Select text + Enter** -- create a pink highlight.
+- **H** -- toggle persistent highlight mode. With the mode on, releasing the mouse after selecting text creates a highlight immediately.
+- **Double-click a highlight** -- add or edit its comment. Escape in the comment editor saves the current text.
+- **Click a highlight or comment card** -- emphasize that annotation and make it the target for Delete. Click the same emphasized highlight or card again, or press **Esc**, to clear the selection.
+- **Delete** or **Forward Delete** -- remove the currently emphasized highlight.
+
+Highlights start without comments by design. Add a comment later by double-clicking the highlight.
+
+### Navigate
+
+- **G** -- go to a 1-based page number.
+- **Home / End** and **Cmd+Home / Cmd+End** -- jump to the beginning or end of the document.
+- **Page Up / Page Down** -- move by one screenful.
+
+### Search
+
+- **Cmd+F** -- search PDF text from the beginning of the current page forward. The active hit appears pale green in the PDF.
+- **Cmd+Shift+F** -- search annotation comments only from the current page forward. Matching cards receive thin pale-green borders; the current hit has a thicker pale-green border.
+- **F3** -- advance to the next hit in the active search. Searches stop at document end and do not wrap.
+- **Esc** -- clear the active PDF-text search, comment search, or annotation emphasis, in that order.
+
+PDF-text search results are temporary reader selections, not annotation selections. Finding text never creates a highlight, including while persistent H mode is enabled. Starting a search clears annotation emphasis; clicking a highlight or card exits search and returns to normal annotation interaction.
+
+### Inspect native PDF comments
+
+- **P** -- toggle X-Ray mode, which reveals native PDF popup indicators for comments. This is primarily a diagnostic view; ordinary reading keeps them suppressed in favor of the sidebar.
+
 ### Highlight Workflow
 
 Highlights are created **without a comment**. This keeps the flow fast -- especially in persistent highlight mode where mouseUp instantly highlights. To add or edit a comment after the fact, double-click the highlight. This matches the PDF-XChange Viewer workflow where highlighting and commenting are separate actions.

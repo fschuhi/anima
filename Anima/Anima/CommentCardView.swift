@@ -11,6 +11,14 @@
 //    The card itself does not manage emphasis state — MainViewController calls
 //    setActive() and setInactive() to control the visual indication.
 //
+//  Comment search:
+//    MainViewController marks cards whose comment text matches the active
+//    comment-search query. All matches receive a thin pale-green border; the
+//    current F3 result receives a thicker pale-green border. These visual
+//    states are separate from normal annotation emphasis, although search
+//    takes visual precedence defensively. Entering either find mode clears
+//    annotation emphasis at the coordination layer.
+//
 
 import Cocoa
 
@@ -32,11 +40,26 @@ class CommentCardView: NSView {
     // Top-left origin makes layout math easier
     override var isFlipped: Bool { return true }
 
-    // --- Active state appearance ---
+    // --- Border appearance ---
     private static let activeBorderColor = NSColor.controlAccentColor
     private static let activeBorderWidth: CGFloat = 2.0
+    private static let searchMatchBorderColor = NSColor(
+        red: 0.70,
+        green: 0.90,
+        blue: 0.70,
+        alpha: 1.0
+    )
+    private static let searchMatchBorderWidth: CGFloat = 1.0
+    private static let currentSearchHitBorderWidth: CGFloat = 3.0
     private static let normalBorderColor = NSColor.separatorColor
     private static let normalBorderWidth: CGFloat = 1.0
+
+    // These states are controlled by MainViewController. They are kept
+    // independent because a card can be a search match without being the
+    // current F3 result, and annotation emphasis has separate semantics.
+    private var isAnnotationActive = false
+    private var isSearchMatch = false
+    private var isCurrentSearchHit = false
 
     init(card: CommentCard) {
         self.card = card
@@ -79,8 +102,7 @@ class CommentCardView: NSView {
         self.wantsLayer = true
         self.layer?.cornerRadius = 5
         self.layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
-        self.layer?.borderColor = CommentCardView.normalBorderColor.cgColor
-        self.layer?.borderWidth = CommentCardView.normalBorderWidth
+        updateBorderAppearance()
 
         self.addSubview(titleLabel)
         self.addSubview(divider)
@@ -112,21 +134,71 @@ class CommentCardView: NSView {
         ])
     }
 
-    // --- Active state (controlled by MainViewController) ---
+    // MARK: - Visual State
+
+    /// Recomputes the border from the card's independent display states.
+    ///
+    /// Search states deliberately take precedence. The coordinator clears
+    /// annotation emphasis before beginning a search, but this ordering keeps
+    /// the card visually correct if state changes briefly overlap.
+    private func updateBorderAppearance() {
+        if isCurrentSearchHit {
+            self.layer?.borderColor = CommentCardView.searchMatchBorderColor.cgColor
+            self.layer?.borderWidth = CommentCardView.currentSearchHitBorderWidth
+        } else if isSearchMatch {
+            self.layer?.borderColor = CommentCardView.searchMatchBorderColor.cgColor
+            self.layer?.borderWidth = CommentCardView.searchMatchBorderWidth
+        } else if isAnnotationActive {
+            self.layer?.borderColor = CommentCardView.activeBorderColor.cgColor
+            self.layer?.borderWidth = CommentCardView.activeBorderWidth
+        } else {
+            self.layer?.borderColor = CommentCardView.normalBorderColor.cgColor
+            self.layer?.borderWidth = CommentCardView.normalBorderWidth
+        }
+    }
+
+    // MARK: - Annotation Emphasis
 
     /// Visually indicate that this card's highlight is currently emphasized.
     func setActive() {
-        self.layer?.borderColor = CommentCardView.activeBorderColor.cgColor
-        self.layer?.borderWidth = CommentCardView.activeBorderWidth
+        isAnnotationActive = true
+        updateBorderAppearance()
     }
 
-    /// Restore the card to its normal visual state.
+    /// Restore the card's annotation-emphasis state to inactive.
     func setInactive() {
-        self.layer?.borderColor = CommentCardView.normalBorderColor.cgColor
-        self.layer?.borderWidth = CommentCardView.normalBorderWidth
+        isAnnotationActive = false
+        updateBorderAppearance()
     }
 
-    // --- Click handling ---
+    // MARK: - Comment Search
+
+    /// Marks or unmarks this card as matching the active comment-search query.
+    /// Matching cards use a thin pale-green border unless they are the current
+    /// F3 result, which uses the thicker pale-green border.
+    func setSearchMatch(_ isMatch: Bool) {
+        isSearchMatch = isMatch
+
+        if !isMatch {
+            isCurrentSearchHit = false
+        }
+
+        updateBorderAppearance()
+    }
+
+    /// Marks or unmarks this card as the current F3 comment-search result.
+    /// A current hit is necessarily also a match.
+    func setCurrentSearchHit(_ isCurrentHit: Bool) {
+        isCurrentSearchHit = isCurrentHit
+
+        if isCurrentHit {
+            isSearchMatch = true
+        }
+
+        updateBorderAppearance()
+    }
+
+    // MARK: - Click Handling
 
     override func mouseDown(with event: NSEvent) {
         super.mouseDown(with: event)

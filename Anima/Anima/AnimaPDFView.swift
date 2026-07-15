@@ -10,8 +10,9 @@
 //    - P key → toggle X-Ray mode (reveals native popups for comments)
 //    - G key → go to a page through a native modal input field
 //    - Cmd+F → find text forward from the current page
+//    - Cmd+Shift+F → find matching annotation comments forward from the current page
 //    - F3 → advance to the next active find hit
-//    - Esc → clear the active find hit
+//    - Esc → clear PDF-text search, comment search, or annotation emphasis
 //    - Double-click on highlight (or card via delegate) → edit comment (via AnnotationManager)
 //    - Single-click highlight → toggle emphasis
 //    - Delete key → remove the currently emphasized highlight (via AnnotationManager)
@@ -55,6 +56,29 @@ protocol SidebarUpdateDelegate: AnyObject {
     ///   - toggle: If true (single-click), toggles emphasis on/off.
     ///             If false (double-click), ensures emphasis is on without toggling.
     func highlightWasClicked(uuid: String, onPageIndex pageIndex: Int, toggle: Bool)
+
+    /// Starts a comment-only search from the current PDF page forward.
+    /// Returns false if no matching annotation comment is found.
+    func startCommentSearch(query: String) -> Bool
+
+    /// Advances to the next matching comment card without wrapping.
+    /// Returns false if no comment search is active.
+    func advanceToNextCommentSearchHit() -> Bool
+
+    /// Returns true when the current comment-search hit is the final result.
+    func isAtFinalCommentSearchHit() -> Bool
+
+    /// Clears all comment-search state and card borders.
+    func clearCommentSearch()
+
+    /// Clears annotation emphasis and the associated Delete-key target.
+    func clearAnnotationEmphasis()
+
+    /// True while a comment-search hit is active.
+    var hasActiveCommentSearch: Bool { get }
+
+    /// True while a PDF annotation is emphasized.
+    var hasAnnotationEmphasis: Bool { get }
 }
 
 class AnimaPDFView: PDFView {
@@ -88,7 +112,7 @@ class AnimaPDFView: PDFView {
     static let uncontrolledDocumentHandleMaximumLength = 40
 
     // --- Find state ---
-    // Find hits deliberately use PDFView.highlightedSelections rather than
+    // PDF-text hits deliberately use PDFView.highlightedSelections rather than
     // currentSelection. This keeps temporary reader navigation separate from
     // text selection used to create persisted highlight annotations.
     private static let findHitColor = NSColor(
@@ -103,6 +127,10 @@ class AnimaPDFView: PDFView {
     private var activeFindQuery: String?
     private var findResults: [PDFSelection] = []
     private var activeFindResultIndex: Int?
+
+    private var hasActivePDFTextSearch: Bool {
+        activeFindResultIndex != nil
+    }
 
     // --- Keyboard handling ---
 
@@ -129,21 +157,53 @@ class AnimaPDFView: PDFView {
 
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-        // Cmd+F = start a new document search. A new search always clears
-        // the previous temporary find-hit selection before prompting.
+        // Cmd+F = start a new document-text search. Starting either search
+        // mode clears the other search mode and annotation emphasis first.
         if event.keyCode == 3,
            modifiers.contains(.command),
+           !modifiers.contains(.shift),
            !modifiers.contains(.control),
            !modifiers.contains(.option) {
+            sidebarDelegate?.clearAnnotationEmphasis()
+            sidebarDelegate?.clearCommentSearch()
             showFindDialog()
             lastHandledEvent = event
             return true
         }
 
-        // F3 = find next occurrence of the active query. With no active
-        // find hit, beep and otherwise leave the reader untouched.
+        // Cmd+Shift+F = search only annotation comments. The sidebar owns
+        // comment cards and their visual state, while this view owns the
+        // native prompt and keyboard event dispatch.
+        if event.keyCode == 3,
+           modifiers.contains(.command),
+           modifiers.contains(.shift),
+           !modifiers.contains(.control),
+           !modifiers.contains(.option) {
+            sidebarDelegate?.clearAnnotationEmphasis()
+            clearFindHit()
+            sidebarDelegate?.clearCommentSearch()
+            showCommentFindDialog()
+            lastHandledEvent = event
+            return true
+        }
+
+        // F3 = find next in whichever search mode is active. Search modes
+        // are mutually exclusive, but PDF-text search is checked first to
+        // match the ordered-Esc behavior.
         if event.keyCode == 99 {
-            if advanceToNextFindHit() {
+            if hasActivePDFTextSearch {
+                _ = advanceToNextFindHit()
+                lastHandledEvent = event
+                return true
+            }
+
+            if sidebarDelegate?.hasActiveCommentSearch == true {
+                if sidebarDelegate?.isAtFinalCommentSearchHit() == true {
+                    showNoMoreHitsAlert()
+                } else {
+                    _ = sidebarDelegate?.advanceToNextCommentSearchHit()
+                }
+
                 lastHandledEvent = event
                 return true
             }
@@ -153,13 +213,28 @@ class AnimaPDFView: PDFView {
             return true
         }
 
-        // Escape = clear the temporary find-hit selection. Do not consume
-        // Escape when no find result exists, so PDFKit retains its normal
-        // behavior in all unrelated situations.
-        if event.keyCode == 53, activeFindResultIndex != nil {
-            clearFindHit()
-            lastHandledEvent = event
-            return true
+        // Escape clears the most immediate temporary reader state:
+        // PDF-text search -> comment search -> annotation emphasis.
+        // If none is active, leave Escape unconsumed for normal AppKit/PDFKit
+        // behavior.
+        if event.keyCode == 53 {
+            if hasActivePDFTextSearch {
+                clearFindHit()
+                lastHandledEvent = event
+                return true
+            }
+
+            if sidebarDelegate?.hasActiveCommentSearch == true {
+                sidebarDelegate?.clearCommentSearch()
+                lastHandledEvent = event
+                return true
+            }
+
+            if sidebarDelegate?.hasAnnotationEmphasis == true {
+                sidebarDelegate?.clearAnnotationEmphasis()
+                lastHandledEvent = event
+                return true
+            }
         }
 
         // H = toggle persistent highlight mode
@@ -375,9 +450,9 @@ class AnimaPDFView: PDFView {
         isShowingDialog = false
     }
 
-    // MARK: - Find
+    // MARK: - PDF-Text Find
 
-    /// Starts a new forward-only document search. The previous result is
+    /// Starts a new forward-only document-text search. The previous result is
     /// cleared before the prompt appears, even if the user cancels the prompt.
     private func showFindDialog() {
         clearFindHit()
@@ -499,11 +574,64 @@ class AnimaPDFView: PDFView {
         return document.index(for: page)
     }
 
+    // MARK: - Comment Find
+
+    /// Prompts for text to search only within annotation comments. The
+    /// matching-card state and result cursor are owned by MainViewController.
+    private func showCommentFindDialog() {
+        let queryField = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        queryField.placeholderString = "Text to find in comments"
+
+        let alert = NSAlert()
+        alert.messageText = "Find in Comments"
+        alert.informativeText = "Search annotation comments from the current page forward."
+        alert.addButton(withTitle: "Find")
+        alert.addButton(withTitle: "Cancel")
+        alert.accessoryView = queryField
+        alert.layout()
+        alert.window.initialFirstResponder = queryField
+        alert.window.makeFirstResponder(queryField)
+
+        isShowingDialog = true
+        let response = alert.runModal()
+        isShowingDialog = false
+
+        guard response == .alertFirstButtonReturn else {
+            return
+        }
+
+        let query = queryField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !query.isEmpty else {
+            NSSound.beep()
+            return
+        }
+
+        guard sidebarDelegate?.startCommentSearch(query: query) == true else {
+            showNoCommentHitsAlert(for: query)
+            return
+        }
+    }
+
+    // MARK: - Find Alerts
+
     private func showNoHitsAlert(for query: String) {
         let alert = NSAlert()
         alert.alertStyle = .informational
         alert.messageText = "No hits"
         alert.informativeText = "No matches for \"\(query)\" were found from the current page to the end of the document."
+        alert.addButton(withTitle: "OK")
+
+        isShowingDialog = true
+        alert.runModal()
+        isShowingDialog = false
+    }
+
+    private func showNoCommentHitsAlert(for query: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "No comment hits"
+        alert.informativeText = "No annotation comments matching \"\(query)\" were found from the current page to the end of the document."
         alert.addButton(withTitle: "OK")
 
         isShowingDialog = true
@@ -603,6 +731,8 @@ class AnimaPDFView: PDFView {
             return false
         }
 
+        clearFindModesForAnnotationInteraction()
+
         // Ensure emphasis is on before opening the dialog (toggle: false
         // means "ensure on" — if already emphasized on this annotation,
         // it's a no-op rather than toggling off).
@@ -652,6 +782,8 @@ class AnimaPDFView: PDFView {
         }
 
         if let annot = highlightAnnotation(at: pagePoint, on: page) {
+            clearFindModesForAnnotationInteraction()
+
             // Hit a highlight — notify delegate for emphasis toggle.
             // selectedAnnotation/Page will be set by MainViewController
             // via applyEmphasis/clearEmphasis (unified with emphasis state).
@@ -668,6 +800,13 @@ class AnimaPDFView: PDFView {
             selectedAnnotation = nil
             selectedAnnotationPage = nil
         }
+    }
+
+    /// Leaves either find mode before normal annotation interaction. Search
+    /// result display and annotation emphasis deliberately never coexist.
+    private func clearFindModesForAnnotationInteraction() {
+        clearFindHit()
+        sidebarDelegate?.clearCommentSearch()
     }
 
     // MARK: - Delete Selected Highlight
