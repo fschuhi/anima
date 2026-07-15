@@ -15,8 +15,13 @@ GOALS.md
 TODO.md
 # CHANGELOG.md
 
+# Design notes for bookmark management and navigation.
+docs/BOOKMARKS_DESIGN.md
+docs/JumpStation.bas
+docs/UserFormSelector.frm
+
 # Historical design notes from the sidebar build-out. Not actively maintained.
-# SIDEBAR_DESIGN.md
+# docs/SIDEBAR_DESIGN.md
 
 ### --- Build & Configuration ---
 Anima/Anima/Info.plist
@@ -49,7 +54,7 @@ Anima/AnimaTests/Fixtures/sidebar_basic_expected.json
 Anima/AnimaTests/Fixtures/sidebar_page_extract_expected.json
 Anima/AnimaTests/AnimaTests.swift
 
-### --- Testing Python tools ---
+### --- Testing Python Tools ---
 tests/conftest.py
 tests/test_anima_helper.py
 
@@ -60,6 +65,6 @@ tests/test_anima_helper.py
 ### --- Data ---
 # data/input_original.pdf
 
-### --- Documentation ---
-# experiments to determine the highlight color rendering behavior for Preview/Anima, PDF-Xchange-Viewer, Chrome, Edge
+### --- Further Documentation ---
+# Experiments to determine the highlight color rendering behavior for Preview/Anima, PDF-Xchange-Viewer, Chrome, Edge.
 # docs/Anima_16_(GPT-5.6-Terra).md

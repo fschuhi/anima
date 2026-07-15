@@ -6,12 +6,12 @@
 
 ---
 
-**Where we are:** Main-window frame persistence and split-divider persistence/holding behavior closed on 2026-07-14. On the same date, Anima gained compact page-aware window captions: controlled PDFs show their leading `(Author Year)` `pdf_id`, uncontrolled filenames use a configurable abbreviated fallback, and the caption updates as the current page changes. The startup empty-window flash is also gone: Anima now presents its single window only after frame restoration, document loading, and caption setup. Bare `G` opens a small native modal input, accepts valid 1-based page numbers, and fails fast with the valid range for invalid input. `Cmd+G` remains reserved for future Find Next behavior. On 2026-07-15, the two parked Swift test gaps closed: `testFitzBridgeAddHighlightRoundTrip` pins the real Swift -> Python -> fitz subprocess boundary, and `testCrossPageSelectionOnlyHighlightsFirstPage` pins the intentional page-scoped cross-page selection behavior. The recorded baseline is now 22 green tests (11 Python + 11 Swift).
+**Where we are:** On 2026-07-15, the two Python test gaps closed:added `test_clear_comment_on_popupless_annotation` to `TestEditComment`. Prepared `docs/BOOKMARKS_DESIGN.md` as handover document.
 
 **What's next (in order):**
 
-1. Close the one remaining Python test gap: `edit-comment` clearing a comment on a popup-less annotation, pinning the xref-clear ordering in `cmd_edit_comment`.
-2. Reassess the remaining reading-ergonomics backlog only after the test gap is closed.
+1. Implement bookmarks management and navigation, based on the ideas in `dosc/BOOKMARKS_DESIGN.md`.
+2. Reassess the remaining reading-ergonomics backlog.
 
 Tabs remain deferred; separate `open -n` instances are the accepted multi-document workflow for now.
 

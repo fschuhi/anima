@@ -43,7 +43,7 @@
 
 ### Python -- remaining
 
-- ~~edit-comment clear on a popup-less annotation: clear a comment (`--comment ""`) on an annotation without a popup, save, reopen with fitz, assert `/Contents` is empty. Pins the xref-clear ordering in `cmd_edit_comment` (the second `annot.update()` after the xref write must not resurrect the old text). Completed 2026-07-15: added `test_clear_comment_on_popupless_annotation` to `TestEditComment`; the popup-less fixture is built directly with fitz because add-highlight always sets a popup. Green -- the second `annot.update()` does not resurrect the cleared comment on the current fitz, and `/Contents` is empty at the xref level.~~
+- ~~Edit-comment clear on a popup-less annotation: clear a comment (`--comment ""`) on an annotation without a popup, save, reopen with fitz, assert `/Contents` is empty. Pins the xref-clear ordering in `cmd_edit_comment` (the second `annot.update()` after the xref write must not resurrect the old text). Completed 2026-07-15: added `test_clear_comment_on_popupless_annotation` to `TestEditComment`; the popup-less fixture is built directly with fitz because add-highlight always sets a popup. Green -- the second `annot.update()` does not resurrect the cleared comment on the current fitz, and `/Contents` is empty at the xref level.~~
 
 ---
 
