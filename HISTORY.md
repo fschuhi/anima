@@ -42,7 +42,7 @@
 - Per-page architecture (PageSidebarView) for efficient rebuilds
 - Scroll sync (lockstep with PDF via bounds change notifications)
 - Bidirectional emphasis (card ↔ highlight, toggle on single-click)
-- Double-click → ensure emphasis + open comment editor
+- Double-click -> ensure emphasis + open comment editor
 - Emphasis unified with selectedAnnotation (Delete key targeting)
 - Scroll card into view when emphasized via highlight-click
 - Live sidebar updates via SidebarUpdateDelegate protocol
@@ -63,7 +63,7 @@
 
 - Native PDFKit yellow popup squares eliminated on load
 - `/AnimaComment` custom dictionary key stores comment text
-- `scrubCommentsForPopupSuppression()` migrates `.contents` → `/AnimaComment`
+- `scrubCommentsForPopupSuppression()` migrates `.contents` -> `/AnimaComment`
   and aggressively severs all `/Popup` links before rendering
 - X-Ray mode (P key toggle) rehydrates popups for debugging
 - Dual-key contract threaded through SidebarExtractor, editComment,
@@ -93,7 +93,7 @@
 ## Testing
 
 ### Python (pytest) — 11 tests passing
-- Round-trip: create → verify → edit → verify → delete → verify
+- Round-trip: create -> verify -> edit -> verify -> delete -> verify
 - Edge cases: invalid page, missing file, nonexistent UUID
 - Incremental save preserves existing annotations
 - UUID correctly written to /NM field (xref-level check)
@@ -107,8 +107,10 @@
 - SidebarExtractor: per-page extraction (page 0, page 1, empty page 2)
 - Per-page reassembly matches document-level extraction
 - In-memory annotation round-trip (guards dual-write field omissions)
-- `testFitzQuadYFlip` -- pins the PDFKit→fitz y-flip contract (known page/rect, round-trip identity, non-standard page height, x unaffected) (2026-07-11)
+- `testFitzQuadYFlip` -- pins the PDFKit->fitz y-flip contract (known page/rect, round-trip identity, non-standard page height, x unaffected) (2026-07-11)
 - `testQuadPointsConstruction` -- pins QuadPoints corner order and count (single rect, multi-rect flattening, degenerate zero-width/height rects) (2026-07-11)
+- - `testFitzBridgeAddHighlightRoundTrip` -- exercises the real Swift -> Python -> fitz subprocess boundary (distinct from `testInMemoryAnnotationRoundTrip`'s in-memory simulation): `FitzBridge.addHighlight` against a disposable copy of `sidebar_basic.pdf`, verified by reload. Project root located via `#filePath` self-location on the test file rather than an Xcode scheme environment variable (2026-07-15)
+- `testCrossPageSelectionOnlyHighlightsFirstPage` -- pins the intentional page-scoped behavior of `AnimaPDFView.createHighlightFromSelection()`: a genuine cross-page `PDFSelection` (via `PDFDocument.selection(from:atCharacterIndex:to:atCharacterIndex:)`) produces a highlight confined to the first page; the second page's portion is silently dropped by design (cross-page stitching is `pdf-annotations`' downstream `link` comment convention, out of Anima's scope). Verification reads `PDFAnnotation`s directly via `AnnotationManager.annotationUUID(_:)` rather than `SidebarExtractor`, since highlights created this way start without a comment and `SidebarExtractor` only surfaces commented highlights (2026-07-15)
 
 ### Fixes found along the way (2026-07-11)
 - Fixed stale test reference: `testInMemoryAnnotationRoundTrip` referenced `AnimaPDFView.highlightColor`/`highlightOpacity`, which live on `AnnotationManager` -- predated this session, caught by a clean build
@@ -116,7 +118,7 @@
 
 ## Refactoring
 
-- Extracted `AnnotationManager` from `AnimaPDFView` — All annotation CRUD operations (highlight creation with quad math and dual-write, comment editing via `CommentInputPanel`, highlight deletion) moved to a dedicated class. `AnimaPDFView` is now purely event handling, hit-testing, and mode management. `AnnotationManager` is a toolbox: it holds no references to the view or document, receiving all context per-call. This keeps it testable and safe for future multi-document (tabs) support. Constants (`authorName`, `highlightColor`, `highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`) also moved. `AppDelegate` creates and wires the manager. Four files changed: `AnnotationManager.swift` (new, 397 lines), `AnimaPDFView.swift` (700→463), `MainViewController.swift` (1 reference updated), `AppDelegate.swift` (wiring).
+- Extracted `AnnotationManager` from `AnimaPDFView` — All annotation CRUD operations (highlight creation with quad math and dual-write, comment editing via `CommentInputPanel`, highlight deletion) moved to a dedicated class. `AnimaPDFView` is now purely event handling, hit-testing, and mode management. `AnnotationManager` is a toolbox: it holds no references to the view or document, receiving all context per-call. This keeps it testable and safe for future multi-document (tabs) support. Constants (`authorName`, `highlightColor`, `highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`) also moved. `AppDelegate` creates and wires the manager. Four files changed: `AnnotationManager.swift` (new, 397 lines), `AnimaPDFView.swift` (700->463), `MainViewController.swift` (1 reference updated), `AppDelegate.swift` (wiring).
 - Extracted `AnnotationManager.fitzQuad(from:pageHeight:)` and `AnnotationManager.quadPoints(for:)` as pure static functions, replacing inline math in `createHighlight`/`addInMemoryHighlight` and removing a hand-copied duplicate of the QuadPoints corner construction in `testInMemoryAnnotationRoundTrip` (2026-07-11)
 
 ## Documentation & Process

@@ -13,9 +13,7 @@
 
 ## UX Priorities (Session 2026-07-11 -- order is initial ranking, final prios pending review)
 
-- ~~**Goto page.** Bare `G` now opens a native modal page-number input. A valid 1-based number in `1...pageCount` navigates with `pdfView.go(to:)`; invalid or non-numeric input fails fast with an error showing the valid range, then returns to the reader without navigation. `Cmd+G` remains unclaimed for future Find Next behavior. Completed YYYY-MM-DD; manually verified and the existing 20-test baseline remains green.~~
-
- **Bookmarks with jump stack.** JumpStation-style navigation (reference: Frank's Excel VBA JumpStation.bas / UserFormSelector.frm): a back-stack of jump targets (push current page on jump, pop with a shortcut) plus a keyboard-driven type-to-filter selector panel for named targets (e.g. "endnotes"). UI precedent in Anima: CommentInputPanel (modal, keyboard-first). Primary use case: main text <-> endnotes round trips.
+**Bookmarks with jump stack.** JumpStation-style navigation (reference: Frank's Excel VBA JumpStation.bas / UserFormSelector.frm): a back-stack of jump targets (push current page on jump, pop with a shortcut) plus a keyboard-driven type-to-filter selector panel for named targets (e.g. "endnotes"). UI precedent in Anima: CommentInputPanel (modal, keyboard-first). Primary use case: main text <-> endnotes round trips.
 
 - **Consider a Status bar.** Thin bar below the PDF view. Carries: mode indicators (auto-highlight, X-Ray), page display, pdf size info, maybe stats like number of highlights, maybe last bookmark target. Window title then shows the filename, permanently.
 
@@ -45,10 +43,9 @@
 
 ### Swift -- remaining
 
-- Integration: FitzBridge round-trip against test PDF (requires venv).
-- Cross-page selection: pin the page-scoped behavior -- only first-page lines produce quads, second-page lines are dropped (intended: highlights are per-page; continuation via `link` comment convention).
+~~**Integration: FitzBridge round-trip against test PDF.** `testFitzBridgeAddHighlightRoundTrip` drives the real Swift → Python → fitz path: `FitzBridge.addHighlight` shells out to `anima_helper.py` against a disposable copy of `sidebar_basic.pdf`, verified by reload. Project root (and `.venv`) located via `#filePath` self-location on the test file, not an Xcode scheme environment variable. Completed 2026-07-15; manually verified.~~
 
-_Pattern established for the two closed items: extract the inline math as a pure `static func` on `AnnotationManager`, test it standalone (no PDF fixture needed), then have call sites (including existing tests) use it instead of duplicating. Worth the same treatment if either remaining item turns out to have similar inline logic._
+~~**Cross-page selection.** `testCrossPageSelectionOnlyHighlightsFirstPage` pins the page-scoped behavior: a genuine cross-page `PDFSelection` (via `PDFDocument.selection(from:atCharacterIndex:to:atCharacterIndex:)`) drives `AnimaPDFView.createHighlightFromSelection()` directly; only page 0 gets a new highlight, page 1's portion is silently dropped, confirmed intentional (stitching is `pdf-annotations`' downstream `link` comment convention, not Anima's concern). Verification reads raw `PDFAnnotation`s via `AnnotationManager.annotationUUID(_:)`, not `SidebarExtractor` -- highlights from selection start without a comment, so `SidebarExtractor`'s comment-gated extraction would never see them. Completed 2026-07-15; manually verified.~~
 
 ### Python -- remaining
 

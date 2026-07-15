@@ -6,14 +6,12 @@
 
 ---
 
-## 📍 Current Session Pointer
-
-**Where we are:** Reader-first recovery has cleared its first navigation and search pass. The Apple/PDFKit highlight-color trust blocker closed on 2026-07-14: fitz continues to persist the established annotation representation for PDF-XChange/Chromium compatibility, while Anima applies a pale `#FFE6EA` color only to PDFKit's in-memory highlights. Main-window frame persistence and split-divider persistence/holding behavior also closed on 2026-07-14. On the same date, Anima gained compact page-aware window captions: controlled PDFs show their leading `(Author Year)` `pdf_id`, uncontrolled filenames use a configurable abbreviated fallback, and the caption updates as the current page changes. The startup empty-window flash is also gone: Anima now presents its single window only after frame restoration, document loading, and caption setup. Bare `G` opens a small native modal input, accepts valid 1-based page numbers, and fails fast with the valid range for invalid input. `Cmd+G` remains reserved for future Find Next behavior. Native forward-only document-text search (`Cmd+F`) and comment-only search (`Cmd+Shift+F`) are now complete: both begin at the current page, advance with F3 without wrapping, use pale-green result language, and share Esc-based exit behavior. The recorded baseline remains 20 green tests (11 Python + 9 Swift).
+**Where we are:** Main-window frame persistence and split-divider persistence/holding behavior closed on 2026-07-14. On the same date, Anima gained compact page-aware window captions: controlled PDFs show their leading `(Author Year)` `pdf_id`, uncontrolled filenames use a configurable abbreviated fallback, and the caption updates as the current page changes. The startup empty-window flash is also gone: Anima now presents its single window only after frame restoration, document loading, and caption setup. Bare `G` opens a small native modal input, accepts valid 1-based page numbers, and fails fast with the valid range for invalid input. `Cmd+G` remains reserved for future Find Next behavior. On 2026-07-15, the two parked Swift test gaps closed: `testFitzBridgeAddHighlightRoundTrip` pins the real Swift -> Python -> fitz subprocess boundary, and `testCrossPageSelectionOnlyHighlightsFirstPage` pins the intentional page-scoped cross-page selection behavior. The recorded baseline is now 22 green tests (11 Python + 11 Swift).
 
 **What's next (in order):**
 
-1. Return to the parked Swift/Python test gaps now that the core reader loop feels pleasant enough for daily use.
-2. Reassess the remaining reading-ergonomics backlog only after the test gaps are closed.
+1. Close the one remaining Python test gap: `edit-comment` clearing a comment on a popup-less annotation, pinning the xref-clear ordering in `cmd_edit_comment`.
+2. Reassess the remaining reading-ergonomics backlog only after the test gap is closed.
 
 Tabs remain deferred; separate `open -n` instances are the accepted multi-document workflow for now.
 
