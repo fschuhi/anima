@@ -498,4 +498,116 @@ final class AnimaTests: XCTestCase {
         XCTAssertEqual(zeroHeightQuad[0].pointValue.x, 50, "bottom-left x")
         XCTAssertEqual(zeroHeightQuad[1].pointValue.x, 70, "bottom-right x")
     }
+
+    // MARK: - FitzBridge Integration: add-highlight round-trip
+
+    /// Locates the project root from this source file's own compile-time
+    /// path (#filePath), mirroring FitzBridge's own path-derivation logic
+    /// instead of relying on an Xcode scheme environment variable.
+    ///
+    /// #filePath resolves to the absolute path this file had *on the
+    /// machine that compiled it* -- unlike the test bundle's runtime
+    /// location, which lives in DerivedData:
+    ///     <project root>/Anima/AnimaTests/AnimaTests.swift
+    /// Three path components up from that gives the project root.
+    private static var projectRoot: URL = {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()  // AnimaTests/
+            .deletingLastPathComponent()  // Anima/
+            .deletingLastPathComponent()  // <project root>/
+    }()
+
+    /// Absolute path to tools/anima_helper.py, derived from projectRoot.
+    private static var helperPath: String = {
+        projectRoot.appendingPathComponent("tools/anima_helper.py").path
+    }()
+
+    /// Verifies the real Swift -> Python -> fitz path: FitzBridge.addHighlight
+    /// shells out to anima_helper.py (via the project's .venv), which writes
+    /// an incremental-save highlight annotation to disk. Reloading the file
+    /// and running SidebarExtractor must find the new annotation intact.
+    ///
+    /// Unlike testInMemoryAnnotationRoundTrip (which recreates a PDFAnnotation
+    /// by hand, mirroring addInMemoryHighlight), this test never simulates
+    /// the Python side -- it is the actual subprocess boundary under test.
+    ///
+    /// Requires the project's .venv (see the Makefile's `setup` target) to
+    /// be present at <project root>/.venv/bin/python3.
+    func testFitzBridgeAddHighlightRoundTrip() throws {
+        // --- Step 1: locate anima_helper.py via #filePath self-location ---
+        let helperPath = Self.helperPath
+        guard FileManager.default.fileExists(atPath: helperPath) else {
+            XCTFail("anima_helper.py not found at expected path: \(helperPath). " +
+                    "Is the project checkout layout as expected (tools/anima_helper.py " +
+                    "two levels above Anima/AnimaTests)? Also run `make setup` if .venv is missing.")
+            return
+        }
+
+        // --- Step 2: work on a disposable copy of the fixture, never the checked-in file ---
+        let bundle = Bundle(for: type(of: self))
+        guard let fixtureURL = bundle.url(forResource: "sidebar_basic", withExtension: "pdf") else {
+            XCTFail("Missing sidebar_basic.pdf fixture in test bundle.")
+            return
+        }
+
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let workingPDF = tempDir.appendingPathComponent("sidebar_basic.pdf")
+        try FileManager.default.copyItem(at: fixtureURL, to: workingPDF)
+
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+
+        // --- Step 3: baseline card count before the new highlight ---
+        guard let beforeDocument = PDFDocument(url: workingPDF) else {
+            XCTFail("Failed to load working copy at \(workingPDF.path)")
+            return
+        }
+        let beforeCards = SidebarExtractor.extractCards(from: beforeDocument)
+
+        // --- Step 4: call FitzBridge.addHighlight for real ---
+        let newUUID = UUID().uuidString
+        let newComment = "Added via FitzBridge integration test"
+        let pageIndex = 0
+
+        // A simple one-line quad on the page, in fitz space (origin top-left).
+        // Coordinates chosen to land in a plain, uncommented region of the fixture page.
+        let quadsJSON = """
+        [{"x0": 72, "y0": 660, "x1": 300, "y1": 675}]
+        """
+
+        let success = FitzBridge.addHighlight(
+            helperPath: helperPath,
+            filePath: workingPDF.path,
+            page: pageIndex,
+            uuid: newUUID,
+            quadsJSON: quadsJSON,
+            comment: newComment
+        )
+        XCTAssertTrue(success, "FitzBridge.addHighlight should return true on success")
+
+        // --- Step 5: reload and verify via SidebarExtractor ---
+        guard let afterDocument = PDFDocument(url: workingPDF) else {
+            XCTFail("Failed to reload working copy after addHighlight at \(workingPDF.path)")
+            return
+        }
+        let afterCards = SidebarExtractor.extractCards(from: afterDocument)
+
+        XCTAssertEqual(afterCards.count, beforeCards.count + 1,
+                       "Adding one highlight via FitzBridge should increase the card count by exactly one")
+
+        guard let newCard = afterCards.first(where: { $0.uuid == newUUID }) else {
+            XCTFail("New highlight (uuid: \(newUUID)) not found after FitzBridge.addHighlight + reload")
+            return
+        }
+
+        XCTAssertEqual(newCard.text, newComment,
+                       "Comment text mismatch -- anima_helper.py's add-highlight should persist --comment as /Contents")
+        XCTAssertEqual(newCard.pageIndex, pageIndex,
+                       "Page index mismatch for the newly added highlight")
+
+        print("✅ FitzBridge.addHighlight round-trip passed: uuid \(newUUID) found after reload")
+    }
 }
