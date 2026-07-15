@@ -49,6 +49,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     var mainViewController: MainViewController!
     var eventMonitor: Any?
+    var bookmarkManager: BookmarkManager!
 
     /// Set by application(_:open:) during cold launch, before the
     /// window exists. Consumed by applicationDidFinishLaunching.
@@ -69,9 +70,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             Swift.print("⚠️ Could not enable main-window frame autosave")
         }
 
-        // --- Wire up the annotation manager ---
+        // --- Wire up the persistence managers ---
         let helperPath = "\(projectRoot)/tools/anima_helper.py"
         mainViewController.pdfView.annotationManager = AnnotationManager(helperPath: helperPath)
+        bookmarkManager = BookmarkManager(helperPath: helperPath)
 
         // --- Determine which PDF to open ---
         guard let url = resolvePDFURL() else {
@@ -133,6 +135,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             Swift.print("❌ Failed to parse PDF: \(url.path)")
             NSApplication.shared.terminate(nil)
             return
+        }
+
+        if !bookmarkManager.loadBookmarks(filePath: url.path) {
+            Swift.print("⚠️ Could not load bookmarks; continuing with an empty bookmark list")
         }
 
         mainViewController.loadPDF(document: document)

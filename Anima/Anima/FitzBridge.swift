@@ -1,15 +1,16 @@
 // FitzBridge.swift — Anima PoC
 //
 // Calls anima_helper.py via Process() (Swift's equivalent of subprocess).
-// All annotation writing goes through this bridge to fitz, keeping PDFKit
-// as a read-only renderer.
+// All persistent PDF mutations and catalog reads go through this bridge to
+// fitz, keeping PDFKit as a read-only renderer.
 //
 // Path resolution:
 //   The Python executable is derived from the helperPath passed in each call.
 //   helperPath points to tools/anima_helper.py; the project root is two levels
 //   up, and the venv Python lives at .venv/bin/python3 relative to that root.
 //   This means FitzBridge has no hardcoded paths of its own — everything flows
-//   from the helperPath that AppDelegate sets on AnnotationManager.
+//   from the helperPath that AppDelegate sets on AnnotationManager and
+//   BookmarkManager.
 
 import Foundation
 
@@ -46,7 +47,7 @@ struct FitzBridge {
             arguments.append(contentsOf: ["--comment", comment])
         }
 
-        return runPython(arguments: arguments)
+        return runPython(arguments: arguments) != nil
     }
 
     /// Edit the comment on an existing highlight.
@@ -63,7 +64,7 @@ struct FitzBridge {
             "--uuid", uuid,
             "--comment", comment
         ]
-        return runPython(arguments: arguments)
+        return runPython(arguments: arguments) != nil
     }
 
     /// Delete a highlight entirely.
@@ -78,18 +79,36 @@ struct FitzBridge {
             "--file", filePath,
             "--uuid", uuid
         ]
+        return runPython(arguments: arguments) != nil
+    }
+
+    /// Read the complete bookmark array stored in the PDF catalog.
+    ///
+    /// The helper prints a JSON array on stdout. This bridge deliberately
+    /// returns raw JSON rather than decoding it, so BookmarkManager remains
+    /// the owner of the bookmark data model and session-local state.
+    static func listBookmarks(
+        helperPath: String,
+        filePath: String
+    ) -> String? {
+        let arguments = [
+            helperPath,
+            "list-bookmarks",
+            "--file", filePath
+        ]
         return runPython(arguments: arguments)
     }
 
     // MARK: - Internal: run a Python process
 
-    /// Resolves the venv Python path from the helperPath and runs the process.
+    /// Resolves the venv Python path from the helperPath, runs the process,
+    /// and returns trimmed stdout when it exits successfully.
     ///
     /// Path derivation:
     ///   helperPath = .../projects/anima/tools/anima_helper.py
     ///                                  ^^^^^^ project root is 2 levels up
     ///   pythonPath = .../projects/anima/.venv/bin/python3
-    private static func runPython(arguments: [String]) -> Bool {
+    private static func runPython(arguments: [String]) -> String? {
         let process = Process()
 
         // Derive the venv Python path from the helper script location.
@@ -117,7 +136,7 @@ struct FitzBridge {
         } catch {
             Swift.print("❌ Failed to launch Python process: \(error)")
             Swift.print("   Expected Python at: \(pythonPath)")
-            return false
+            return nil
         }
 
         let status = process.terminationStatus
@@ -126,16 +145,17 @@ struct FitzBridge {
             let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
             let stderrString = String(data: stderrData, encoding: .utf8) ?? "(no stderr)"
             Swift.print("❌ anima_helper.py failed (exit \(status)): \(stderrString)")
-            return false
+            return nil
         }
 
-        // Print stdout (the UUID) for debugging
         let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        if let stdoutString = String(data: stdoutData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !stdoutString.isEmpty {
+        let stdoutString = String(data: stdoutData, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        if !stdoutString.isEmpty {
             Swift.print("🔧 helper returned: \(stdoutString)")
         }
 
-        return true
+        return stdoutString
     }
 }
