@@ -131,8 +131,8 @@ Bookmark pages are stored as fitz-native 0-based indices. `BookmarkManager` keep
 | **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
 | **Xcode Project** | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
 | **Sidebar** | ✅ Complete  | Live cards, bidirectional emphasis, scroll sync    |
-| **Bookmark Navigation** | 🚧 In progress | `Cmd+J` picker and `Cmd+D` deletion are next |
-| **Reading ergonomics** | 🚧 In progress | UX priority list in `TODO.md` |
+| **Bookmark Navigation** | ✅ Complete | `Cmd+J` JumpStation: select, Enter-to-jump, `Cmd+D` deletion |
+| **Reading ergonomics** | ✅ Complete | Phase 1 baseline complete; later refinements return to `TODO.md` |
 | **Tabs** | 🚧 Planned  | Backlog (see `TODO.md`)                            |
 | **pdf:// URL Handler** | 🚧 Planned  | Phase 2 (see `GOALS.md`)                           |
 
@@ -143,7 +143,7 @@ Bookmark pages are stored as fitz-native 0-based indices. `BookmarkManager` keep
 ### Highlight and comment
 
 - **Select text + Enter** -- create a pink highlight.
-- **H** -- toggle persistent highlight mode. With the mode on, releasing the mouse after selecting text creates a highlight immediately.
+- **Cmd+H** -- toggle persistent highlight mode. With the mode on, releasing the mouse after selecting text creates a highlight immediately.
 - **Double-click a highlight** -- add or edit its comment. Escape in the comment editor saves the current text.
 - **Click a highlight or comment card** -- emphasize that annotation and make it the target for Delete. Click the same emphasized highlight or card again, or press **Esc**, to clear the selection.
 - **Delete** or **Forward Delete** -- remove the currently emphasized highlight.
@@ -152,7 +152,7 @@ Highlights start without comments by design. Add a comment later by double-click
 
 ### Navigate
 
-- **G** -- go to a 1-based page number.
+- **Cmd+G** -- go to a 1-based page number.
 - **Home / End** and **Cmd+Home / Cmd+End** -- jump to the beginning or end of the document.
 - **Page Up / Page Down** -- move by one screenful.
 
@@ -160,8 +160,11 @@ Highlights start without comments by design. Add a comment later by double-click
 
 - **Cmd+B** -- add a named bookmark for the current page. The prompt identifies pages using normal 1-based reader numbering.
 - Bookmark names are unique case-insensitively. If the name already exists, choose **Re-point** to move it to the current page or **Keep Existing** to leave it unchanged.
+- **Cmd+J** -- open JumpStation. It lists bookmark names and normal 1-based page numbers in two columns. Mouse clicks, right-clicks, and double-clicks select a row only; Up/Down also move selection. **Enter** jumps to the selected bookmark and **Esc** closes the panel.
+- **Cmd+D** -- while JumpStation is open, delete its selected bookmark after confirmation. The list refreshes immediately, and the panel closes if the final bookmark is removed.
+- If no bookmarks exist, `Cmd+J` reports that state instead of opening an empty picker.
 
-Bookmark navigation and deletion are the next implementation step. Bookmarks persist in the PDF itself and survive reopening without altering the document's native outline/table of contents.
+Bookmarks persist in the PDF itself and survive reopening without altering the document's native outline/table of contents.
 
 ### Search
 
@@ -230,6 +233,7 @@ anima/
 │   ├── BookmarkManager.swift       ← Bookmark session state and catalog persistence coordination
 │   ├── AppDelegate.swift           ← Window setup, PDF loading, manager wiring
 │   ├── FitzBridge.swift            ← Subprocess bridge to Python helper
+│   ├── JumpStationPanel.swift      ← Modal bookmark navigation and deletion picker
 │   ├── MainViewController.swift    ← NSSplitView layout, sidebar sync & emphasis
 │   ├── SidebarExtractor.swift      ← Parses annotations into sidebar CommentCard structs
 │   ├── CommentCardView.swift       ← Custom NSView for rendering sidebar cards
@@ -258,7 +262,7 @@ anima/
 
 ### Module Overview
 
-`AnimaPDFView.swift` -- Subclasses `PDFView` to intercept keyboard and mouse events. Handles persistent highlight mode (H key toggle, mouseUp auto-highlight), X-Ray mode (P key toggle for popup visibility), goto page, bookmark creation (`Cmd+B`), hit-testing for highlight clicks, and emphasis/selection coordination via `SidebarUpdateDelegate`. All annotation CRUD (create, edit, delete) is delegated to `AnnotationManager`; bookmark persistence is delegated to `BookmarkManager`. Defines the `SidebarUpdateDelegate` protocol and notifies its delegate after every annotation mutation and highlight click so the sidebar stays in sync.
+`AnimaPDFView.swift` -- Subclasses `PDFView` to intercept keyboard and mouse events. Handles persistent highlight mode (`Cmd+H`, mouseUp auto-highlight), X-Ray mode (`Cmd+P` for popup visibility), goto page (`Cmd+G`), bookmark creation (`Cmd+B`), JumpStation presentation (`Cmd+J`), hit-testing for highlight clicks, and emphasis/selection coordination via `SidebarUpdateDelegate`. All annotation CRUD (create, edit, delete) is delegated to `AnnotationManager`; bookmark persistence is delegated to `BookmarkManager`. Defines the `SidebarUpdateDelegate` protocol and notifies its delegate after every annotation mutation and highlight click so the sidebar stays in sync.
 
 **`AnnotationManager.swift`** -- Toolbox class that owns all annotation CRUD operations and the dual-write pattern. Creates highlights (with quad math and coordinate conversion from PDFKit to fitz space), edits comments (showing the modal `CommentInputPanel`, writing via fitz, updating in-memory `/AnimaComment`), and deletes highlights. Holds no references to the view or document -- all context is passed per-call, keeping the class testable and safe for multi-document (tabs) support. Also owns shared constants (`authorName`, `highlightColor`, `highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`).
 
@@ -277,6 +281,8 @@ anima/
 **`CommentCardView.swift`** -- The visual representation of a single annotation in the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based on the length of the comment text. Handles all visual styling, including the muted typography applied to structural pipeline commands (e.g., `link` or `H2`). Reports clicks via an `onClicked` closure and supports active/inactive visual states for the emphasis feature.
 
 **`CommentInputPanel.swift`** -- A modal `NSPanel` for adding and editing highlight comments. Replaces the previous `NSAlert`-based dialog with a proper multi-line text editor (`NSTextView`). Styled to match `CommentCardView` -- same background color, corner radius, fonts, and color palette. Escape saves and closes (no cancel), Enter inserts newlines. The panel is resizable and draggable. Each invocation creates a fresh instance; the panel is not reused across calls.
+
+**`JumpStationPanel.swift`** -- A modal `NSPanel` for bookmark navigation and deletion. It renders the active document's bookmarks in name and 1-based page columns, owns temporary table selection and local keyboard dispatch, and reports Enter-to-jump or confirmed deletion through callbacks. It deliberately has no PDFKit, file-path, or persistence knowledge: `AnimaPDFView` owns navigation and delegates deletion to `BookmarkManager`. The future prefix-input/filtering behavior will extend this panel rather than replace it.
 
 ---
 

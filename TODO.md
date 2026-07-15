@@ -13,9 +13,7 @@
 
 ## UX Priorities (Session 2026-07-11 -- order is initial ranking, final prios pending review)
 
-**Bookmark navigation and deletion.** Persistence and `Cmd+B` creation are complete: bookmarks live in the PDF catalog's private `/AnimaBookmarks` key, use 0-based storage with 1-based reader display, and support case-insensitive re-pointing. Next, add a minimal `Cmd+J` picker populated from `BookmarkManager.bookmarks`; Enter jumps through `PDFView.go(to:)`, and `Cmd+D` inside the picker confirms then deletes the selected bookmark. Once the core main-text <-> endnotes round trip is proven useful, replace the minimal picker with the modal keyboard-first, type-to-filter JumpStation experience inspired by `docs/JumpStation.bas` / `docs/UserFormSelector.frm`. No jump-back stack is in scope.
-
-- **Consider a Status bar.** Thin bar below the PDF view. Carries: mode indicators (auto-highlight, X-Ray), page display, pdf size info, maybe stats like number of highlights, maybe last bookmark target. Window title then shows the filename, permanently.
+~~**Bookmark navigation and deletion.** Persistence and `Cmd+B` creation are complete: bookmarks live in the PDF catalog's private `/AnimaBookmarks` key, use 0-based storage with 1-based reader display, and support case-insensitive re-pointing. `Cmd+J` now opens the two-column JumpStation picker; mouse actions select only, Up/Down moves selection, Enter jumps through `PDFView.go(to:)`, Esc closes, and `Cmd+D` confirms then deletes the selected bookmark. The picker refreshes from `BookmarkManager` after deletion and closes if the final bookmark was removed.~~ Completed 2026-07-15; the later prefix-input/filtering enhancement remains active under Cosmetic / UX Improvements.
 
 ---
 
@@ -31,19 +29,10 @@
 
 ## Cosmetic / UX Improvements
 
+- **Extend JumpStation with prefix input/filtering.** Add the display-only prefix panel and VBA-inspired keyboard behavior: case-insensitive prefix matching against bookmark names, repeated Backspace, selection independent from prefix text, and two-stage Escape (clear prefix, then close). Design and test the non-visual state machine before wiring it into `JumpStationPanel`.
 - **Sidebar Card Polish.** Tweak padding, reduce title font to ~9pt, adjust comment font to ~11pt, experiment with custom grayscale background colors for Dark Mode contrast.
-
 - **Emphasis color tuning.** Light yellow (#FFFFE0) at 0.7 opacity may need adjustment for different PDF backgrounds or dark mode.
-
 - **CommentInputPanel geometry persistence.** Use UserDefaults to remember panel position/size across launches (currently session-only via static var). Works across `open -n` instances too. Same mechanism family as main-window frame autosave (see UX Priorities).
-
----
-
-## Testing
-
-### Python -- remaining
-
-- ~~Edit-comment clear on a popup-less annotation: clear a comment (`--comment ""`) on an annotation without a popup, save, reopen with fitz, assert `/Contents` is empty. Pins the xref-clear ordering in `cmd_edit_comment` (the second `annot.update()` after the xref write must not resurrect the old text). Completed 2026-07-15: added `test_clear_comment_on_popupless_annotation` to `TestEditComment`; the popup-less fixture is built directly with fitz because add-highlight always sets a popup. Green -- the second `annot.update()` does not resurrect the cleared comment on the current fitz, and `/Contents` is empty at the xref level.~~
 
 ---
 
@@ -79,9 +68,12 @@
 - Undo (remove) last highlight.
 - Empty-comment confirmation before clearing.
 
+### Reader chrome
+
+- **Consider a status bar.** Thin bar below the PDF view. Possible contents: mode indicators (persistent highlight, X-Ray), page display, PDF size, highlight count, or most recent bookmark target. Reassess alongside other backlog work; if added, the window title should become the filename permanently.
+
 ### Navigation
 
-- Cmd+F find (PDFKit native -- may come free).
 - Zoom via menu bar or simple widget (not pinch).
 
 ### Find
@@ -108,4 +100,4 @@
 
 ### Housekeeping
 
-- Review and clean up MainMenu.xib (remove unused Font/Format/Text menus).
+- Review and clean up `MainMenu.xib` (remove unused Font/Format/Text menus).

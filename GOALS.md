@@ -6,13 +6,14 @@
 
 ---
 
-**Where we are:** Bookmark persistence and creation are complete: `/AnimaBookmarks` catalog storage, Python helper commands and pytest coverage, Swift bridge/manager integration coverage, and `Cmd+B` add/re-point behavior are all green. The reader UI presents pages as 1-based while bookmark storage remains fitz-native 0-based.
+## 📍 Current Session Pointer
+
+**Where we are:** Phase 1 is complete. Anima now has durable window behavior, core reading/navigation ergonomics, hardened annotation and bookmark persistence seams, bookmark creation, and the usable `Cmd+J` JumpStation round trip for navigation and deletion. Reader-facing page numbers remain 1-based while bookmark storage remains fitz-native 0-based.
 
 **What's next (in order):**
 
-1. Implement minimal bookmark navigation: `Cmd+J` picker, Enter-to-jump, and `Cmd+D` deletion with confirmation.
-2. Replace that minimal picker with the keyboard-first filtered JumpStation experience when the core round-trip is confirmed useful.
-3. Reassess the remaining reading-ergonomics backlog.
+1. Extend JumpStation with its keyboard-first prefix-input/filtering behavior when that enhancement wins prioritization.
+2. Prioritize the backlog across UX refinements, tests, refactorings, reader chrome, and Phase 2 toolchain integration before choosing the next implementation slice.
 
 Tabs remain deferred; separate `open -n` instances are the accepted multi-document workflow for now.
 
@@ -26,16 +27,15 @@ Anima exists to serve one workflow: reading academic papers and wisdom tradition
 
 ---
 
-## Phase 1 -- Pleasant to live in (current)
+## Phase 1 -- Pleasant to live in (complete)
 
-Make Anima the place where reading actually happens. Two strands, in order:
+Phase 1 made Anima viable as the daily reader rather than merely a functional prototype. It established civilized window and split-view behavior, page-aware captions, forward-only PDF and comment search, goto-page navigation, durable bookmark persistence and creation, and the usable `Cmd+J` JumpStation navigation/deletion round trip. The known coordinate, cross-page selection, bookmark persistence, and comment-clear regression contracts are now pinned by the current Swift and Python suites.
 
-- **Reading ergonomics.** The seven UX priorities: civilized window behavior (resize, frame persistence), faithful rendering (the saturation investigation), and page awareness (status bar -> page indicator -> goto page -> jump stack). See `TODO.md` -> UX Priorities.
-- **Test-first hardening.** Close the known Swift and Python test gaps before touching UI code, so the coordinate and comment-lifecycle contracts are pinned when the UI work starts. See `TODO.md` -> Testing.
+Later refinements -- including JumpStation prefix input/filtering and a possible status bar -- return to the general backlog for explicit prioritization rather than extending Phase 1 by default.
 
 ---
 
-## Phase 2 -- Toolchain Integration (next)
+## Phase 2 -- Toolchain Integration (when prioritized)
 
 Retire the Windows/Parallels PDF route; Anima becomes the target of the `pdf://` flow.
 

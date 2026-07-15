@@ -416,26 +416,23 @@ final class JumpStationPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegat
         alert.addButton(withTitle: "Delete")
         alert.addButton(withTitle: "Cancel")
 
-        alert.beginSheetModal(for: self) { [weak self] response in
-            guard let self = self,
-                  response == .alertFirstButtonReturn else {
-                return
-            }
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
 
-            guard let updatedBookmarks = self.onDelete(bookmark) else {
-                NSSound.beep()
-                return
-            }
+        guard let updatedBookmarks = onDelete(bookmark) else {
+            NSSound.beep()
+            return
+        }
 
-            self.bookmarks = updatedBookmarks
-            self.tableView.reloadData()
-            self.tableView.deselectAll(nil)
+        bookmarks = updatedBookmarks
+        tableView.reloadData()
+        tableView.deselectAll(nil)
 
-            // The opening path prevents an empty panel. If the user deletes
-            // the final bookmark while already in JumpStation, close cleanly.
-            if self.bookmarks.isEmpty {
-                self.closeModal()
-            }
+        // The opening path prevents an empty panel. If the user deletes
+        // the final bookmark while already in JumpStation, close cleanly.
+        if bookmarks.isEmpty {
+            closeModal()
         }
     }
 

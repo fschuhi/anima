@@ -6,10 +6,11 @@
 //
 //  Current capabilities:
 //    - ENTER with selection → create highlight (via AnnotationManager)
-//    - H key → toggle persistent highlight mode (mouseUp creates highlight)
-//    - P key → toggle X-Ray mode (reveals native popups for comments)
-//    - G key → go to a page through a native modal input field
+//    - Cmd+H → toggle persistent highlight mode (mouseUp creates highlight)
+//    - Cmd+P → toggle X-Ray mode (reveals native popups for comments)
+//    - Cmd+G key → go to a page through a native modal input field
 //    - Cmd+B → add a named bookmark for the current page
+//    - Cmd+J → open JumpStation bookmark navigation
 //    - Cmd+F → find text forward from the current page
 //    - Cmd+Shift+F → find matching annotation comments forward from the current page
 //    - F3 → advance to the next active find hit
@@ -204,6 +205,17 @@ class AnimaPDFView: PDFView {
             return true
         }
 
+        // Cmd+J = open bookmark JumpStation navigation.
+        if event.keyCode == 38,
+           modifiers.contains(.command),
+           !modifiers.contains(.shift),
+           !modifiers.contains(.control),
+           !modifiers.contains(.option) {
+            showJumpStation()
+            lastHandledEvent = event
+            return true
+        }
+
         // F3 = find next in whichever search mode is active. Search modes
         // are mutually exclusive, but PDF-text search is checked first to
         // match the ordered-Esc behavior.
@@ -254,23 +266,34 @@ class AnimaPDFView: PDFView {
             }
         }
 
-        // H = toggle persistent highlight mode
-        if event.keyCode == 4 {  // keyCode 4 = H
+        // Cmd+H = toggle persistent highlight mode
+        if event.keyCode == 4,
+            modifiers.contains(.command),
+            !modifiers.contains(.shift),
+            !modifiers.contains(.control),
+            !modifiers.contains(.option) {
             toggleHighlightMode()
             lastHandledEvent = event
             return true
         }
 
-        // P = toggle X-Ray mode (show popups)
-        if event.keyCode == 35 { // keyCode 35 = P
+        // Cmd+P = toggle X-Ray mode (show popups)
+        if event.keyCode == 35,
+            modifiers.contains(.command),
+            !modifiers.contains(.shift),
+            !modifiers.contains(.control),
+            !modifiers.contains(.option) {
             toggleXRayMode()
             lastHandledEvent = event
             return true
         }
 
-        // G = go to page. Cmd+G remains available for future Find Next behavior.
+        // Cmd+G = go to page.
         if event.keyCode == 5,
-           event.modifierFlags.intersection([.command, .control, .option]).isEmpty {
+            modifiers.contains(.command),
+            !modifiers.contains(.shift),
+            !modifiers.contains(.control),
+            !modifiers.contains(.option) {
             showGotoPageDialog()
             lastHandledEvent = event
             return true
@@ -585,6 +608,96 @@ class AnimaPDFView: PDFView {
         } else {
             Swift.print("❌ Could not save bookmark \"\(name)\"")
         }
+    }
+
+    /// Opens the bookmark-navigation panel when the active document has
+    /// bookmarks. The panel owns temporary list selection; this view owns
+    /// PDFKit navigation and delegates persistent deletion to BookmarkManager.
+    private func showJumpStation() {
+        guard let document = document,
+              let documentURL = document.documentURL,
+              let bookmarkManager = bookmarkManager else {
+            Swift.print("⚠️  Could not open JumpStation -- missing document or bookmark manager")
+            return
+        }
+
+        guard !bookmarkManager.bookmarks.isEmpty else {
+            showNoBookmarksAlert()
+            return
+        }
+
+        isShowingDialog = true
+
+        JumpStationPanel.showModal(
+            bookmarks: bookmarkManager.bookmarks,
+            onJump: { [weak self] bookmark in
+                self?.jumpToBookmark(bookmark)
+            },
+            onDelete: { [weak self] bookmark in
+                guard let self = self,
+                      let bookmarkManager = self.bookmarkManager else {
+                    return nil
+                }
+
+                guard bookmarkManager.deleteBookmark(
+                    name: bookmark.name,
+                    filePath: documentURL.path
+                ) else {
+                    Swift.print("❌ Could not delete bookmark \"\(bookmark.name)\"")
+                    return nil
+                }
+
+                Swift.print("🗑️  Deleted bookmark \"\(bookmark.name)\"")
+                return bookmarkManager.bookmarks
+            }
+        )
+
+        isShowingDialog = false
+    }
+
+    /// Navigates to a bookmark's fitz-native 0-based page index. The catalog
+    /// is intentionally independent from a PDF's page count, so a PDF changed
+    /// externally after bookmark creation may leave a stale target behind.
+    private func jumpToBookmark(_ bookmark: Bookmark) {
+        guard let document = document else {
+            return
+        }
+
+        guard (0..<document.pageCount).contains(bookmark.page),
+              let page = document.page(at: bookmark.page) else {
+            showUnavailableBookmarkPageAlert(for: bookmark, pageCount: document.pageCount)
+            return
+        }
+
+        go(to: page)
+        Swift.print("🔖 Jumped to bookmark \"\(bookmark.name)\" on page \(bookmark.page + 1)")
+    }
+
+    /// Reports the normal no-bookmarks state without opening an empty picker.
+    private func showNoBookmarksAlert() {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "No Bookmarks"
+        alert.informativeText = "Add one with Cmd+B first."
+        alert.addButton(withTitle: "OK")
+
+        isShowingDialog = true
+        alert.runModal()
+        isShowingDialog = false
+    }
+
+    /// Explains why a persisted bookmark cannot be opened when its stored
+    /// page no longer exists in the currently opened PDF.
+    private func showUnavailableBookmarkPageAlert(for bookmark: Bookmark, pageCount: Int) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Bookmark page unavailable"
+        alert.informativeText = "\"\(bookmark.name)\" points to page \(bookmark.page + 1), but this PDF has \(pageCount) page(s). The PDF may have changed since the bookmark was created."
+        alert.addButton(withTitle: "OK")
+
+        isShowingDialog = true
+        alert.runModal()
+        isShowingDialog = false
     }
 
     // MARK: - PDF-Text Find

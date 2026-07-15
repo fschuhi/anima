@@ -1,6 +1,6 @@
 # Bookmarks (Jumpstation) -- Design & Prep
 
-Status: In progress. Persistence, session state, automated coverage, and `Cmd+B` bookmark creation are implemented; navigation and deletion remain.
+Status: First-cut complete. Persistence, session state, automated coverage, `Cmd+B` creation, and `Cmd+J` navigation/deletion are implemented; keyboard-first prefix input/filtering remains a later extension.
 Date: 2026-07-15
 Reference material: `docs/JumpStation.bas`, `docs/UserFormSelector.frm` (Excel/VBA, UX inspiration only).
 
@@ -12,16 +12,16 @@ In scope:
 
 - Named, full-page bookmarks: a bookmark associates a user-supplied name with a whole page (no sub-page anchor).
 - Add a bookmark for the current page (`Cmd+B`) through a prototype `NSAlert`. Implemented.
-- Open a keyboard-first "jumpstation" selector (`Cmd+J`) to filter, pick, and jump. Next.
-- Delete the selected bookmark from the jumpstation (`Cmd+D`), with confirmation. Next.
+- Open JumpStation (`Cmd+J`) to select a bookmark and jump with Enter. Implemented.
+- Delete the selected JumpStation bookmark (`Cmd+D`), with confirmation. Implemented.
+- Extend JumpStation later with a keyboard-first display-only prefix panel, case-insensitive prefix matching, Backspace behavior, and two-stage Escape.
 - Unique names, case-insensitive: re-adding an existing name prompts to re-point it to the current page or keep the old association. Implemented for `Cmd+B`.
 - Persistence inside the PDF, surviving reopen, without disturbing the document's existing outline. Implemented.
 
 Non-goals (explicitly out of scope):
 
-- The ephemeral jump-back stack from the VBA reference. We dropped it -- only the selector ("jumpstation") is in scope. No origin-push, no "jump back" key.
 - Sub-page or coordinate-level anchors. A bookmark is always a whole page.
-- The final visual selector. The first cut uses an `NSAlert` for naming and a minimal picker; the polished panel is a later step (see Sequencing).
+- A jump-back stack. The initial selector is already a custom `JumpStationPanel`; its later prefix-input/filtering behavior is an extension of that panel, not a replacement architecture.
 - Multi-user / untrusted-input concerns. Single-user project; no sanitization beyond what fitz needs.
 
 Note on the reference: `JumpStation.bas` / `UserFormSelector.frm` inspire the *navigation and selection* UX -- a modal, keyboard-first, type-to-filter picker with a two-stage Escape. They do **not** cover adding, removing, or renaming (their targets are hard-coded in code). The management half is new to Anima, and it is where most of the decisions below live.
@@ -36,12 +36,14 @@ Completed:
 - `FitzBridge` read/mutation calls and `BookmarkManager`, which owns the session-local `[Bookmark]` list and reloads it after every successful mutation.
 - Swift integration coverage for the real `BookmarkManager -> FitzBridge -> helper -> PDF catalog -> reload` path.
 - `Cmd+B` bookmark creation: native naming alert, 1-based page wording in the reader UI, case-insensitive duplicate detection, and a `Re-point` / `Keep Existing` decision.
+- `Cmd+J` JumpStation: a modal card-styled `NSPanel` with two columns (bookmark name and 1-based page number), selection-only mouse behavior, Up/Down selection, Enter-to-jump, and Esc-to-close.
+- `Cmd+D` deletion inside JumpStation: confirmation, `BookmarkManager` persistence, immediate list refresh, and clean panel closure after the final bookmark is removed.
+- Empty-bookmark and unavailable-target-page alerts. The deletion confirmation uses a conventional modal `NSAlert`, not a sheet, so Enter reliably activates its default Delete action.
 
 Remaining:
 
-- `Cmd+J` bookmark navigation.
-- `Cmd+D` bookmark deletion from the navigation picker.
-- Replacement of the initial picker with the polished keyboard-first `JumpStationPanel`.
+- Extend `JumpStationPanel` with the display-only prefix panel and VBA-inspired key behavior.
+- Design and test the non-visual prefix/selection state machine before wiring that behavior into AppKit.
 
 ## Persistence (settled and verified)
 
@@ -109,33 +111,37 @@ Implemented add path:
 
 - **Add (`Cmd+B`)** -- `AnimaPDFView` identifies the current page, shows a naming `NSAlert`, checks `BookmarkManager`'s in-memory list case-insensitively, and either persists the new bookmark or presents `Re-point` / `Keep Existing` for a duplicate. A confirmed add or re-point calls `BookmarkManager.setBookmark`, which persists through the helper and reloads the catalog-backed in-memory list.
 
-Remaining paths:
+Implemented navigation paths:
 
-- **Open / jump (`Cmd+J`)** -- will present a minimal picker populated from the in-memory list; `Enter` will jump through `PDFView.go(to:)`, reusing the same navigation mechanism as bare `G`.
-- **Delete (`Cmd+D`, inside the picker)** -- will confirm, call `BookmarkManager.deleteBookmark`, refresh the picker from the updated in-memory list, and remain scoped to bookmark navigation.
+- **Open / jump (`Cmd+J`)** -- `AnimaPDFView` rejects an empty list with an alert, otherwise presents `JumpStationPanel` from `BookmarkManager.bookmarks`. The panel owns temporary selection; Enter returns the selected `Bookmark`, and `AnimaPDFView` validates its stored 0-based page before navigating through `PDFView.go(to:)`.
+- **Delete (`Cmd+D`, inside JumpStation)** -- the panel confirms deletion, delegates persistence through an `AnimaPDFView` callback to `BookmarkManager.deleteBookmark`, then replaces its displayed list with the manager's refreshed authoritative state.
+
+The panel intentionally has no PDFKit document, file-path, or helper knowledge. `AnimaPDFView` owns reader navigation and `BookmarkManager` owns persistence/session state.
 
 ## Keybindings
 
-Settled for the jumpstation (all `Cmd`-modified, to stay clear of the Karabiner Capslock layer where bare letters like `Capslock+J` are remapped to cursor motion):
+Current JumpStation bindings:
 
-- `Cmd+J` -- open the jumpstation.
+- `Cmd+J` -- open JumpStation.
 - `Cmd+B` -- add a bookmark for the current page.
-- `Cmd+D` -- delete the selected bookmark (inside the panel), with confirmation.
-- `Esc` -- exit the jumpstation. Two-stage, per the VBA reference: if a filter string is typed, the first `Esc` clears it; a second `Esc` closes the panel.
-- Up / Down -- move the selection.
-- Typing (letters, space) -- incremental case-insensitive substring filter; the selection jumps to the first match (`UserFormSelector.FindMatch` behavior).
+- `Cmd+D` -- delete the selected bookmark inside JumpStation, with confirmation.
+- Up / Down -- move the list selection.
 - `Enter` -- jump to the selected bookmark's page.
+- `Esc` -- close JumpStation.
 
-Why `Cmd+D` and not `Del`/`Backspace`: inside the panel, `Backspace` must stay bound to editing the filter string, so it cannot also mean "delete bookmark." Outside the panel, `Backspace`/`Del` continue to delete the emphasized highlight in the PDF view -- unchanged.
+Mouse behavior is intentionally selection-only: left-click, right-click, and double-click select a row but never navigate. This preserves one unambiguous jump action -- Enter -- and leaves the future prefix-input model free to keep typed prefix text independent from table selection.
 
-Comment / future migration (not part of this feature; recorded here at your request): for consistency with the new `Cmd`-modified bindings and to avoid the Karabiner Capslock layer, consider migrating the existing bare reader-mode toggles to `Cmd`-modified equivalents -- persistent-highlight / auto-annotate `H -> Cmd+H`, and the X-Ray toggle `-> Cmd+R`. Two things to resolve before doing so:
+The reader command migration is settled:
 
-- The X-Ray toggle is currently bound to `P` in `AnimaPDFView.keyDown` (`toggleXRayMode()`), not `R`. Confirm the intended source key -- the prep note mentioned `R`, the code says `P`.
-- `Cmd+H` is, by macOS convention, the system "Hide application" shortcut. Rebinding it to auto-annotate would shadow that standard behavior; that is possible but unusual, so it should be a conscious choice rather than a surprise. (`Cmd+G` is already reserved for a future Find Next, so bare `G` is staying.)
+- `Cmd+H` -- persistent highlight mode.
+- `Cmd+P` -- X-Ray mode.
+- `Cmd+G` -- goto page.
+
+Anima intentionally reclaims the conventional macOS Hide and Print shortcuts: this is a focused personal reader, print is explicitly out of scope, and hiding its only window is not useful in the intended workflow.
 
 ## Interaction with existing state machines
 
-The jumpstation is a modal panel in the `CommentInputPanel` mold: while open it captures its own keys, so its `Esc` handling is local (the two-stage clear-then-close above) and does not alter the PDF view's existing Esc precedence (PDF-text search -> comment search -> annotation emphasis). Opening the jumpstation is mutually exclusive with search and emphasis, the same way the comment editor is.
+JumpStation is a modal panel in the `CommentInputPanel` mold: while open it captures its own keys, so its current `Esc` handling is local and does not alter the PDF view's Esc precedence (PDF-text search -> comment search -> annotation emphasis). Opening JumpStation does not currently clear an existing search or annotation emphasis; it temporarily takes keyboard focus and returns the reader to its prior state on close. The later prefix-input extension will introduce its own two-stage Escape behavior inside the panel.
 
 ## Sequencing (value-first)
 
@@ -144,13 +150,11 @@ Completed:
 1. **Persistence + helper.** Implemented `list-bookmarks`, `set-bookmark`, and `delete-bookmark` in `anima_helper.py`, with pytest coverage including the native-TOC preservation guard.
 2. **Swift persistence boundary.** Implemented `FitzBridge` bookmark operations, `BookmarkManager`, load-time hydration, and a real Swift integration test against the helper and disposable PDF fixtures.
 3. **End-to-end bookmark creation.** Implemented `Cmd+B`, prototype naming alert, duplicate-name `Re-point` / `Keep Existing` decision, and in-session state refresh after persistence.
+4. **Minimal navigation and deletion.** Implemented `Cmd+J` through `JumpStationPanel`, Enter-to-jump, selection-only pointer interaction, `Cmd+D` confirmation/deletion, and helper-backed list refresh. This completes the central main-text <-> endnotes round trip.
 
-Next:
+Next, when it wins backlog prioritization:
 
-4. **Minimal navigation and deletion.** Implement `Cmd+J` with a minimal picker, `Enter` to navigate to the selected bookmark, and `Cmd+D` inside that picker to delete with confirmation. This is the next point at which the bookmark feature becomes usable for its central main-text <-> endnotes round trip.
-5. **Polished selector.** Replace the minimal picker with the keyboard-first `JumpStationPanel` and the `UserFormSelector` type-to-filter experience.
-
-Parked later, separately: the reader-keybinding migration discussion and a custom replacement for the `Cmd+B` naming `NSAlert`.
+5. **Keyboard-first prefix behavior.** Extend `JumpStationPanel` with a display-only prefix panel and the `UserFormSelector`-inspired case-insensitive prefix-matching experience. First define and test the non-visual state machine for prefix text, no-selection state, Backspace, manual selection, and two-stage Escape; then wire it into the panel.
 
 ## Remaining decisions
 
@@ -159,10 +163,7 @@ Settled:
 - **Page index base.** `/AnimaBookmarks` stores fitz-native 0-based page indices. Swift keeps those values internally; reader-facing UI displays `page + 1`.
 - **`BookmarkManager` construction and wiring.** `AppDelegate` creates it alongside `AnnotationManager` and injects it into `AnimaPDFView`.
 
-Still parked for a separate keybinding-migration discussion:
-
-- **X-Ray source key.** The current code uses bare `P`; the earlier migration note mentioned `R`. Confirm the intended source key before proposing a `Cmd`-modified replacement.
-- **`Cmd+H` versus system Hide.** Do not shadow the conventional macOS Hide shortcut for auto-annotate without an explicit decision.
+The reader-keybinding migration is settled: `Cmd+H`, `Cmd+P`, and `Cmd+G` replace bare `H`, `P`, and `G`. The remaining JumpStation design work is the later prefix-input state-machine specification, not a keybinding decision.
 
 ## References
 
