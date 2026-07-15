@@ -610,4 +610,159 @@ final class AnimaTests: XCTestCase {
 
         print("✅ FitzBridge.addHighlight round-trip passed: uuid \(newUUID) found after reload")
     }
+
+    // MARK: - Cross-Page Selection: page-scoped highlight creation
+
+    /// Pins the page-scoped behavior of AnimaPDFView.createHighlightFromSelection()
+    /// when the user's text selection spans two pages: only the first-page lines
+    /// produce a highlight; the second-page portion is silently dropped.
+    ///
+    /// This is intentional, not a bug -- Anima's highlight model is deliberately
+    /// per-page. Cross-page spans would otherwise pull in inter-page whitespace,
+    /// running headers/footers, and footnotes that have nothing to do with the
+    /// highlighted content. Stitching a highlight on page N to its continuation
+    /// on page N+1 is handled entirely downstream, by pdf-annotations' `link`
+    /// comment convention -- Anima's own contract is just to keep producing
+    /// clean, single-page highlights and let that convention carry the
+    /// relationship.
+    ///
+    /// Uses PDFDocument.selection(from:atCharacterIndex:to:atCharacterIndex:) to
+    /// build a genuine cross-page PDFSelection through PDFKit's own text-selection
+    /// machinery, rather than assembling one by hand from two page-local rects.
+    ///
+    /// Verification reads raw PDFAnnotations directly, not via SidebarExtractor:
+    /// highlights created by createHighlightFromSelection() start with an empty
+    /// comment (see AnnotationManager.createHighlight's "Highlights are created
+    /// without a comment" contract), and SidebarExtractor only surfaces highlights
+    /// with a non-empty comment ("cards" and "highlights" are not the same thing
+    /// in this codebase). Using SidebarExtractor here would make the test fail
+    /// regardless of page-scoping, for an unrelated reason.
+    func testCrossPageSelectionOnlyHighlightsFirstPage() throws {
+        // --- Step 1: locate anima_helper.py (see testFitzBridgeAddHighlightRoundTrip) ---
+        let helperPath = Self.helperPath
+        guard FileManager.default.fileExists(atPath: helperPath) else {
+            XCTFail("anima_helper.py not found at expected path: \(helperPath). " +
+                    "Run `make setup` if .venv is missing.")
+            return
+        }
+
+        // --- Step 2: work on a disposable copy of the two-page fixture ---
+        let bundle = Bundle(for: type(of: self))
+        guard let fixtureURL = bundle.url(forResource: "sidebar_page_extract", withExtension: "pdf") else {
+            XCTFail("Missing sidebar_page_extract.pdf fixture in test bundle.")
+            return
+        }
+
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        let workingPDF = tempDir.appendingPathComponent("sidebar_page_extract.pdf")
+        try FileManager.default.copyItem(at: fixtureURL, to: workingPDF)
+
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+
+        guard let document = PDFDocument(url: workingPDF) else {
+            XCTFail("Failed to load working copy at \(workingPDF.path)")
+            return
+        }
+
+        guard let page0 = document.page(at: 0), let page1 = document.page(at: 1) else {
+            XCTFail("Fixture must have at least two pages")
+            return
+        }
+
+        // One AnnotationManager instance for the whole test: it's the same
+        // toolbox instance the view will use to create the highlight, and we
+        // reuse its annotationUUID(_:) helper for verification below rather
+        // than duplicating the /NM-then-userName fallback a fourth time
+        // (AnnotationManager, SidebarExtractor, and MainViewController each
+        // already have their own copy -- see TODO.md's Refactoring section).
+        let annotationManager = AnnotationManager(helperPath: helperPath)
+
+        /// Collects UUIDs of all highlight annotations on a page, regardless
+        /// of whether they carry a comment.
+        func highlightUUIDs(on page: PDFPage) -> Set<String> {
+            var uuids: Set<String> = []
+            for annot in page.annotations where annot.type == "Highlight" {
+                if let uuid = annotationManager.annotationUUID(annot) {
+                    uuids.insert(uuid)
+                }
+            }
+            return uuids
+        }
+
+        // --- Step 3: baseline highlight UUIDs per page, before the new highlight ---
+        let beforePage0UUIDs = highlightUUIDs(on: page0)
+        let beforePage1UUIDs = highlightUUIDs(on: page1)
+
+        // --- Step 4: build a genuine cross-page selection ---
+        // Character indices are UTF-16-based, matching PDFKit's own indexing.
+        let page0Length = (page0.string as NSString?)?.length ?? 0
+        let page1Length = (page1.string as NSString?)?.length ?? 0
+
+        guard page0Length > 5, page1Length > 5 else {
+            XCTFail("Fixture pages too short to select near their boundary " +
+                    "(page0: \(page0Length), page1: \(page1Length) chars)")
+            return
+        }
+
+        let startCharIndex = page0Length - 5  // near the end of page 0
+        let endCharIndex = 5                  // near the start of page 1
+
+        guard let selection = document.selection(
+            from: page0, atCharacterIndex: startCharIndex,
+            to: page1, atCharacterIndex: endCharIndex
+        ) else {
+            XCTFail("Could not create cross-page PDFSelection")
+            return
+        }
+
+        // Sanity-check the selection setup itself spans both pages before we
+        // trust what createHighlightFromSelection() does with it.
+        XCTAssertTrue(selection.pages.contains(page0),
+                      "Test setup: selection should include page 0")
+        XCTAssertTrue(selection.pages.contains(page1),
+                      "Test setup: selection should include page 1")
+
+        // --- Step 5: drive AnimaPDFView.createHighlightFromSelection() directly ---
+        // No window or layout needed -- this method only reads document,
+        // currentSelection, isXRayMode, and annotationManager.
+        let view = AnimaPDFView()
+        view.document = document
+        view.annotationManager = annotationManager
+        view.isXRayMode = false
+        view.currentSelection = selection
+
+        let success = view.createHighlightFromSelection()
+        XCTAssertTrue(success, "createHighlightFromSelection should succeed using only the first-page lines")
+
+        // --- Step 6: reload from disk and verify page-scoped behavior ---
+        guard let reloadedDocument = PDFDocument(url: workingPDF) else {
+            XCTFail("Failed to reload working copy after createHighlightFromSelection at \(workingPDF.path)")
+            return
+        }
+        guard let reloadedPage0 = reloadedDocument.page(at: 0),
+              let reloadedPage1 = reloadedDocument.page(at: 1) else {
+            XCTFail("Reloaded document must still have at least two pages")
+            return
+        }
+
+        let afterPage0UUIDs = highlightUUIDs(on: reloadedPage0)
+        let afterPage1UUIDs = highlightUUIDs(on: reloadedPage1)
+
+        let newPage0UUIDs = afterPage0UUIDs.subtracting(beforePage0UUIDs)
+        let newPage1UUIDs = afterPage1UUIDs.subtracting(beforePage1UUIDs)
+
+        XCTAssertEqual(newPage0UUIDs.count, 1,
+                       "The cross-page selection should create exactly one new highlight on page 0 " +
+                       "(first-page lines only); found \(newPage0UUIDs.count)")
+        XCTAssertEqual(newPage1UUIDs.count, 0,
+                       "The cross-page selection's page-1 portion should be silently dropped, not " +
+                       "stitched, duplicated, or otherwise turned into a highlight on page 1; " +
+                       "found \(newPage1UUIDs.count)")
+
+        print("✅ Cross-page selection round-trip passed: highlight confined to page 0, as intended")
+    }
 }
