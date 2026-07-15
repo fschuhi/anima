@@ -5,9 +5,9 @@
 //  Owns Anima's session-local named page bookmarks.
 //
 //  Bookmarks are persisted by anima_helper.py in the PDF catalog's private
-//  /AnimaBookmarks key. This manager loads that JSON once when a document
-//  opens and becomes the in-memory source of truth for the rest of that
-//  reader session.
+//  /AnimaBookmarks key. This manager loads that JSON when a document opens
+//  and becomes the in-memory source of truth for the rest of that reader
+//  session.
 //
 //  Design:
 //    Like AnnotationManager, this is a toolbox-style class. It holds no
@@ -31,8 +31,8 @@ final class BookmarkManager {
     let helperPath: String
 
     /// The current document's bookmarks, in the order persisted by the helper.
-    /// This is read-only to collaborators; future set/delete methods will
-    /// update it only after the corresponding helper mutation succeeds.
+    /// This is read-only to collaborators. Mutation methods replace the list
+    /// only after the corresponding helper operation succeeds.
     private(set) var bookmarks: [Bookmark] = []
 
     init(helperPath: String) {
@@ -70,5 +70,48 @@ final class BookmarkManager {
             Swift.print("❌ Could not decode bookmark JSON: \(error)")
             return false
         }
+    }
+
+    /// Persists a bookmark through the helper, then reloads the complete
+    /// catalog-backed list. The helper owns case-insensitive upsert semantics,
+    /// including the authoritative display casing and ordering after an update.
+    ///
+    /// - Parameters:
+    ///   - name: Bookmark display name.
+    ///   - page: fitz-native 0-based page index.
+    ///   - filePath: Absolute path of the open PDF.
+    /// - Returns: true only if persistence and the subsequent reload succeed.
+    @discardableResult
+    func setBookmark(name: String, page: Int, filePath: String) -> Bool {
+        guard FitzBridge.setBookmark(
+            helperPath: helperPath,
+            filePath: filePath,
+            name: name,
+            page: page
+        ) else {
+            return false
+        }
+
+        return loadBookmarks(filePath: filePath)
+    }
+
+    /// Removes a bookmark through the helper, then reloads the complete
+    /// catalog-backed list. Name matching is case-insensitive in the helper.
+    ///
+    /// - Parameters:
+    ///   - name: Bookmark name to remove.
+    ///   - filePath: Absolute path of the open PDF.
+    /// - Returns: true only if deletion and the subsequent reload succeed.
+    @discardableResult
+    func deleteBookmark(name: String, filePath: String) -> Bool {
+        guard FitzBridge.deleteBookmark(
+            helperPath: helperPath,
+            filePath: filePath,
+            name: name
+        ) else {
+            return false
+        }
+
+        return loadBookmarks(filePath: filePath)
     }
 }

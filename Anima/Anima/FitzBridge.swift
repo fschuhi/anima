@@ -99,6 +99,39 @@ struct FitzBridge {
         return runPython(arguments: arguments)
     }
 
+    /// Add or update a named bookmark. The helper validates the fitz-native
+    /// 0-based page index and applies case-insensitive upsert semantics.
+    static func setBookmark(
+        helperPath: String,
+        filePath: String,
+        name: String,
+        page: Int
+    ) -> Bool {
+        let arguments = [
+            helperPath,
+            "set-bookmark",
+            "--file", filePath,
+            "--name", name,
+            "--page", String(page)
+        ]
+        return runPython(arguments: arguments) != nil
+    }
+
+    /// Delete a named bookmark. The helper matches names case-insensitively.
+    static func deleteBookmark(
+        helperPath: String,
+        filePath: String,
+        name: String
+    ) -> Bool {
+        let arguments = [
+            helperPath,
+            "delete-bookmark",
+            "--file", filePath,
+            "--name", name
+        ]
+        return runPython(arguments: arguments) != nil
+    }
+
     // MARK: - Internal: run a Python process
 
     /// Resolves the venv Python path from the helperPath, runs the process,

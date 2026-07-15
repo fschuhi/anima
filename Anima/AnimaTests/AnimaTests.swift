@@ -611,6 +611,141 @@ final class AnimaTests: XCTestCase {
         print("✅ FitzBridge.addHighlight round-trip passed: uuid \(newUUID) found after reload")
     }
 
+    // MARK: - FitzBridge + BookmarkManager Integration
+
+    /// Verifies the complete Swift bookmark persistence seam against the real
+    /// helper: manager mutation -> FitzBridge -> Python -> PDF catalog ->
+    /// FitzBridge list -> JSON decode -> refreshed session-local state.
+    ///
+    /// The test intentionally uses a disposable fixture copy. It checks the
+    /// bookmark contract that Swift owns: names, persisted ordering after a
+    /// case-insensitive upsert, and fitz-native 0-based page indices.
+    func testBookmarkManagerPersistenceRoundTrip() throws {
+        // --- Step 1: locate the real helper and a disposable PDF fixture ---
+        let helperPath = Self.helperPath
+        guard FileManager.default.fileExists(atPath: helperPath) else {
+            XCTFail("anima_helper.py not found at expected path: \(helperPath). " +
+                    "Run `make setup` if .venv is missing.")
+            return
+        }
+
+        let bundle = Bundle(for: type(of: self))
+        guard let fixtureURL = bundle.url(
+            forResource: "sidebar_page_extract",
+            withExtension: "pdf"
+        ) else {
+            XCTFail("Missing sidebar_page_extract.pdf fixture in test bundle.")
+            return
+        }
+
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: tempDir,
+            withIntermediateDirectories: true
+        )
+
+        let workingPDF = tempDir.appendingPathComponent("sidebar_page_extract.pdf")
+        try FileManager.default.copyItem(at: fixtureURL, to: workingPDF)
+
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+
+        // --- Step 2: load an initially bookmark-free document ---
+        let bookmarkManager = BookmarkManager(helperPath: helperPath)
+
+        XCTAssertTrue(
+            bookmarkManager.loadBookmarks(filePath: workingPDF.path),
+            "BookmarkManager should decode the helper's empty JSON array"
+        )
+        XCTAssertEqual(bookmarkManager.bookmarks, [])
+
+        // --- Step 3: add two bookmarks through the manager ---
+        XCTAssertTrue(
+            bookmarkManager.setBookmark(
+                name: "Endnotes Start",
+                page: 1,
+                filePath: workingPDF.path
+            ),
+            "Setting the first bookmark should persist and refresh manager state"
+        )
+
+        XCTAssertTrue(
+            bookmarkManager.setBookmark(
+                name: "Important Figure",
+                page: 0,
+                filePath: workingPDF.path
+            ),
+            "Setting the second bookmark should persist and refresh manager state"
+        )
+
+        XCTAssertEqual(
+            bookmarkManager.bookmarks,
+            [
+                Bookmark(name: "Endnotes Start", page: 1),
+                Bookmark(name: "Important Figure", page: 0),
+            ],
+            "Bookmark pages remain 0-based inside Swift, matching the helper contract"
+        )
+
+        // --- Step 4: case-insensitive upsert changes the helper's order ---
+        // The Python helper removes the old matching name and appends the
+        // supplied one, so the updated bookmark becomes the final item.
+        XCTAssertTrue(
+            bookmarkManager.setBookmark(
+                name: "ENDNOTES start",
+                page: 2,
+                filePath: workingPDF.path
+            ),
+            "Case-insensitive upsert should persist and refresh manager state"
+        )
+
+        XCTAssertEqual(
+            bookmarkManager.bookmarks,
+            [
+                Bookmark(name: "Important Figure", page: 0),
+                Bookmark(name: "ENDNOTES start", page: 2),
+            ],
+            "The helper's persisted order and newer display casing must survive the Swift reload"
+        )
+
+        // --- Step 5: case-insensitive delete refreshes manager state ---
+        XCTAssertTrue(
+            bookmarkManager.deleteBookmark(
+                name: "important figure",
+                filePath: workingPDF.path
+            ),
+            "Case-insensitive deletion should persist and refresh manager state"
+        )
+
+        XCTAssertEqual(
+            bookmarkManager.bookmarks,
+            [Bookmark(name: "ENDNOTES start", page: 2)]
+        )
+
+        // --- Step 6: prove the persisted PDF independently matches Swift ---
+        guard let persistedJSON = FitzBridge.listBookmarks(
+            helperPath: helperPath,
+            filePath: workingPDF.path
+        ),
+        let persistedData = persistedJSON.data(using: .utf8) else {
+            XCTFail("FitzBridge.listBookmarks should return the persisted JSON array")
+            return
+        }
+
+        let persistedBookmarks = try JSONDecoder().decode(
+            [Bookmark].self,
+            from: persistedData
+        )
+
+        XCTAssertEqual(
+            persistedBookmarks,
+            bookmarkManager.bookmarks,
+            "BookmarkManager's session state must match the PDF catalog after each mutation"
+        )
+    }
+
     // MARK: - Cross-Page Selection: page-scoped highlight creation
 
     /// Pins the page-scoped behavior of AnimaPDFView.createHighlightFromSelection()
