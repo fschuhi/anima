@@ -24,7 +24,7 @@
 - Hybrid PDFKit (render) + fitz (write) architecture
 - Incremental save via fitz preserves all existing annotations
 - Dual-write for highlight creation, comment editing, and deletion
-- No document reload during session — scroll drift eliminated
+- No document reload during session -- scroll drift eliminated
 - Dialog focus fix (isShowingDialog prevents duplicate Enter handling)
 
 ## Highlight Workflow
@@ -92,7 +92,7 @@
 
 ## Testing
 
-### Python (pytest) — 11 tests passing
+### Python (pytest)
 - Round-trip: create -> verify -> edit -> verify -> delete -> verify
 - Edge cases: invalid page, missing file, nonexistent UUID
 - Incremental save preserves existing annotations
@@ -100,8 +100,9 @@
 - QuadPoints match input coordinates (multi-quad)
 - Comment clearing works (empty string via xref_set_key)
 - Opacity survives edit (annot.update() regression guard)
+- `test_clear_comment_on_popupless_annotation` -- pins the comment-clear path for a popup-less annotation, the case `test_clear_comment` cannot reach because add-highlight always creates a popup (so `cmd_edit_comment`'s popup-creation branch, and the second `annot.update()` it runs after the xref-level `/Contents` clear, are skipped there). The precondition -- a highlight that carries a comment but has no popup -- is built directly with fitz, then cleared through the helper via `edit-comment --comment ""`. Green: the second `annot.update()` does not resurrect the old text and `/Contents` is verified empty at the xref level, so the popup-less path is now pinned alongside the popup-having one. This is the guard `GOALS.md` names for the parked "comment set/clear lifecycle" redesign (2026-07-15)
 
-### Swift (Swift Testing) — 9 tests passing
+### Swift (Swift Testing)
 - SidebarExtractor: golden JSON test (sidebar_basic.pdf)
 - SidebarExtractor: multi-page extraction (sidebar_page_extract.pdf)
 - SidebarExtractor: per-page extraction (page 0, page 1, empty page 2)
@@ -118,7 +119,7 @@
 
 ## Refactoring
 
-- Extracted `AnnotationManager` from `AnimaPDFView` — All annotation CRUD operations (highlight creation with quad math and dual-write, comment editing via `CommentInputPanel`, highlight deletion) moved to a dedicated class. `AnimaPDFView` is now purely event handling, hit-testing, and mode management. `AnnotationManager` is a toolbox: it holds no references to the view or document, receiving all context per-call. This keeps it testable and safe for future multi-document (tabs) support. Constants (`authorName`, `highlightColor`, `highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`) also moved. `AppDelegate` creates and wires the manager. Four files changed: `AnnotationManager.swift` (new, 397 lines), `AnimaPDFView.swift` (700->463), `MainViewController.swift` (1 reference updated), `AppDelegate.swift` (wiring).
+- Extracted `AnnotationManager` from `AnimaPDFView` -- All annotation CRUD operations (highlight creation with quad math and dual-write, comment editing via `CommentInputPanel`, highlight deletion) moved to a dedicated class. `AnimaPDFView` is now purely event handling, hit-testing, and mode management. `AnnotationManager` is a toolbox: it holds no references to the view or document, receiving all context per-call. This keeps it testable and safe for future multi-document (tabs) support. Constants (`authorName`, `highlightColor`, `highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`) also moved. `AppDelegate` creates and wires the manager. Four files changed: `AnnotationManager.swift` (new, 397 lines), `AnimaPDFView.swift` (700->463), `MainViewController.swift` (1 reference updated), `AppDelegate.swift` (wiring).
 - Extracted `AnnotationManager.fitzQuad(from:pageHeight:)` and `AnnotationManager.quadPoints(for:)` as pure static functions, replacing inline math in `createHighlight`/`addInMemoryHighlight` and removing a hand-copied duplicate of the QuadPoints corner construction in `testInMemoryAnnotationRoundTrip` (2026-07-11)
 
 ## Documentation & Process
@@ -126,4 +127,4 @@
 - Architecture review, no-code session: full read-through of all Swift and Python sources. Confirmed dual-write/coordinate/popup-suppression design; surfaced FitzBridge subprocess seam (pipe deadlock risk, per-operation latency), comment set/clear lifecycle fragility in cmd_edit_comment, cross-page selection truncation (accepted as intended page-scoped behavior), and window-title/mode-indicator conflict. Findings triaged into TODO.md and GOALS.md (2026-07-11)
 - GOALS.md established: Current Session Pointer + strategic vision, added to manifest.lst (2026-07-11)
 - TODO.md restructured: new UX Priorities section from first sustained daily-use feedback; review findings folded in; test specs for the comment-clear ordering and cross-page behavior added (2026-07-11)
-- CHANGELOG.md renamed to HISTORY.md — resolved-work archive, matching the session workflow in LLM_INSTRUCTIONS.md (2026-07-11)
+- CHANGELOG.md renamed to HISTORY.md -- resolved-work archive, matching the session workflow in LLM_INSTRUCTIONS.md (2026-07-11)

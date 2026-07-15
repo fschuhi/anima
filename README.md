@@ -223,7 +223,7 @@ anima/
 │   └── requirements.txt            ← Python dependencies (PyMuPDF)
 ├── tests/                          ← Python tests (pytest)
 │   ├── conftest.py                 ← Fixtures: test_pdf, run_helper
-│   └── test_anima_helper.py        ← 11 tests: round-trip, contracts, edge cases
+│   └── test_anima_helper.py        ← round-trip, contracts, edge cases
 ├── data/
 │   └── input_original.pdf          ← Test PDF (unmodified backup)
 ├── CRITICAL_RULES.md               ← Non-negotiable collaboration rules
@@ -252,7 +252,7 @@ anima/
 
 **`FitzBridge.swift`** -- Static methods that call `anima_helper.py` via `Process()` (Swift's subprocess equivalent). Captures stdout/stderr, checks exit codes, and resolves the Python executable from the project's `.venv`.
 
-**`anima_helper.py`** -- Standalone CLI tool with three subcommands: `add-highlight`, `edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save preserves existing annotations. Tested with 11 pytest tests covering round-trips, contract verification (UUID in /NM, opacity survival), and error handling.
+**`anima_helper.py`** -- Standalone CLI tool with three subcommands: `add-highlight`, `edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save preserves existing annotations. Tested with pytest, covering round-trips, contract verification (UUID in /NM, opacity survival), and error handling.
 
 **`CommentCardView.swift`** -- The visual representation of a single annotation in the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based on the length of the comment text. Handles all visual styling, including the muted typography applied to structural pipeline commands (e.g., `link` or `H2`). Reports clicks via an `onClicked` closure and supports active/inactive visual states for the emphasis feature.
 

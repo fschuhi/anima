@@ -41,15 +41,9 @@
 
 ## Testing
 
-### Swift -- remaining
-
-~~**Integration: FitzBridge round-trip against test PDF.** `testFitzBridgeAddHighlightRoundTrip` drives the real Swift → Python → fitz path: `FitzBridge.addHighlight` shells out to `anima_helper.py` against a disposable copy of `sidebar_basic.pdf`, verified by reload. Project root (and `.venv`) located via `#filePath` self-location on the test file, not an Xcode scheme environment variable. Completed 2026-07-15; manually verified.~~
-
-~~**Cross-page selection.** `testCrossPageSelectionOnlyHighlightsFirstPage` pins the page-scoped behavior: a genuine cross-page `PDFSelection` (via `PDFDocument.selection(from:atCharacterIndex:to:atCharacterIndex:)`) drives `AnimaPDFView.createHighlightFromSelection()` directly; only page 0 gets a new highlight, page 1's portion is silently dropped, confirmed intentional (stitching is `pdf-annotations`' downstream `link` comment convention, not Anima's concern). Verification reads raw `PDFAnnotation`s via `AnnotationManager.annotationUUID(_:)`, not `SidebarExtractor` -- highlights from selection start without a comment, so `SidebarExtractor`'s comment-gated extraction would never see them. Completed 2026-07-15; manually verified.~~
-
 ### Python -- remaining
 
-- edit-comment clear on a popup-less annotation: clear a comment (`--comment ""`) on an annotation without a popup, save, reopen with fitz, assert `/Contents` is empty. Pins the xref-clear ordering in `cmd_edit_comment` (the second `annot.update()` after the xref write must not resurrect the old text).
+- ~~edit-comment clear on a popup-less annotation: clear a comment (`--comment ""`) on an annotation without a popup, save, reopen with fitz, assert `/Contents` is empty. Pins the xref-clear ordering in `cmd_edit_comment` (the second `annot.update()` after the xref write must not resurrect the old text). Completed 2026-07-15: added `test_clear_comment_on_popupless_annotation` to `TestEditComment`; the popup-less fixture is built directly with fitz because add-highlight always sets a popup. Green -- the second `annot.update()` does not resurrect the cleared comment on the current fitz, and `/Contents` is empty at the xref level.~~
 
 ---
 
