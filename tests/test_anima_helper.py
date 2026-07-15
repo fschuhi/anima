@@ -279,6 +279,80 @@ class TestEditComment:
         assert annot.info.get("content", "") == ""
         doc.close()
 
+    def test_clear_comment_on_popupless_annotation(self, test_pdf, run_helper):
+        """Clearing a comment on a popup-less annotation must not resurrect it.
+
+        Companion to test_clear_comment, which covers the popup-HAVING path:
+        add-highlight always creates a popup, so cmd_edit_comment's
+        popup-creation branch (and its second annot.update()) is skipped there.
+        This test covers the gap. With no popup, cmd_edit_comment runs a SECOND
+        annot.update() AFTER the xref-level /Contents clear. We pin that this
+        second update() does not rewrite the old comment back from the
+        still-in-memory info dict.
+
+        The precondition -- a highlight that carries a comment but has no popup
+        -- cannot be produced by add-highlight, so we build it with fitz.
+        """
+        test_uuid = fresh_uuid()
+
+        # --- Setup: build a popup-less highlight WITH a comment, via fitz ---
+        # add-highlight always sets a popup, so the helper cannot create this
+        # precondition; we build it directly and deliberately skip set_popup().
+        quad = QUAD_WITH_COMMENT
+        doc = fitz.open(test_pdf)
+        page = doc[TEST_PAGE]
+        annot = page.add_highlight_annot(
+            quads=[
+                fitz.Quad(
+                    fitz.Point(quad["x0"], quad["y0"]),  # top-left
+                    fitz.Point(quad["x1"], quad["y0"]),  # top-right
+                    fitz.Point(quad["x0"], quad["y1"]),  # bottom-left
+                    fitz.Point(quad["x1"], quad["y1"]),  # bottom-right
+                )
+            ]
+        )
+        info = annot.info
+        info["content"] = "Temporary comment"
+        annot.set_info(info)
+        annot.update()  # no set_popup() -- a popup-less fixture is the point
+        doc.xref_set_key(annot.xref, "NM", f"({test_uuid})")
+        doc.save(str(test_pdf), incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
+        doc.close()
+
+        # --- Guard the precondition: comment present, and no popup ---
+        doc = fitz.open(test_pdf)
+        _, annot = find_annot_by_uuid(doc, test_uuid)
+        assert annot is not None, "Setup failed: fixture annotation not found"
+        assert annot.info.get("content") == "Temporary comment"
+        assert not annot.has_popup, "Setup failed: fixture must have no popup"
+        doc.close()
+
+        # --- Clear the comment via the helper (the popup-less edit path) ---
+        result = run_helper(
+            "edit-comment",
+            "--file",
+            str(test_pdf),
+            "--uuid",
+            test_uuid,
+            "--comment",
+            "",
+        )
+        assert result.returncode == 0, f"Helper failed: {result.stderr}"
+
+        # --- Verify: highlight survives, comment is gone (not resurrected) ---
+        doc = fitz.open(test_pdf)
+        _, annot = find_annot_by_uuid(doc, test_uuid)
+        assert annot is not None, "Highlight should still exist after clearing comment"
+        assert annot.info.get("content", "") == ""
+
+        # Pin the xref-clear ordering: the second annot.update() in the
+        # popup-creation branch must not rewrite /Contents from stale text.
+        contents_type, contents_value = doc.xref_get_key(annot.xref, "Contents")
+        assert (
+            contents_value == ""
+        ), f"/Contents not empty at xref level: ({contents_type!r}, {contents_value!r})"
+        doc.close()
+
 
 class TestDeleteHighlight:
     """Tests for the delete-highlight subcommand."""
