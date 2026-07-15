@@ -66,6 +66,17 @@ def find_annot_by_uuid(doc: fitz.Document, target_uuid: str):
     return None, None
 
 
+def list_bookmarks(run_helper, pdf_path):
+    """Call list-bookmarks and decode its JSON stdout."""
+    result = run_helper(
+        "list-bookmarks",
+        "--file",
+        str(pdf_path),
+    )
+    assert result.returncode == 0, f"Helper failed: {result.stderr}"
+    return json.loads(result.stdout)
+
+
 # ---------------------------------------------------------------------------
 #  Round-trip tests
 # ---------------------------------------------------------------------------
@@ -390,6 +401,144 @@ class TestDeleteHighlight:
         _, annot = find_annot_by_uuid(doc, test_uuid)
         assert annot is None, f"Annotation {test_uuid} should have been deleted"
         doc.close()
+
+
+# ---------------------------------------------------------------------------
+#  Bookmark persistence
+# ---------------------------------------------------------------------------
+
+
+class TestBookmarks:
+    """Tests for catalog-backed bookmark persistence and CLI behavior."""
+
+    def test_list_missing_bookmarks_returns_empty_array(self, test_pdf, run_helper):
+        """A PDF without Anima's private catalog key lists no bookmarks."""
+        assert list_bookmarks(run_helper, test_pdf) == []
+
+    def test_set_bookmark_roundtrip_and_case_insensitive_upsert(self, test_pdf, run_helper):
+        """Setting the same name with different casing updates one stored entry."""
+        first_result = run_helper(
+            "set-bookmark",
+            "--file",
+            str(test_pdf),
+            "--name",
+            "Endnotes Start",
+            "--page",
+            "1",
+        )
+        assert first_result.returncode == 0, f"Helper failed: {first_result.stderr}"
+
+        assert list_bookmarks(run_helper, test_pdf) == [{"name": "Endnotes Start", "page": 1}]
+
+        # This is a UI-independent helper contract: the newer spelling and
+        # page win, while uniqueness remains case-insensitive.
+        update_result = run_helper(
+            "set-bookmark",
+            "--file",
+            str(test_pdf),
+            "--name",
+            "ENDNOTES start",
+            "--page",
+            "0",
+        )
+        assert update_result.returncode == 0, f"Helper failed: {update_result.stderr}"
+
+        assert list_bookmarks(run_helper, test_pdf) == [{"name": "ENDNOTES start", "page": 0}]
+
+    def test_delete_bookmark_roundtrip(self, test_pdf, run_helper):
+        """Deleting by a differently cased name removes the matching bookmark."""
+        set_result = run_helper(
+            "set-bookmark",
+            "--file",
+            str(test_pdf),
+            "--name",
+            "Important Figure",
+            "--page",
+            "1",
+        )
+        assert set_result.returncode == 0, f"Helper failed: {set_result.stderr}"
+
+        delete_result = run_helper(
+            "delete-bookmark",
+            "--file",
+            str(test_pdf),
+            "--name",
+            "important figure",
+        )
+        assert delete_result.returncode == 0, f"Helper failed: {delete_result.stderr}"
+
+        assert list_bookmarks(run_helper, test_pdf) == []
+
+    def test_delete_nonexistent_bookmark_fails(self, test_pdf, run_helper):
+        """Deleting a name that has no stored bookmark must fail clearly."""
+        result = run_helper(
+            "delete-bookmark",
+            "--file",
+            str(test_pdf),
+            "--name",
+            "No Such Bookmark",
+        )
+
+        assert result.returncode != 0
+        assert "not found" in result.stderr.lower()
+
+    def test_set_bookmark_rejects_page_outside_zero_based_range(self, test_pdf, run_helper):
+        """Bookmark persistence uses fitz-native 0-based page indices."""
+        doc = fitz.open(test_pdf)
+        page_count = doc.page_count
+        doc.close()
+
+        result = run_helper(
+            "set-bookmark",
+            "--file",
+            str(test_pdf),
+            "--name",
+            "Invalid Page",
+            "--page",
+            str(page_count),
+        )
+
+        assert result.returncode != 0
+        assert "out of range" in result.stderr.lower()
+
+    def test_bookmarks_leave_existing_native_toc_intact(self, tmp_path, run_helper):
+        """Writing /AnimaBookmarks must not alter the PDF's native outline."""
+        pdf_path = tmp_path / "document_with_toc.pdf"
+
+        # Build a small, ordinary PDF with its own native outline. This avoids
+        # relying on whether the shared annotation fixture happens to have one.
+        doc = fitz.open()
+        doc.new_page()
+        doc.new_page()
+        original_toc = [
+            [1, "Existing Chapter", 1],
+            [2, "Existing Section", 2],
+        ]
+        doc.set_toc(original_toc)
+        doc.save(pdf_path)
+        doc.close()
+
+        set_result = run_helper(
+            "set-bookmark",
+            "--file",
+            str(pdf_path),
+            "--name",
+            "Endnotes Start",
+            "--page",
+            "1",
+        )
+        assert set_result.returncode == 0, f"Helper failed: {set_result.stderr}"
+
+        doc = fitz.open(pdf_path)
+        assert doc.get_toc() == original_toc
+        catalog_value_type, catalog_value = doc.xref_get_key(
+            doc.pdf_catalog(),
+            "AnimaBookmarks",
+        )
+        doc.close()
+
+        assert catalog_value_type == "string"
+        assert json.loads(catalog_value) == [{"name": "Endnotes Start", "page": 1}]
 
 
 # ---------------------------------------------------------------------------

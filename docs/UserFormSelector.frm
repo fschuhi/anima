@@ -1,4 +1,4 @@
-VERSION 5.00
+ï»¿VERSION 5.00
 Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} UserFormSelector
    Caption         =   "Selector"
    ClientHeight    =   4305
@@ -199,11 +199,11 @@ Private Sub ListBox1_KeyDown(ByVal KeyCode As MSForms.ReturnInteger, ByVal Shift
             ElseIf KeyCode = 32 Then
                 CurrentInput = CurrentInput & " "
             ElseIf KeyCode = 186 Then
-                CurrentInput = CurrentInput & "Ö"
+                CurrentInput = CurrentInput & "Ã–"
             ElseIf KeyCode = 192 Then
-                CurrentInput = CurrentInput & "Ü"
+                CurrentInput = CurrentInput & "Ãœ"
             ElseIf KeyCode = 222 Then
-                CurrentInput = CurrentInput & "Ä"
+                CurrentInput = CurrentInput & "Ã„"
             End If
 
             Dim newIndex As Integer

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-anima_helper.py — CLI tool for managing PDF highlight annotations via fitz.
+anima_helper.py — CLI tool for managing PDF highlight annotations and bookmarks via fitz.
 
 Called by the Anima Swift app (or manually from Terminal) to create, edit,
 and delete highlight annotations using fitz's incremental save, which
@@ -34,6 +34,17 @@ Examples:
     # Delete a highlight entirely:
     python3 anima_helper.py delete-highlight \
         --file paper.pdf --uuid "abc-123"
+
+    # List bookmarks stored in Anima's private PDF catalog key:
+    python3 anima_helper.py list-bookmarks --file paper.pdf
+
+    # Add or move a bookmark. Page is fitz-native and 0-based:
+    python3 anima_helper.py set-bookmark \
+        --file paper.pdf --name "Endnotes Start" --page 141
+
+    # Delete a bookmark by case-insensitive name:
+    python3 anima_helper.py delete-bookmark \
+        --file paper.pdf --name "Endnotes Start"
 """
 
 import argparse
@@ -54,6 +65,11 @@ DEFAULT_AUTHOR = "fschuhi"
 # Popup dimensions (placed off-page right margin; visible in other viewers)
 POPUP_WIDTH = 200
 POPUP_HEIGHT = 100
+
+# Private PDF catalog key for Anima's named page bookmarks. This deliberately
+# does not use the document's native /Outlines tree, which belongs to the PDF's
+# own table of contents when one exists.
+BOOKMARKS_CATALOG_KEY = "AnimaBookmarks"
 
 
 # ===============================================================
@@ -99,6 +115,61 @@ def _quads_from_json(quads_json: str):
             )
         )
     return quads
+
+
+def _read_bookmarks(doc: fitz.Document) -> list[dict[str, object]]:
+    """
+    Read Anima's bookmark array from the PDF catalog.
+
+    The catalog always exists, unlike an optional /Info dictionary. A missing
+    private key simply means this PDF has no Anima bookmarks yet.
+    """
+    value_type, value = doc.xref_get_key(doc.pdf_catalog(), BOOKMARKS_CATALOG_KEY)
+
+    if value_type == "null":
+        return []
+
+    if value_type != "string":
+        raise ValueError(
+            f"invalid /{BOOKMARKS_CATALOG_KEY} value: expected PDF string, got {value_type}"
+        )
+
+    bookmarks = json.loads(value)
+
+    if not isinstance(bookmarks, list):
+        raise ValueError(f"invalid /{BOOKMARKS_CATALOG_KEY} value: expected JSON array")
+
+    for bookmark in bookmarks:
+        if not isinstance(bookmark, dict):
+            raise ValueError(f"invalid /{BOOKMARKS_CATALOG_KEY} entry: expected object")
+
+        name = bookmark.get("name")
+        page = bookmark.get("page")
+
+        if not isinstance(name, str) or not isinstance(page, int):
+            raise ValueError(
+                f"invalid /{BOOKMARKS_CATALOG_KEY} entry: expected string name and integer page"
+            )
+
+    return bookmarks
+
+
+def _write_bookmarks(doc: fitz.Document, bookmarks: list[dict[str, object]]) -> None:
+    """Write the complete bookmark array to Anima's private PDF catalog key."""
+    serialized_bookmarks = json.dumps(bookmarks, ensure_ascii=False)
+    doc.xref_set_key(
+        doc.pdf_catalog(),
+        BOOKMARKS_CATALOG_KEY,
+        fitz.get_pdf_str(serialized_bookmarks),
+    )
+
+
+def _validate_bookmark_page(doc: fitz.Document, page: int) -> None:
+    """Reject pages outside fitz's native 0-based page-index range."""
+    if page < 0 or page >= doc.page_count:
+        raise ValueError(
+            f"page {page} out of range (document has {doc.page_count} pages, indexed from 0)"
+        )
 
 
 # ===============================================================
@@ -242,12 +313,105 @@ def cmd_delete_highlight(args):
     return 0
 
 
+def cmd_list_bookmarks(args):
+    """Print Anima's bookmark array as JSON, or [] when no key exists."""
+    pdf_path = Path(args.file)
+    if not pdf_path.exists():
+        print(f"Error: file not found: {pdf_path}", file=sys.stderr)
+        return 1
+
+    doc = fitz.open(pdf_path)
+
+    try:
+        bookmarks = _read_bookmarks(doc)
+    except (json.JSONDecodeError, ValueError) as error:
+        doc.close()
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+
+    doc.close()
+
+    print(json.dumps(bookmarks, ensure_ascii=False))
+    return 0
+
+
+def cmd_set_bookmark(args):
+    """
+    Add or update a named page bookmark.
+
+    Names are unique case-insensitively. A matching existing entry is removed
+    before the supplied entry is appended, so the supplied spelling and page
+    are the authoritative last write.
+    """
+    pdf_path = Path(args.file)
+    if not pdf_path.exists():
+        print(f"Error: file not found: {pdf_path}", file=sys.stderr)
+        return 1
+
+    doc = fitz.open(pdf_path)
+
+    try:
+        _validate_bookmark_page(doc, args.page)
+        bookmarks = _read_bookmarks(doc)
+    except (json.JSONDecodeError, ValueError) as error:
+        doc.close()
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+
+    normalized_name = args.name.casefold()
+    bookmarks = [
+        bookmark for bookmark in bookmarks if str(bookmark["name"]).casefold() != normalized_name
+    ]
+    bookmarks.append({"name": args.name, "page": args.page})
+
+    _write_bookmarks(doc, bookmarks)
+    doc.save(str(pdf_path), incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
+    doc.close()
+
+    print(args.name)
+    return 0
+
+
+def cmd_delete_bookmark(args):
+    """Delete one bookmark by case-insensitive name."""
+    pdf_path = Path(args.file)
+    if not pdf_path.exists():
+        print(f"Error: file not found: {pdf_path}", file=sys.stderr)
+        return 1
+
+    doc = fitz.open(pdf_path)
+
+    try:
+        bookmarks = _read_bookmarks(doc)
+    except (json.JSONDecodeError, ValueError) as error:
+        doc.close()
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+
+    normalized_name = args.name.casefold()
+    updated_bookmarks = [
+        bookmark for bookmark in bookmarks if str(bookmark["name"]).casefold() != normalized_name
+    ]
+
+    if len(updated_bookmarks) == len(bookmarks):
+        doc.close()
+        print(f"Error: bookmark not found: {args.name}", file=sys.stderr)
+        return 1
+
+    _write_bookmarks(doc, updated_bookmarks)
+    doc.save(str(pdf_path), incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
+    doc.close()
+
+    print(args.name)
+    return 0
+
+
 # ===============================================================
 #  CLI setup
 # ===============================================================
 def main():
     parser = argparse.ArgumentParser(
-        description="Anima — PDF highlight annotation helper (fitz backend)",
+        description="Anima — PDF highlight annotation and bookmark helper (fitz backend)",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -288,6 +452,35 @@ def main():
     p_del.add_argument("--file", required=True, help="Path to the PDF file")
     p_del.add_argument("--uuid", required=True, help="UUID of the annotation to delete")
 
+    # --- list-bookmarks ---
+    p_list_bookmarks = subparsers.add_parser(
+        "list-bookmarks",
+        help="List Anima bookmarks stored in the PDF catalog",
+    )
+    p_list_bookmarks.add_argument("--file", required=True, help="Path to the PDF file")
+
+    # --- set-bookmark ---
+    p_set_bookmark = subparsers.add_parser(
+        "set-bookmark",
+        help="Add or update an Anima bookmark",
+    )
+    p_set_bookmark.add_argument("--file", required=True, help="Path to the PDF file")
+    p_set_bookmark.add_argument("--name", required=True, help="Bookmark name")
+    p_set_bookmark.add_argument(
+        "--page",
+        type=int,
+        required=True,
+        help="Page number (0-indexed)",
+    )
+
+    # --- delete-bookmark ---
+    p_delete_bookmark = subparsers.add_parser(
+        "delete-bookmark",
+        help="Delete an Anima bookmark by name",
+    )
+    p_delete_bookmark.add_argument("--file", required=True, help="Path to the PDF file")
+    p_delete_bookmark.add_argument("--name", required=True, help="Bookmark name")
+
     args = parser.parse_args()
 
     if args.command == "add-highlight":
@@ -296,6 +489,12 @@ def main():
         sys.exit(cmd_edit_comment(args))
     elif args.command == "delete-highlight":
         sys.exit(cmd_delete_highlight(args))
+    elif args.command == "list-bookmarks":
+        sys.exit(cmd_list_bookmarks(args))
+    elif args.command == "set-bookmark":
+        sys.exit(cmd_set_bookmark(args))
+    elif args.command == "delete-bookmark":
+        sys.exit(cmd_delete_bookmark(args))
 
 
 if __name__ == "__main__":
