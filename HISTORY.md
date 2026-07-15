@@ -69,6 +69,10 @@
 - Dual-key contract threaded through SidebarExtractor, editComment,
   addInMemoryHighlight
 
+## Bookmarks
+
+- Bookmark persistence and creation (2026-07-15): added named whole-page bookmarks stored as JSON in the PDF catalog's private `/AnimaBookmarks` key. The implementation deliberately leaves the document's native `/Outlines` / table of contents untouched. Stored pages use fitz-native 0-based indices; reader-facing prompts display the corresponding 1-based page number. `anima_helper.py` now provides `list-bookmarks`, `set-bookmark`, and `delete-bookmark`; pytest covers missing-key listing, case-insensitive upsert and deletion, invalid 0-based pages, deletion failure, and native-TOC preservation. On the Swift side, `FitzBridge` exposes matching operations and `BookmarkManager` owns the active session's decoded list, reloading after successful mutations so helper-owned catalog semantics remain authoritative. `testBookmarkManagerPersistenceRoundTrip` exercises the real Swift -> Python -> PDF catalog -> reload boundary. `Cmd+B` now prompts for a bookmark name on the current page, detects duplicates case-insensitively, and offers `Re-point` or `Keep Existing`; bookmark navigation and deletion remain the next active work.
+
 ## Reading Ergonomics
 
 - Civilized main-window and split-view behavior (2026-07-14): main-window frame now persists across launches through AppKit frame autosave; split-divider position also persists through split-view autosave. The sidebar holds its current width during ordinary live window resizing while the PDF pane absorbs the change, subject to the existing minimum widths. The first-run 300-point sidebar default is applied only after layout has settled and never overwrites a restored divider position. This removed the launch-time resize/sidebar-width jitter.

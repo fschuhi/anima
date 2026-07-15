@@ -104,6 +104,14 @@ Every annotation gets a UUID stored in the PDF `/NM` field. Swift generates UUID
 
 **Important:** On in-memory annotations, `/NM` must be set explicitly via `setValue(_:forAnnotationKey:)`. PDFKit maps `userName` to `/T` (the author field), not to `/NM`. Relying on `userName` alone for UUID storage causes the author field to overwrite the UUID. See SIDEBAR_DESIGN.md "Known Gotchas" for full details.
 
+### Bookmarks
+
+Named page bookmarks are persisted independently from annotations. `anima_helper.py` stores a JSON array in the PDF catalog's private `/AnimaBookmarks` key, rather than modifying the PDF's native `/Outlines` tree. This preserves any table of contents already supplied by the document.
+
+Bookmark pages are stored as fitz-native 0-based indices. `BookmarkManager` keeps the catalog-backed list in memory for the active reader session, refreshing it after every successful helper mutation. Reader-facing UI always presents the corresponding 1-based page number.
+
+`AppDelegate` creates `BookmarkManager` alongside `AnnotationManager`; `AnimaPDFView` owns reader key dispatch and temporary bookmark dialogs; `FitzBridge` owns the Swift -> helper subprocess calls. Bookmark persistence and state are deliberately separate from annotation CRUD, sidebar extraction, search, and emphasis.
+
 ---
 
 ## Current Status
@@ -116,13 +124,15 @@ Every annotation gets a UUID stored in the PDF `/NM` field. Swift generates UUID
 | **Highlight Creation** | ✅ Complete  | ENTER with selection, dual-write, no reload        |
 | **Persistent Highlight** | ✅ Complete  | H key toggles mode; mouseUp = instant highlight    |
 | **Goto Page** | ✅ Complete | Bare `G`, native modal input, fail-fast range validation |
+| **Bookmark Creation** | ✅ Complete | `Cmd+B`, catalog-backed persistence, duplicate re-point prompt |
 | **Comment Editing** | ✅ Complete  | Modal input panel (CommentInputPanel), card-styled |
 | **Highlight Deletion** | ✅ Complete  | Click + Delete key, dual-write removal             |
 | **Incremental Save** | ✅ Complete  | fitz preserves all existing annotations            |
 | **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
 | **Xcode Project** | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
 | **Sidebar** | ✅ Complete  | Live cards, bidirectional emphasis, scroll sync    |
-| **Reading ergonomics** | 🚧 In progress | UX priority list in `TODO.md`                   |
+| **Bookmark Navigation** | 🚧 In progress | `Cmd+J` picker and `Cmd+D` deletion are next |
+| **Reading ergonomics** | 🚧 In progress | UX priority list in `TODO.md` |
 | **Tabs** | 🚧 Planned  | Backlog (see `TODO.md`)                            |
 | **pdf:// URL Handler** | 🚧 Planned  | Phase 2 (see `GOALS.md`)                           |
 
@@ -145,6 +155,13 @@ Highlights start without comments by design. Add a comment later by double-click
 - **G** -- go to a 1-based page number.
 - **Home / End** and **Cmd+Home / Cmd+End** -- jump to the beginning or end of the document.
 - **Page Up / Page Down** -- move by one screenful.
+
+### Bookmarks
+
+- **Cmd+B** -- add a named bookmark for the current page. The prompt identifies pages using normal 1-based reader numbering.
+- Bookmark names are unique case-insensitively. If the name already exists, choose **Re-point** to move it to the current page or **Keep Existing** to leave it unchanged.
+
+Bookmark navigation and deletion are the next implementation step. Bookmarks persist in the PDF itself and survive reopening without altering the document's native outline/table of contents.
 
 ### Search
 
@@ -210,6 +227,7 @@ anima/
 ├── Anima/Anima/                    ← Swift source files (app target)
 │   ├── AnimaPDFView.swift          ← PDFView subclass: keyboard, mouse, hit-testing
 │   ├── AnnotationManager.swift     ← Annotation CRUD: create, edit, delete (dual-write)
+│   ├── BookmarkManager.swift       ← Bookmark session state and catalog persistence coordination
 │   ├── AppDelegate.swift           ← Window setup, PDF loading, manager wiring
 │   ├── FitzBridge.swift            ← Subprocess bridge to Python helper
 │   ├── MainViewController.swift    ← NSSplitView layout, sidebar sync & emphasis
@@ -240,9 +258,11 @@ anima/
 
 ### Module Overview
 
-**`AnimaPDFView.swift`** -- Subclasses `PDFView` to intercept keyboard and mouse events. Handles persistent highlight mode (H key toggle, mouseUp auto-highlight), X-Ray mode (P key toggle for popup visibility), hit-testing for highlight clicks, and emphasis/selection coordination via `SidebarUpdateDelegate`. All annotation CRUD (create, edit, delete) is delegated to `AnnotationManager`. Defines the`SidebarUpdateDelegate` protocol and notifies its delegate after every annotation mutation and highlight click so the sidebar stays in sync.
+`AnimaPDFView.swift` -- Subclasses `PDFView` to intercept keyboard and mouse events. Handles persistent highlight mode (H key toggle, mouseUp auto-highlight), X-Ray mode (P key toggle for popup visibility), goto page, bookmark creation (`Cmd+B`), hit-testing for highlight clicks, and emphasis/selection coordination via `SidebarUpdateDelegate`. All annotation CRUD (create, edit, delete) is delegated to `AnnotationManager`; bookmark persistence is delegated to `BookmarkManager`. Defines the `SidebarUpdateDelegate` protocol and notifies its delegate after every annotation mutation and highlight click so the sidebar stays in sync.
 
 **`AnnotationManager.swift`** -- Toolbox class that owns all annotation CRUD operations and the dual-write pattern. Creates highlights (with quad math and coordinate conversion from PDFKit to fitz space), edits comments (showing the modal `CommentInputPanel`, writing via fitz, updating in-memory `/AnimaComment`), and deletes highlights. Holds no references to the view or document -- all context is passed per-call, keeping the class testable and safe for multi-document (tabs) support. Also owns shared constants (`authorName`, `highlightColor`, `highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`).
+
+**`BookmarkManager.swift`** -- Toolbox-style owner of the active document's in-memory named-page bookmark list. It decodes bookmark JSON returned by `FitzBridge`, delegates set/delete persistence to the helper, and reloads after each successful mutation so helper-owned catalog semantics remain authoritative. Bookmark page indices are 0-based internally; reader UI converts them to 1-based display values.
 
 **`AppDelegate.swift`** -- Creates the window, loads the PDF, creates and wires the `AnnotationManager`, and sets up the NSEvent monitor as a fallback for keyboard events (PDFKit's internal `PDFDocumentView` sometimes captures keyboard focus).
 
@@ -250,7 +270,7 @@ anima/
 
 **`SidebarExtractor.swift`** -- The pure data layer for the sidebar. Scans the PDFDocument for highlight annotations and safely extracts their text, UUID (/NM), author (/T), modification date, and vertical anchor points. Converts this raw PDFKit data into sorted `CommentCard` structs, keeping the extraction logic completely decoupled from the UI. Supports both document-level and per-page extraction (the latter used by the live-update path to rebuild a single page efficiently). Tested with `AnimaTests.swift`.
 
-**`FitzBridge.swift`** -- Static methods that call `anima_helper.py` via `Process()` (Swift's subprocess equivalent). Captures stdout/stderr, checks exit codes, and resolves the Python executable from the project's `.venv`.
+**`FitzBridge.swift`** -- Static methods that call `anima_helper.py` via `Process()` (Swift's subprocess equivalent). Captures stdout/stderr, checks exit codes, and resolves the Python executable from the project's `.venv`. It provides annotation mutation calls plus bookmark list/set/delete calls; raw bookmark-list JSON is decoded by `BookmarkManager`, which owns the Swift data model and session state.
 
 **`anima_helper.py`** -- Standalone CLI tool with three subcommands: `add-highlight`, `edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save preserves existing annotations. Tested with pytest, covering round-trips, contract verification (UUID in /NM, opacity survival), and error handling.
 
@@ -292,6 +312,7 @@ Python test suite (`tests/test_anima_helper.py`):
 - `TestUUIDContract` -- xref-level /NM verification
 - `TestIncrementalSavePreservation` -- pre-existing annotations survive new writes
 - `TestErrorHandling` -- invalid page, missing file, nonexistent UUID
+- `TestBookmarks` -- catalog-backed list/set/delete, case-insensitive upsert and deletion, 0-based page validation, and native-TOC preservation
 
 To inspect test output PDFs: `ANIMA_KEEP_TEST_OUTPUT=1 make test` (copies modified PDFs to `tmp/tests/` for manual inspection).
 

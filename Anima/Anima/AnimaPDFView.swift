@@ -9,6 +9,7 @@
 //    - H key → toggle persistent highlight mode (mouseUp creates highlight)
 //    - P key → toggle X-Ray mode (reveals native popups for comments)
 //    - G key → go to a page through a native modal input field
+//    - Cmd+B → add a named bookmark for the current page
 //    - Cmd+F → find text forward from the current page
 //    - Cmd+Shift+F → find matching annotation comments forward from the current page
 //    - F3 → advance to the next active find hit
@@ -87,6 +88,11 @@ class AnimaPDFView: PDFView {
     // Handles all annotation CRUD (create, edit, delete). Initialized by
     // the caller (AppDelegate or MainViewController) after the view is created.
     var annotationManager: AnnotationManager!
+
+    // --- Bookmark Manager ---
+    // Owns the session-local bookmark list and delegates PDF catalog
+    // persistence to FitzBridge. Injected by AppDelegate.
+    var bookmarkManager: BookmarkManager!
 
     // Track which highlight is currently "selected" for Delete key.
     // Unified with emphasis state: MainViewController sets these when
@@ -183,6 +189,17 @@ class AnimaPDFView: PDFView {
             clearFindHit()
             sidebarDelegate?.clearCommentSearch()
             showCommentFindDialog()
+            lastHandledEvent = event
+            return true
+        }
+
+        // Cmd+B = add a named bookmark for the current page.
+        if event.keyCode == 11,
+           modifiers.contains(.command),
+           !modifiers.contains(.shift),
+           !modifiers.contains(.control),
+           !modifiers.contains(.option) {
+            showAddBookmarkDialog()
             lastHandledEvent = event
             return true
         }
@@ -448,6 +465,126 @@ class AnimaPDFView: PDFView {
         isShowingDialog = true
         alert.runModal()
         isShowingDialog = false
+    }
+
+    // MARK: - Bookmarks
+
+    /// Prompts for a name and persists a bookmark for the current PDF page.
+    ///
+    /// The user-facing alert describes the page with 1-based numbering. The
+    /// manager receives PDFKit's 0-based page index, which matches the helper
+    /// and PDF catalog storage contract.
+    private func showAddBookmarkDialog() {
+        guard let document = document,
+              let currentPage = currentPage,
+              let documentURL = document.documentURL,
+              let bookmarkManager = bookmarkManager else {
+            Swift.print("⚠️  Could not add bookmark -- missing document, current page, or bookmark manager")
+            return
+        }
+
+        let pageIndex = document.index(for: currentPage)
+        let displayedPageNumber = pageIndex + 1
+
+        let nameField = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        nameField.placeholderString = "Bookmark name"
+
+        let alert = NSAlert()
+        alert.messageText = "Add Bookmark"
+        alert.informativeText = "Add a bookmark for page \(displayedPageNumber)."
+        alert.addButton(withTitle: "Add")
+        alert.addButton(withTitle: "Cancel")
+        alert.accessoryView = nameField
+        alert.layout()
+        alert.window.initialFirstResponder = nameField
+        alert.window.makeFirstResponder(nameField)
+
+        isShowingDialog = true
+        let response = alert.runModal()
+        isShowingDialog = false
+
+        guard response == .alertFirstButtonReturn else {
+            return
+        }
+
+        let name = nameField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !name.isEmpty else {
+            NSSound.beep()
+            return
+        }
+
+        if let existingBookmark = bookmarkManager.bookmarks.first(where: {
+            $0.name.compare(
+                name,
+                options: [.caseInsensitive, .diacriticInsensitive]
+            ) == .orderedSame
+        }) {
+            showDuplicateBookmarkDialog(
+                enteredName: name,
+                existingBookmark: existingBookmark,
+                currentPageIndex: pageIndex,
+                filePath: documentURL.path
+            )
+            return
+        }
+
+        persistBookmark(
+            name: name,
+            pageIndex: pageIndex,
+            filePath: documentURL.path
+        )
+    }
+
+    /// Resolves the duplicate-name interaction in Swift, where user intent
+    /// belongs. The helper remains a deliberately simple case-insensitive
+    /// upsert operation and does not prompt.
+    private func showDuplicateBookmarkDialog(
+        enteredName: String,
+        existingBookmark: Bookmark,
+        currentPageIndex: Int,
+        filePath: String
+    ) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Bookmark already exists"
+        alert.informativeText = "\"\(existingBookmark.name)\" already points to page \(existingBookmark.page + 1). Re-point it to page \(currentPageIndex + 1)?"
+        alert.addButton(withTitle: "Re-point")
+        alert.addButton(withTitle: "Keep Existing")
+
+        isShowingDialog = true
+        let response = alert.runModal()
+        isShowingDialog = false
+
+        guard response == .alertFirstButtonReturn else {
+            return
+        }
+
+        persistBookmark(
+            name: enteredName,
+            pageIndex: currentPageIndex,
+            filePath: filePath
+        )
+    }
+
+    /// Persists one bookmark through BookmarkManager and reports the outcome.
+    /// The manager reloads the catalog after mutation, keeping the helper as
+    /// the authority for case-insensitive upsert behavior and stored ordering.
+    private func persistBookmark(name: String, pageIndex: Int, filePath: String) {
+        guard let bookmarkManager = bookmarkManager else {
+            Swift.print("⚠️  Could not save bookmark -- bookmark manager is unavailable")
+            return
+        }
+
+        if bookmarkManager.setBookmark(
+            name: name,
+            page: pageIndex,
+            filePath: filePath
+        ) {
+            Swift.print("🔖 Saved bookmark \"\(name)\" for page \(pageIndex + 1)")
+        } else {
+            Swift.print("❌ Could not save bookmark \"\(name)\"")
+        }
     }
 
     // MARK: - PDF-Text Find

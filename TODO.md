@@ -13,7 +13,7 @@
 
 ## UX Priorities (Session 2026-07-11 -- order is initial ranking, final prios pending review)
 
-**Bookmarks with jump stack.** JumpStation-style navigation (reference: Frank's Excel VBA JumpStation.bas / UserFormSelector.frm): a back-stack of jump targets (push current page on jump, pop with a shortcut) plus a keyboard-driven type-to-filter selector panel for named targets (e.g. "endnotes"). UI precedent in Anima: CommentInputPanel (modal, keyboard-first). Primary use case: main text <-> endnotes round trips.
+**Bookmark navigation and deletion.** Persistence and `Cmd+B` creation are complete: bookmarks live in the PDF catalog's private `/AnimaBookmarks` key, use 0-based storage with 1-based reader display, and support case-insensitive re-pointing. Next, add a minimal `Cmd+J` picker populated from `BookmarkManager.bookmarks`; Enter jumps through `PDFView.go(to:)`, and `Cmd+D` inside the picker confirms then deletes the selected bookmark. Once the core main-text <-> endnotes round trip is proven useful, replace the minimal picker with the modal keyboard-first, type-to-filter JumpStation experience inspired by `docs/JumpStation.bas` / `docs/UserFormSelector.frm`. No jump-back stack is in scope.
 
 - **Consider a Status bar.** Thin bar below the PDF view. Carries: mode indicators (auto-highlight, X-Ray), page display, pdf size info, maybe stats like number of highlights, maybe last bookmark target. Window title then shows the filename, permanently.
 

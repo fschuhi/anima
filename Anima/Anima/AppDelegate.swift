@@ -73,7 +73,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // --- Wire up the persistence managers ---
         let helperPath = "\(projectRoot)/tools/anima_helper.py"
         mainViewController.pdfView.annotationManager = AnnotationManager(helperPath: helperPath)
+
         bookmarkManager = BookmarkManager(helperPath: helperPath)
+        mainViewController.pdfView.bookmarkManager = bookmarkManager
 
         // --- Determine which PDF to open ---
         guard let url = resolvePDFURL() else {

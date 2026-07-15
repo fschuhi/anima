@@ -6,12 +6,13 @@
 
 ---
 
-**Where we are:** On 2026-07-15, the two Python test gaps closed:added `test_clear_comment_on_popupless_annotation` to `TestEditComment`. Prepared `docs/BOOKMARKS_DESIGN.md` as handover document.
+**Where we are:** Bookmark persistence and creation are complete: `/AnimaBookmarks` catalog storage, Python helper commands and pytest coverage, Swift bridge/manager integration coverage, and `Cmd+B` add/re-point behavior are all green. The reader UI presents pages as 1-based while bookmark storage remains fitz-native 0-based.
 
 **What's next (in order):**
 
-1. Implement bookmarks management and navigation, based on the ideas in `dosc/BOOKMARKS_DESIGN.md`.
-2. Reassess the remaining reading-ergonomics backlog.
+1. Implement minimal bookmark navigation: `Cmd+J` picker, Enter-to-jump, and `Cmd+D` deletion with confirmation.
+2. Replace that minimal picker with the keyboard-first filtered JumpStation experience when the core round-trip is confirmed useful.
+3. Reassess the remaining reading-ergonomics backlog.
 
 Tabs remain deferred; separate `open -n` instances are the accepted multi-document workflow for now.
 
