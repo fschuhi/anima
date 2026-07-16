@@ -12,6 +12,7 @@
 
 **What's next (in order):**
 
+0. Review refactorings.
 1. Phase 2 "Open PDFs" (see below): scoping, possibly implement quick wins.
 2. Prioritize the backlog refactorings, UX improvements, and Phase 3 "Toolchain Integration" before choosing the next implementation slice.
 
@@ -21,7 +22,7 @@ Everything else sits in `TODO.md` until it earns a place here.
 
 ## 🎯 Strategic vision
 
-Anima exists to serve one workflow: reading academic papers and wisdom tradition texts, highlighting passages, and adding comments. It replaces PDF-XChange Viewer in a macOS-native toolchain that flows from PDF -> highlights -> Obsidian notes. The design conviction: Anima is a scratchpad for engaged reading, not a document editor -- complexity belongs downstream in the toolchain, not in the reader. The current gap is not capability but *habitability*: the viewer works, but it is not yet pleasant enough to pull daily reading away from the Parallels bridge. Phase 1 closes that gap; Phase 2 retires the bridge.
+Anima exists to serve one workflow: reading academic papers and wisdom tradition texts, highlighting passages, and adding comments. It replaces PDF-XChange Viewer in a macOS-native toolchain that flows from PDF -> highlights -> Obsidian notes. The design conviction: Anima is a scratchpad for engaged reading, not a document editor -- complexity belongs downstream in the toolchain, not in the reader.
 
 ---
 
