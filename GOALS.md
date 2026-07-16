@@ -8,14 +8,15 @@
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Phase 1 is complete. Anima now has durable window behavior, core reading/navigation ergonomics, hardened annotation and bookmark persistence seams, bookmark creation, and the usable `Cmd+J` JumpStation round trip for navigation and deletion. Reader-facing page numbers remain 1-based while bookmark storage remains fitz-native 0-based.
+**Where we are:** Phase 1 is complete. The architecture review of the recently added navigation, search, bookmark, and PDF-opening action paths is complete. The review confirmed the existing load path as the right seam for active-document replacement, identified a small shared far-jump execution seam needed before JumpStack, and left broader search, command-controller, and multi-document abstractions parked as premature.
 
 **What's next (in order):**
 
-1. Architecture review and update and prioritize backlog refactorings (see `TODO.md`).
-2. Implement selected backlog refactorings, if any.
-3. Phase 2 "Open PDFs" (see below): scoping, possibly implement quick wins.
-4. Prioritize the backlog refactorings, UX improvements, and Phase 3 "Toolchain Integration" before choosing the next implementation slice.
+1. Implement the split of `AnimaTests.swift` by test concern, reducing the standard filesdump while preserving the self-documenting cross-boundary round trips.
+2. Begin Phase 2 with safe hot replacement of the active PDF.
+3. Add per-PDF last-page persistence and restoration.
+4. Reassess lower-priority opening entry points such as reader-window drag-and-drop and `Cmd+O`.
+5. Return to navigation improvements, toolchain integration, and the remaining backlog according to visible value.
 
 Everything else sits in `TODO.md` until it earns a place here.
 
@@ -35,11 +36,12 @@ Anima exists to serve one workflow: reading academic papers and wisdom tradition
 
 ## Phase 2 -- Opening PDFs
 
-- Clicking on a different PDF in the Finder while Anima is open should show the new PDF, not just give Anima the focus with the old PDF.
-- Drag-and-drop of PDFs should open them in Anima.
-- File open dialog with `Cmd+O`.
-- Anima should open the PDF on the page which was shown last for that PDF. No sidecar structures; needs to save the info in the PDF metadata.
-- We currently cannot have more than one Anima window open at a time. Scope out possible solutions, e.g. multiple windows and cycle through them with keyboard shortcuts, or tabs with independent PDF and sidebar.
+Phase 2 makes switching between PDFs reliable before adding more ways to initiate an open request. Anima's near-term model remains one active PDF per process: fast document replacement, restored reading position, and later restored JumpStack state provide the practical proxy for keeping several PDFs open.
+
+1. **Safe active-document replacement.** Clicking another PDF in Finder, using "Open With", or dropping a PDF onto the Dock icon while Anima is running should replace the displayed PDF rather than merely focus the existing window. Replacement must retire document-specific search, emphasis, selection, and mutation-target state. Failed hot opens preserve the current PDF and report the failure.
+2. **Last-page restoration.** Persist the most recently displayed page in private PDF metadata and restore it when that PDF is reopened. This is the highest-priority enhancement after safe replacement because it makes rapid external switching useful in practice.
+3. **Additional opening entry points.** Add reader-window drag-and-drop and `Cmd+O` only after replacement and restoration are reliable; neither is currently as valuable as preserving reading position.
+4. **Same-process multiple documents remain parked.** Multiple windows or tabs would require first-class per-document reader sessions with independent PDF views, sidebars, bookmarks, search, emphasis, and modal ownership. Do not build that infrastructure unless replacement-based switching proves insufficient. Separate simultaneous instances remain available through `open -n`.
 
 ---
 
