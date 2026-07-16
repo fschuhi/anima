@@ -12,9 +12,10 @@
 
 **What's next (in order):**
 
-0. Review refactorings.
-1. Phase 2 "Open PDFs" (see below): scoping, possibly implement quick wins.
-2. Prioritize the backlog refactorings, UX improvements, and Phase 3 "Toolchain Integration" before choosing the next implementation slice.
+1. Architecture review and update and prioritize backlog refactorings (see `TODO.md`).
+2. Implement selected backlog refactorings, if any.
+3. Phase 2 "Open PDFs" (see below): scoping, possibly implement quick wins.
+4. Prioritize the backlog refactorings, UX improvements, and Phase 3 "Toolchain Integration" before choosing the next implementation slice.
 
 Everything else sits in `TODO.md` until it earns a place here.
 
