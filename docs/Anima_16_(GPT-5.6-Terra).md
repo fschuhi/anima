@@ -169,7 +169,7 @@ For immediate reading utility:
 -   Add goto page.
 -   Investigate whether simple native PDFKit find can be surfaced cheaply.
 
-I would challenge the existing implied sequence here: a status bar may be a good eventual home for these controls, but it should not automatically become a prerequisite structural project. We should first ask whether a small page indicator plus Cmd+G gives the needed value without building a generalized status-bar framework.
+I would challenge the existing implied sequence here: a status bar may be a good eventual home for these controls, but it should not automatically become a prerequisite structural project. We should first ask whether a small page indicator plus `Cmd+G` gives the needed value without building a generalized status-bar framework.
 
 ### Step 4 -- Defer real tabs consciously
 
@@ -479,7 +479,7 @@ That means page navigation is likely a **PDFKit-facing feature**, while the side
 -   `updateSidebarLayout()` page-position math and card collision avoidance.
 -   The local-scroll routing in `PageSidebarView`.
 
-These are exactly the kind of working-but-dense subsystem that should not become collateral damage while adding a page display or Cmd+G.
+These are exactly the kind of working-but-dense subsystem that should not become collateral damage while adding a page display or `Cmd+G`.
 
 ### Likely narrow seams for upcoming work
 

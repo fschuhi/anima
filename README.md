@@ -116,25 +116,23 @@ Bookmark pages are stored as fitz-native 0-based indices. `BookmarkManager` keep
 
 ## Current Status
 
-| Feature                  | Status      | Notes                                              |
-|--------------------------|-------------|-----------------------------------------------------|
-| **PDF Rendering** | ✅ Complete  | PDFKit, including Internet Archive layered PDFs    |
-| **Continuous Scroll** | ✅ Complete  | Native trackpad scrolling                          |
-| **Text Selection** | ✅ Complete  | Drag to select, per-line quad extraction           |
-| **Highlight Creation** | ✅ Complete  | ENTER with selection, dual-write, no reload        |
-| **Persistent Highlight** | ✅ Complete  | H key toggles mode; mouseUp = instant highlight    |
-| **Goto Page** | ✅ Complete | Bare `G`, native modal input, fail-fast range validation |
-| **Bookmark Creation** | ✅ Complete | `Cmd+B`, catalog-backed persistence, duplicate re-point prompt |
-| **Comment Editing** | ✅ Complete  | Modal input panel (CommentInputPanel), card-styled |
-| **Highlight Deletion** | ✅ Complete  | Click + Delete key, dual-write removal             |
-| **Incremental Save** | ✅ Complete  | fitz preserves all existing annotations            |
-| **pdf-annot Compatible** | ✅ Complete  | Round-trip verified with extraction pipeline       |
-| **Xcode Project** | ✅ Complete  | .app bundle, menu bar, Cmd+Q                       |
-| **Sidebar** | ✅ Complete  | Live cards, bidirectional emphasis, scroll sync    |
-| **Bookmark Navigation** | ✅ Complete | `Cmd+J` JumpStation: select, Enter-to-jump, `Cmd+D` deletion |
-| **Reading ergonomics** | ✅ Complete | Phase 1 baseline complete; later refinements return to `TODO.md` |
-| **Tabs** | 🚧 Planned  | Backlog (see `TODO.md`)                            |
-| **pdf:// URL Handler** | 🚧 Planned  | Phase 2 (see `GOALS.md`)                           |
+| Feature                  | Status      | Notes                                                            |
+|--------------------------|-------------|------------------------------------------------------------------|
+| **PDF Rendering**        | ✅ Complete | PDFKit, including Internet Archive layered PDFs                  |
+| **Continuous Scroll**    | ✅ Complete | Native trackpad scrolling                                        |
+| **Text Selection**       | ✅ Complete | Drag to select, per-line quad extraction                         |
+| **Highlight Creation**   | ✅ Complete | `Enter` with selection, dual-write, no reload                    |
+| **Persistent Highlight** | ✅ Complete | `Cmd+H` toggles mode; mouseUp = instant highlight                |
+| **Goto Page**            | ✅ Complete | `Cmd+G`, native modal input, fail-fast range validation          |
+| **Bookmark Creation**    | ✅ Complete | `Cmd+B`, catalog-backed persistence, duplicate re-point prompt   |
+| **Comment Editing**      | ✅ Complete | Modal input panel (CommentInputPanel), card-styled               |
+| **Highlight Deletion**   | ✅ Complete | Click + Delete key, dual-write removal                           |
+| **Incremental Save**     | ✅ Complete | fitz preserves all existing annotations                          |
+| **pdf-annot Compatible** | ✅ Complete | Round-trip verified with extraction pipeline                     |
+| **Xcode Project**        | ✅ Complete | .app bundle, menu bar, Cmd+Q                                     |
+| **Sidebar**              | ✅ Complete | Live cards, bidirectional emphasis, scroll sync                  |
+| **Bookmark Navigation**  | ✅ Complete | `Cmd+J` JumpStation: select, Enter-to-jump, `Cmd+D` deletion     |
+| **Reading ergonomics**   | ✅ Complete | Phase 1 baseline complete; later refinements return to `TODO.md` |
 
 ---
 
@@ -143,47 +141,47 @@ Bookmark pages are stored as fitz-native 0-based indices. `BookmarkManager` keep
 ### Highlight and comment
 
 - **Select text + Enter** -- create a pink highlight.
-- **Cmd+H** -- toggle persistent highlight mode. With the mode on, releasing the mouse after selecting text creates a highlight immediately.
+- **`Cmd+H`** -- toggle persistent highlight mode. With the mode on, releasing the mouse after selecting text creates a highlight immediately.
 - **Double-click a highlight** -- add or edit its comment. Escape in the comment editor saves the current text.
-- **Click a highlight or comment card** -- emphasize that annotation and make it the target for Delete. Click the same emphasized highlight or card again, or press **Esc**, to clear the selection.
-- **Delete** or **Forward Delete** -- remove the currently emphasized highlight.
+- **Click a highlight or comment card** -- emphasize that annotation and make it the target for Delete. Click the same emphasized highlight or card again, or press `Esc`, to clear the selection.
+- **`Delete`** or **`Forward Delete`** -- remove the currently emphasized highlight.
 
 Highlights start without comments by design. Add a comment later by double-clicking the highlight.
 
 ### Navigate
 
-- **Cmd+G** -- go to a 1-based page number.
-- **Home / End** and **Cmd+Home / Cmd+End** -- jump to the beginning or end of the document.
-- **Page Up / Page Down** -- move by one screenful.
+- **`Cmd+G`** -- go to a 1-based page number.
+- **`Home` / `End`** and **`Cmd+Home` / `Cmd+End`** -- jump to the beginning or end of the document.
+- **`Page Up` / `Page Down`** -- move by one screenful.
 
 ### Bookmarks
 
-- **Cmd+B** -- add a named bookmark for the current page. The prompt identifies pages using normal 1-based reader numbering.
+- **`Cmd+B`** -- add a named bookmark for the current page. The prompt identifies pages using normal 1-based reader numbering.
 - Bookmark names are unique case-insensitively. If the name already exists, choose **Re-point** to move it to the current page or **Keep Existing** to leave it unchanged.
-- **Cmd+J** -- open JumpStation. It lists bookmark names and normal 1-based page numbers in two columns. Mouse clicks, right-clicks, and double-clicks select a row only; Up/Down also move selection. **Enter** jumps to the selected bookmark and **Esc** closes the panel.
-- **Cmd+D** -- while JumpStation is open, delete its selected bookmark after confirmation. The list refreshes immediately, and the panel closes if the final bookmark is removed.
+- **`Cmd+J`** -- open JumpStation. It lists bookmark names and normal 1-based page numbers in two columns. Mouse clicks, right-clicks, and double-clicks select a row only; `Up`/`Down` also move selection. `Enter` jumps to the selected bookmark and `Esc` closes the panel.
+- **`Cmd+D`** -- while JumpStation is open, delete its selected bookmark after confirmation. The list refreshes immediately, and the panel closes if the final bookmark is removed.
 - If no bookmarks exist, `Cmd+J` reports that state instead of opening an empty picker.
 
 Bookmarks persist in the PDF itself and survive reopening without altering the document's native outline/table of contents.
 
 ### Search
 
-- **Cmd+F** -- search PDF text from the beginning of the current page forward. The active hit appears pale green in the PDF.
-- **Cmd+Shift+F** -- search annotation comments only from the current page forward. Matching cards receive thin pale-green borders; the current hit has a thicker pale-green border.
-- **F3** -- advance to the next hit in the active search. Searches stop at document end and do not wrap.
-- **Esc** -- clear the active PDF-text search, comment search, or annotation emphasis, in that order.
+- **`Cmd+F`** -- search PDF text from the beginning of the current page forward. The active hit appears pale green in the PDF.
+- **`Cmd+Shift+F`** -- search annotation comments only from the current page forward. Matching cards receive thin pale-green borders; the current hit has a thicker pale-green border.
+- **`F3`** -- advance to the next hit in the active search. Searches stop at document end and do not wrap.
+- **`Esc`** -- clear the active PDF-text search, comment search, or annotation emphasis, in that order.
 
 PDF-text search results are temporary reader selections, not annotation selections. Finding text never creates a highlight, including while persistent H mode is enabled. Starting a search clears annotation emphasis; clicking a highlight or card exits search and returns to normal annotation interaction.
 
 ### Inspect native PDF comments
 
-- **P** -- toggle X-Ray mode, which reveals native PDF popup indicators for comments. This is primarily a diagnostic view; ordinary reading keeps them suppressed in favor of the sidebar.
+- **`Cmd+P`** -- toggle X-Ray mode, which reveals native PDF popup indicators for comments. This is primarily a diagnostic view; ordinary reading keeps them suppressed in favor of the sidebar.
 
 ### Highlight Workflow
 
 Highlights are created **without a comment**. This keeps the flow fast -- especially in persistent highlight mode where mouseUp instantly highlights. To add or edit a comment after the fact, double-click the highlight. This matches the PDF-XChange Viewer workflow where highlighting and commenting are separate actions.
 
-Highlights are **page-scoped by design**: a selection that spans a page break creates the highlight only on the first page -- lines on the following page are dropped. This is intended behavior, not a limitation. Highlights should be specific; a continuation on the next page is its own highlight, connected via the `link` command comment per the existing annotation conventions.
+Highlights are **page-scoped by design**: a selection that spans a page break creates the highlight only on the first page -- lines on the following page are dropped. This is intended behavior, not a limitation. Highlights should be specific; a continuation on the next page is its own highlight, connected via the "link" command comment per the existing annotation conventions (see `pdf-annotations` for details).
 
 ### Sidebar
 
@@ -215,7 +213,7 @@ Zettelkasten: idea notes, workbenches, Folgezettel sequences
 
 - **`pdf-annotations`**: Extracts highlights and comments from PDFs into Obsidian Markdown notes. Uses fitz -- Anima's annotations are fully compatible. Standard `/Annot` with `/Subtype /Highlight`, `/Contents` for comments, `QuadPoints` for precise multi-line highlighting.
 
-- **`pdf://` URL scheme**: Obsidian bibnotes reference PDFs via `pdf://HASH?page=N`. Currently routes through a Windows Parallels bridge to PDF-XChange Viewer. Milestone 2 registers Anima as the native macOS handler, eliminating the Parallels dependency entirely.
+- **`pdf://` URL scheme**: Obsidian bibnotes reference PDFs via `pdf://HASH?page=N`. Currently routes through a Windows Parallels bridge to PDF-XChange Viewer. Phase 3 registers Anima as the native macOS handler, eliminating the Parallels dependency entirely, see `GOALS.md`.
 
 - **Obsidian "The Studio"**: The Zettelkasten knowledge management system where bibnotes, idea notes, and workbenches live. Anima serves as the PDF reading layer that feeds this system.
 
@@ -278,7 +276,7 @@ anima/
 
 **`anima_helper.py`** -- Standalone CLI tool with three subcommands: `add-highlight`, `edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save preserves existing annotations. Tested with pytest, covering round-trips, contract verification (UUID in /NM, opacity survival), and error handling.
 
-**`CommentCardView.swift`** -- The visual representation of a single annotation in the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based on the length of the comment text. Handles all visual styling, including the muted typography applied to structural pipeline commands (e.g., `link` or `H2`). Reports clicks via an `onClicked` closure and supports active/inactive visual states for the emphasis feature.
+**`CommentCardView.swift`** -- The visual representation of a single annotation in the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based on the length of the comment text. Handles all visual styling, including the muted typography applied to structural pipeline commands (e.g., "link" or "H2"). Reports clicks via an `onClicked` closure and supports active/inactive visual states for the emphasis feature.
 
 **`CommentInputPanel.swift`** -- A modal `NSPanel` for adding and editing highlight comments. Replaces the previous `NSAlert`-based dialog with a proper multi-line text editor (`NSTextView`). Styled to match `CommentCardView` -- same background color, corner radius, fonts, and color palette. Escape saves and closes (no cancel), Enter inserts newlines. The panel is resizable and draggable. Each invocation creates a fresh instance; the panel is not reused across calls.
 

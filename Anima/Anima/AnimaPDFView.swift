@@ -6,18 +6,18 @@
 //
 //  Current capabilities:
 //    - ENTER with selection → create highlight (via AnnotationManager)
-//    - Cmd+H → toggle persistent highlight mode (mouseUp creates highlight)
-//    - Cmd+P → toggle X-Ray mode (reveals native popups for comments)
-//    - Cmd+G key → go to a page through a native modal input field
-//    - Cmd+B → add a named bookmark for the current page
-//    - Cmd+J → open JumpStation bookmark navigation
-//    - Cmd+F → find text forward from the current page
-//    - Cmd+Shift+F → find matching annotation comments forward from the current page
-//    - F3 → advance to the next active find hit
-//    - Esc → clear PDF-text search, comment search, or annotation emphasis
+//    - `Cmd+H` → toggle persistent highlight mode (mouseUp creates highlight)
+//    - `Cmd+P` → toggle X-Ray mode (reveals native popups for comments)
+//    - `Cmd+G` key → go to a page through a native modal input field
+//    - `Cmd+B` → add a named bookmark for the current page
+//    - `Cmd+J` → open JumpStation bookmark navigation
+//    - `Cmd+F` → find text forward from the current page
+//    - `Cmd+Shift+F` → find matching annotation comments forward from the current page
+//    - `F3` → advance to the next active find hit
+//    - `Esc` → clear PDF-text search, comment search, or annotation emphasis
 //    - Double-click on highlight (or card via delegate) → edit comment (via AnnotationManager)
 //    - Single-click highlight → toggle emphasis
-//    - Delete key → remove the currently emphasized highlight (via AnnotationManager)
+//    - `Delete` → remove the currently emphasized highlight (via AnnotationManager)
 //
 //  Annotation CRUD:
 //    All highlight creation, comment editing, and deletion are delegated to
@@ -164,7 +164,7 @@ class AnimaPDFView: PDFView {
 
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-        // Cmd+F = start a new document-text search. Starting either search
+        // `Cmd+F` = start a new document-text search. Starting either search
         // mode clears the other search mode and annotation emphasis first.
         if event.keyCode == 3,
            modifiers.contains(.command),
@@ -178,7 +178,7 @@ class AnimaPDFView: PDFView {
             return true
         }
 
-        // Cmd+Shift+F = search only annotation comments. The sidebar owns
+        // `Cmd+Shift+F` = search only annotation comments. The sidebar owns
         // comment cards and their visual state, while this view owns the
         // native prompt and keyboard event dispatch.
         if event.keyCode == 3,
@@ -194,7 +194,7 @@ class AnimaPDFView: PDFView {
             return true
         }
 
-        // Cmd+B = add a named bookmark for the current page.
+        // `Cmd+B` = add a named bookmark for the current page.
         if event.keyCode == 11,
            modifiers.contains(.command),
            !modifiers.contains(.shift),
@@ -205,7 +205,7 @@ class AnimaPDFView: PDFView {
             return true
         }
 
-        // Cmd+J = open bookmark JumpStation navigation.
+        // `Cmd+J` = open bookmark JumpStation navigation.
         if event.keyCode == 38,
            modifiers.contains(.command),
            !modifiers.contains(.shift),
@@ -216,7 +216,7 @@ class AnimaPDFView: PDFView {
             return true
         }
 
-        // F3 = find next in whichever search mode is active. Search modes
+        // `F3` = find next in whichever search mode is active. Search modes
         // are mutually exclusive, but PDF-text search is checked first to
         // match the ordered-Esc behavior.
         if event.keyCode == 99 {
@@ -242,9 +242,9 @@ class AnimaPDFView: PDFView {
             return true
         }
 
-        // Escape clears the most immediate temporary reader state:
+        // `Esc` clears the most immediate temporary reader state:
         // PDF-text search -> comment search -> annotation emphasis.
-        // If none is active, leave Escape unconsumed for normal AppKit/PDFKit
+        // If none is active, leave `Esc` unconsumed for normal AppKit/PDFKit
         // behavior.
         if event.keyCode == 53 {
             if hasActivePDFTextSearch {
@@ -266,7 +266,7 @@ class AnimaPDFView: PDFView {
             }
         }
 
-        // Cmd+H = toggle persistent highlight mode
+        // `Cmd+H` = toggle persistent highlight mode
         if event.keyCode == 4,
             modifiers.contains(.command),
             !modifiers.contains(.shift),
@@ -277,7 +277,7 @@ class AnimaPDFView: PDFView {
             return true
         }
 
-        // Cmd+P = toggle X-Ray mode (show popups)
+        // `Cmd+P` = toggle X-Ray mode (show popups)
         if event.keyCode == 35,
             modifiers.contains(.command),
             !modifiers.contains(.shift),
@@ -288,7 +288,7 @@ class AnimaPDFView: PDFView {
             return true
         }
 
-        // Cmd+G = go to page.
+        // `Cmd+G` = go to page.
         if event.keyCode == 5,
             modifiers.contains(.command),
             !modifiers.contains(.shift),
@@ -299,7 +299,7 @@ class AnimaPDFView: PDFView {
             return true
         }
 
-        // ENTER = create highlight from current selection
+        // `Enter` = create highlight from current selection
         if event.keyCode == 36 || event.keyCode == 76 {
             if createHighlightFromSelection() {
                 lastHandledEvent = event
@@ -307,7 +307,7 @@ class AnimaPDFView: PDFView {
             }
         }
 
-        // DELETE / BACKSPACE = delete the selected highlight
+        // `Del`, `Backspace` = delete the selected highlight
         // keyCode 51 = Backspace, keyCode 117 = Forward Delete
         if event.keyCode == 51 || event.keyCode == 117 {
             if deleteSelectedHighlight() {
@@ -678,7 +678,7 @@ class AnimaPDFView: PDFView {
         let alert = NSAlert()
         alert.alertStyle = .informational
         alert.messageText = "No Bookmarks"
-        alert.informativeText = "Add one with Cmd+B first."
+        alert.informativeText = "Add one with `Cmd+B` first."
         alert.addButton(withTitle: "OK")
 
         isShowingDialog = true

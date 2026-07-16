@@ -84,7 +84,7 @@
 
 ## Navigation
 
-- Jump to beginning/end (Cmd+Home, Cmd+End, Home, End)
+- Jump to beginning/end (`Cmd+Home`, Cmd+End, Home, End)
 - Page Up / Page Down (one screenful, Windows-style)
 
 ## macOS Integration

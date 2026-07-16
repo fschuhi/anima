@@ -13,23 +13,23 @@ tmp/project_tree.txt
 README.md
 GOALS.md
 TODO.md
-# CHANGELOG.md
+# HISTORY.md
 
-# Design notes for bookmark management and navigation.
-docs/BOOKMARKS_DESIGN.md
-docs/JumpStation.bas
-docs/UserFormSelector.frm
+# Historical design notes for bookmark management and navigation. Actively maintained until 2026-07-16.
+# docs/BOOKMARKS_DESIGN.md
+# docs/JumpStation.bas
+# docs/UserFormSelector.frm
 
 # Historical design notes from the sidebar build-out. Not actively maintained.
 # docs/SIDEBAR_DESIGN.md
 
 ### --- Build & Configuration ---
-Anima/Anima/Info.plist
+# Anima/Anima/Info.plist
 Makefile
-pyproject.toml
+# pyproject.toml
 tools/requirements.txt
 #.editorconfig
-.gitignore
+# .gitignore
 #.gitattributes
 #.pre-commit-config.yaml
 
@@ -50,9 +50,9 @@ tools/anima_helper.py
 # tools/concat_files.py
 
 ### --- Testing Swift---
-#Anima/AnimaTests/Fixtures/sidebar_basic.pdf
+# Anima/AnimaTests/Fixtures/sidebar_basic.pdf
 Anima/AnimaTests/Fixtures/sidebar_basic_expected.json
-#Anima/AnimaTests/Fixtures/sidebar_page_extract.pdf
+# Anima/AnimaTests/Fixtures/sidebar_page_extract.pdf
 Anima/AnimaTests/Fixtures/sidebar_page_extract_expected.json
 Anima/AnimaTests/AnimaTests.swift
 

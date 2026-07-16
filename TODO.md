@@ -19,85 +19,44 @@
 
 ## Refactoring
 
+- **Reduce size of `filesdump.txt`.** Should we exclude files from the `filesdump.txt`? Are there superfluous comments in the `*.swift` files?
+
 - **Extract `PopupController`.** Consolidate all popup suppression logic (scrubbing on load, X-Ray toggle, conditional popup handling in edit/create) into one type. Currently spread across AnimaPDFView and MainViewController. Review 2026-07-11 confirmed: `scrubCommentsForPopupSuppression` and `applyXRayModeToDocument`'s OFF-branch are near-duplicates.
 
 - **Extract `EmphasisManager` from `MainViewController`.** The emphasis state machine (apply/clear/preserve-through-rebuild, ~100 lines) becomes its own type. MainViewController focuses on layout and scroll physics. While extracting: consolidate the triplicated UUID lookup (/NM-then-userName fallback exists in AnnotationManager.annotationUUID, SidebarExtractor.getUUID, MainViewController.findAnnotation) into one shared helper.
 
 - **Delete `reloadDocument()` dead code in AnimaPDFView.** Nothing calls it, and it predates the sidebar: if it were ever called, pageSidebarViews would desync from the new document. Delete (git remembers); a future reload path must go through `loadPDF`.
 
+- **FitzBridge redesign.** The subprocess seam has a latent pipe deadlock (`waitUntilExit` before reading pipes), blocks the main thread per operation, and pays interpreter-startup latency on every mutation (today: barely perceptible hesitation, not gummy). Parked per Scope Skepticism -- no observed problem yet. Trigger: latency becomes noticeable, output grows past pipe buffers, or async/batch needs arise. Scope of the session: async dispatch vs. long-running helper process vs. batching -- trade-offs first, then implement.
+
+- **Comment set/clear lifecycle.** `cmd_edit_comment`'s ordering is fragile: fitz's `set_info` silently ignores empty strings, the xref-level `/Contents` clear must stay the last mutation before save, and a second `annot.update()` (popup creation path) runs after it.
+
+- **`MainMenu.xib` housekeeping.** Review and clean up `MainMenu.xib` (remove unused Font/Format/Text menus).
+
 ---
+
+## Navigation
+
+- **JumpStack.** A "far jump" is the target of a (a) go to page, (b) find in PDF, (c) find in comments, (d) `F3` to find next (in PDF or comment), (e) jump to bookmark. Put current position (page number) before doing the far jumps on the stack, then use Cmd+R to pop the previous position from the stack and jump there. Main use case is having an "Endnotes" bookmark. When we jump there via the JumpStation, we want to return to where we jumped from after checking the endnotes.
+- **Extend JumpStation with prefix input/filtering.** Add the display-only prefix panel and VBA-inspired keyboard behavior: case-insensitive prefix matching against bookmark names, repeated Backspace, selection independent from prefix text, and two-stage Escape (clear prefix, then close). Design and test the non-visual state machine before wiring it into `JumpStationPanel`.
 
 ## Cosmetic / UX Improvements
 
-- **Extend JumpStation with prefix input/filtering.** Add the display-only prefix panel and VBA-inspired keyboard behavior: case-insensitive prefix matching against bookmark names, repeated Backspace, selection independent from prefix text, and two-stage Escape (clear prefix, then close). Design and test the non-visual state machine before wiring it into `JumpStationPanel`.
 - **Sidebar Card Polish.** Tweak padding, reduce title font to ~9pt, adjust comment font to ~11pt, experiment with custom grayscale background colors for Dark Mode contrast.
-- **Emphasis color tuning.** Light yellow (#FFFFE0) at 0.7 opacity may need adjustment for different PDF backgrounds or dark mode.
-- **CommentInputPanel geometry persistence.** Use UserDefaults to remember panel position/size across launches (currently session-only via static var). Works across `open -n` instances too. Same mechanism family as main-window frame autosave (see UX Priorities).
+- **Emphasis color tuning.** Replace light yellow (#FFFFE0) at 0.7 opacity with dark pink.
+- **CommentInputPanel geometry persistence.** Use UserDefaults to remember panel position/size across launches (currently session-only via static var). Works across `open -n` instances too. Same mechanism family as main-window frame autosave.
+- **Consider a status bar.** Thin bar below the PDF view. Possible contents: mode indicators (persistent highlight, X-Ray), page display, PDF size, highlight count, or most recent bookmark target. Reassess alongside other backlog work; if added, the window title should become the filename permanently.
 
 ---
 
 ## Toolchain Integration
 
+### pdf:// URL handler (macOS native)
+
+- We currently have a custom `pdf://` URL scheme registered, in the `pdf-annotation` project. The `pdf://` URLs, usually located on Obsidian pages where we collect highlights and comments from PDFs, use hashes instead of full filenames. Clicking on such a link goes to an Applescript, which connects to a server running on Windows under Parallels, which then opens the PDF in the _formerly preferred_ PDF-Xchange-Viewer.
+- Because Anima is the new preferred viewer, we can now move that server to macOS, and use it directly to open PDFs, without the need for a Parallels bridge.
+
 ### macOS Integration
 
 - Proper .app bundle with icon.
 - Make target to regenerate AppIcon.appiconset from a source PNG (sips + iconutil) -- enables icon experiments without touching Xcode. Caveat: Launch Services may need a nudge before Finder shows changes.
-
-### pdf:// URL handler (macOS native)
-
-- Register custom `pdf://` URL scheme.
-- Parse `pdf://HASH?page=N` URLs.
-- Resolve hash to filename (reuse `pdf_registry.build_pdf_index`).
-- Open PDF at specified page.
-- If PDF already open in a tab, switch to that tab + navigate to page.
-- Eliminate need for Windows PDF server + Parallels bridge.
-
-### pdf-annot compatibility
-
-- Test with full extract.py pipeline (not just round_trip_test.py).
-- Verify comment extraction with actual Obsidian bibnote generation.
-- Match PDF-XChange Viewer's annotation structure as closely as possible.
-
----
-
-## Backlog: Nice to Have
-
-### Sidebar
-
-- Review remove-highlight UX (which keys, confirmation?).
-- Undo (remove) last highlight.
-- Empty-comment confirmation before clearing.
-
-### Reader chrome
-
-- **Consider a status bar.** Thin bar below the PDF view. Possible contents: mode indicators (persistent highlight, X-Ray), page display, PDF size, highlight count, or most recent bookmark target. Reassess alongside other backlog work; if added, the window title should become the filename permanently.
-
-### Navigation
-
-- Zoom via menu bar or simple widget (not pinch).
-
-### Find
-
-- Regex search.
-- "Find all" -- highlight all matches, list in sidebar.
-
-### Performance
-
-- Test with large IA PDFs (~20MB).
-- Lazy annotation loading for PDFs with many highlights.
-
-### Annotation features
-
-- Multiple highlight colors (configurable, switchable via keyboard).
-
-### Tabs
-
-- Browser-style tabs in single window.
-- Each tab: independent PDF + sidebar.
-- Cmd+Shift+] / Cmd+Shift+[ to switch tabs.
-- Tab shows filename.
-- Open new tab: Cmd+O or drag-drop.
-
-### Housekeeping
-
-- Review and clean up `MainMenu.xib` (remove unused Font/Format/Text menus).

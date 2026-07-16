@@ -7,8 +7,8 @@
 //  Current scope:
 //    - Displays named page bookmarks in a two-column NSTableView.
 //    - Mouse clicks select rows only; only Enter performs navigation.
-//    - Up/Down moves selection; Escape closes the panel.
-//    - Cmd+D confirms and deletes the selected bookmark.
+//    - `Up`/`Down` moves selection; Escape closes the panel.
+//    - `Cmd+D` confirms and deletes the selected bookmark.
 //
 //  Deliberately deferred:
 //    The future JumpStation extension will add a display-only prefix panel,
@@ -315,7 +315,7 @@ final class JumpStationPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegat
     private func handleTableKeyEvent(_ event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-        // Cmd+D deletes the selected bookmark. Backspace and Delete remain
+        // `Cmd+D` deletes the selected bookmark. Backspace and Delete remain
         // intentionally unused here; the future prefix-input behavior needs
         // Backspace for editing the typed prefix.
         if event.keyCode == 2,
