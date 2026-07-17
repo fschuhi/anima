@@ -3,6 +3,7 @@
 # Files which are commented out are not included in the `filesdump.txt`.)
 
 ### --- Context & Meta ---
+
 # ⚠️ NON-NEGOTIABLE collaboration rules - READ FIRST
 CRITICAL_RULES.md
 
@@ -24,6 +25,7 @@ TODO.md
 # docs/SIDEBAR_DESIGN.md
 
 ### --- Build & Configuration ---
+
 # Anima/Anima/Info.plist
 Makefile
 # pyproject.toml
@@ -34,6 +36,7 @@ tools/requirements.txt
 #.pre-commit-config.yaml
 
 ### --- Swift ---
+
 Anima/Anima/AnimaPDFView.swift
 Anima/Anima/AnnotationManager.swift
 Anima/Anima/AppDelegate.swift
@@ -50,6 +53,7 @@ tools/anima_helper.py
 # tools/concat_files.py
 
 ### --- Testing Swift---
+
 # Anima/AnimaTests/Fixtures/sidebar_basic.pdf
 Anima/AnimaTests/Fixtures/sidebar_basic_expected.json
 # Anima/AnimaTests/Fixtures/sidebar_page_extract.pdf
@@ -59,6 +63,7 @@ Anima/AnimaTests/AnimaTests.swift
 # Anima/AnimaTests/AnnotationGeometryTests.swift
 
 ### --- Testing Python Tools ---
+
 tests/conftest.py
 tests/test_anima_helper.py
 
@@ -67,8 +72,10 @@ tests/test_anima_helper.py
 # Anima/AnimaUITests/AnimaUITestsLaunchTests.swift
 
 ### --- Data ---
+
 # data/input_original.pdf
 
 ### --- Further Documentation ---
+
 # Experiments to determine the highlight color rendering behavior for Preview/Anima, PDF-Xchange-Viewer, Chrome, Edge.
 # docs/Anima_16_(GPT-5.6-Terra).md
