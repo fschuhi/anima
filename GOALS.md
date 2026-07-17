@@ -12,11 +12,10 @@
 
 **What's next (in order):**
 
-1. Implement the split of `AnimaTests.swift` by test concern, reducing the standard filesdump while preserving the self-documenting cross-boundary round trips.
-2. Begin Phase 2 with safe hot replacement of the active PDF.
-3. Add per-PDF last-page persistence and restoration.
-4. Reassess lower-priority opening entry points such as reader-window drag-and-drop and `Cmd+O`.
-5. Return to navigation improvements, toolchain integration, and the remaining backlog according to visible value.
+1. Begin Phase 2 with safe hot replacement of the active PDF.
+2. Add per-PDF last-page persistence and restoration.
+3. Reassess lower-priority opening entry points such as reader-window drag-and-drop and `Cmd+O`.
+4. Return to navigation improvements, toolchain integration, and the remaining backlog according to visible value.
 
 Everything else sits in `TODO.md` until it earns a place here.
 

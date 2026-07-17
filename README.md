@@ -236,7 +236,10 @@ anima/
 │   ├── SidebarExtractor.swift      ← Parses annotations into sidebar CommentCard structs
 │   ├── CommentCardView.swift       ← Custom NSView for rendering sidebar cards
 │   └── CommentInputPanel.swift     ← Modal comment editor (replaces NSAlert)
-├── Anima/AnimaTests/               ← Swift Testing unit tests (SidebarExtractor)
+├── Anima/AnimaTests/               ← Swift Testing unit tests
+│   ├── AnimaTests.swift            ← Cross-boundary integration tests
+│   ├── SidebarExtractorTests.swift ← Sidebar extraction mechanics (normally excluded from filesdump)
+│   └── AnnotationGeometryTests.swift ← Pure coordinate/geometry tests (normally excluded from filesdump)
 ├── tools/
 │   ├── anima_helper.py             ← CLI: add-highlight, edit-comment, delete-highlight
 │   ├── concat_files.py             ← Filesdump generator for LLM sessions
@@ -323,12 +326,23 @@ To inspect test output PDFs: `ANIMA_KEEP_TEST_OUTPUT=1 make test` (copies modifi
 Swift tests run via Xcode: **Cmd+U** or **Product -> Test**.
 
 Current Swift test suite:
-- `testSidebarExtraction` -- Golden JSON test against `sidebar_basic.pdf`
-- `testMultiPageExtraction` -- Multi-page extraction against `sidebar_page_extract.pdf`
-- `testPerPageExtraction` -- Per-page extraction (page 0, page 1, empty page 2)
-- `testPerPageConsistencyWithDocumentLevel` -- Reassembly matches document-level
-- `testInMemoryAnnotationRoundTrip` -- Verifies in-memory annotations produce
-  correct `CommentCard` data, guarding against dual-write field omissions
+
+- In `AnimaTests.swift` (cross-boundary / behavioral):
+  - `testFitzBridgeAddHighlightRoundTrip` -- Real Swift -> Python -> fitz subprocess boundary
+  - `testBookmarkManagerPersistenceRoundTrip` -- Swift bookmark manager -> helper -> PDF catalog round-trip
+  - `testCrossPageSelectionOnlyHighlightsFirstPage` -- Page-scoped highlight creation for cross-page selections
+
+- In `SidebarExtractorTests.swift` (extraction mechanics):
+  - `testSidebarExtraction` -- Golden JSON test against `sidebar_basic.pdf`
+  - `testMultiPageExtraction` -- Multi-page extraction against `sidebar_page_extract.pdf`
+  - `testPerPageExtraction` -- Per-page extraction (page 0, page 1, empty page 2)
+  - `testPerPageConsistencyWithDocumentLevel` -- Reassembly matches document-level
+  - `testInMemoryAnnotationRoundTrip` -- Verifies in-memory annotations produce
+    correct `CommentCard` data, guarding against dual-write field omissions
+
+- In `AnnotationGeometryTests.swift` (pure geometry):
+  - `testFitzQuadYFlip` -- Pins the PDFKit -> fitz y-flip coordinate contract
+  - `testQuadPointsConstruction` -- Pins QuadPoints corner order and count
 
 ### Opening PDFs
 

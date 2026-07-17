@@ -9,6 +9,10 @@
 
 ---
 
+## Test file organization (2026-07-16)
+
+Split `AnimaTests.swift` by test concern to reduce the standard `filesdump.txt` size while preserving self-documenting cross-boundary round trips. Created `SidebarExtractorTests.swift` for sidebar extraction mechanics (`testSidebarExtraction`, `testMultiPageExtraction`, `testPerPageExtraction`, `testPerPageConsistencyWithDocumentLevel`, `testInMemoryAnnotationRoundTrip`) and `AnnotationGeometryTests.swift` for pure geometry tests (`testFitzQuadYFlip`, `testQuadPointsConstruction`). The integration and behavioral tests remain in `AnimaTests.swift` (`testFitzBridgeAddHighlightRoundTrip`, `testBookmarkManagerPersistenceRoundTrip`, `testCrossPageSelectionOnlyHighlightsFirstPage`). Updated `manifest.lst` to exclude the two mechanics files from the standard dump. Result: ~6,000 tokens shaved from `filesdump.txt`; all Swift tests pass (`Cmd+U`) and `make filesdump` reflects the reduction.
+
 ## Foundation
 
 - Xcode project setup (.app bundle, menu bar, Cmd+Q)
