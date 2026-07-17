@@ -8,15 +8,9 @@
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Phase 1 is complete. The architecture review of the recently added navigation, search, bookmark, and PDF-opening action paths is complete. The review confirmed the existing load path as the right seam for active-document replacement, identified a small shared far-jump execution seam needed before JumpStack, and left broader search, command-controller, and multi-document abstractions parked as premature. Phase 2 has begun; active-document hot replacement is working.
+**Where we are:** Phase 1 is complete. Phase 2 (Opening PDFs) is substantially done -- safe active-document replacement and last-page restoration both landed (2026-07-17); its remaining entry points (drag-and-drop, `Cmd+O`) are deliberately parked as lower-value. The pdf:// toolchain work is Phase 3 below, which corresponds to Phases B and C of `TARGET_ARCHITECTURE.md` (the cross-project pdf:// plan). Its counterpart, Phase A, is now complete on the pdf-annotations side: the resolver CLI (`pdf_annot.resolve`) is implemented, tested, and accepted, and its contract is frozen.
 
-**What's next (in order):**
-
-1. Add per-PDF last-page persistence and restoration.
-2. Reassess lower-priority opening entry points such as reader-window drag-and-drop and `Cmd+O`.
-3. Return to navigation improvements, toolchain integration, and the remaining backlog according to visible value.
-
-Everything else sits in `TODO.md` until it earns a place here.
+**What's next:** Begin Phase 3 == `TARGET_ARCHITECTURE.md` Phase B, starting with section 8 step 4 -- claim the `pdf` URL scheme in `Info.plist` and add the `pdfAnnotationsRoot` constant alongside `projectRoot`. The pdf-annotations resolver contract is frozen: Anima consumes it as a subprocess (§6.2), and must not reach back into or modify it. Steps 5-7 (the bridge, the opening flow, alert plumbing) follow within Phase B. Everything else sits in the phases below and in `TODO.md` until it earns the pointer.
 
 ---
 
