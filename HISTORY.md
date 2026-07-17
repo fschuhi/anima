@@ -9,15 +9,6 @@
 
 ---
 
-## Active-document hot replacement (2026-07-17)
-
-Active-document hot replacement now works through `AppDelegate.loadDocument(url:)`. The same seam handles cold launch and hot open: the incoming PDF is parsed first; outgoing reader state is cleared via `MainViewController.clearOutgoingDocumentState()` and `AnimaPDFView.clearSearchAndSelection()`; bookmarks are reloaded through `BookmarkManager`; and the new document is installed with `MainViewController.loadPDF(document:)`. Parse failures preserve the current document and show an alert instead of terminating. Modal panels block replacement via `NSApp.modalWindow != nil`. Persistent highlight mode and X-Ray mode are reset during replacement so the new document starts in the default reading state.
-
-
-## Active-document hot replacement (2026-07-17)
-
-Replaced the old `application(_:open:)` `open -n` hint with real active-document replacement. `AppDelegate.loadDocument(url:)` now serves both cold-launch and hot-open paths: it parses the incoming PDF first, clears outgoing reader state via `MainViewController.clearOutgoingDocumentState()` -> `AnimaPDFView.clearSearchAndSelection()`, reloads bookmarks via `BookmarkManager`, and installs the new document through `MainViewController.loadPDF(document:)`. If parsing fails, the current document is preserved and an alert is shown instead of terminating the app. Modal panels block replacement through the `NSApp.modalWindow != nil` check. X-Ray mode and persistent highlight mode intentionally survive across replacement. Automated test coverage / a documented manual verification matrix for state clearing and failure preservation was deferred.
-
 ## Foundation
 
 - Xcode project setup (.app bundle, menu bar, Cmd+Q)
@@ -104,6 +95,8 @@ Replaced the old `application(_:open:)` `open -n` hint with real active-document
 - Accept file open via double-click in Finder (`application(_:open:)`)
 - Resolve helper/venv paths from single `projectRoot` constant
   (AppDelegate owns projectRoot; FitzBridge derives venv from helperPath)
+- Active-document hot replacement (2026-07-17): `AppDelegate.loadDocument(url:)` became the single seam for both cold launch and hot open, replacing the old `application(_:open:)` `open -n` hint. The incoming PDF is parsed first; on success, outgoing reader state is cleared via `MainViewController.clearOutgoingDocumentState()` -> `AnimaPDFView.clearSearchAndSelection()` (PDF-text search, comment search, annotation/card emphasis, text selection, and the Delete-key target), bookmarks are reloaded through `BookmarkManager`, and the document is installed with `MainViewController.loadPDF(document:)`. Parse failures preserve the current document and show an alert instead of terminating; modal panels block replacement via `NSApp.modalWindow != nil`. Persistent highlight mode and X-Ray mode are reset during replacement so the new document opens in the default reading state. Automated coverage / a documented manual verification matrix for state clearing and failure preservation was deferred.
+- Per-PDF last-page persistence and restoration (2026-07-17): Anima now remembers each PDF's reading position. `anima_helper.py` gained `get-last-page`/`set-last-page`, storing a single fitz-native 0-based page index as a PDF string under the private catalog key `/AnimaLastPage` -- the same catalog mechanism as `/AnimaBookmarks`, kept as a separate scalar with its own lifecycle. `FitzBridge.getLastPage` returns the raw helper output as `String?` and `setLastPage` returns `Bool`, matching the bridge's transport-only-read / boolean-mutation convention. `AnimaPDFView` gained `currentPageIndex()` and `restore(toPageIndex:)`; the latter clamps a stale index to the last page and reuses the existing `page(at:)` + `go(to:)` primitive, and is deliberately transparent navigation outside any future JumpStack/`Cmd+R` history. `AppDelegate` orchestrates: it persists the outgoing page before the swap in `loadDocument(url:)` and the active page on quit in `applicationWillTerminate`, restores after `loadPDF`, and owns the `String -> Int` decode plus the unset (`-1`)/failure skip. Persistence happens only on replacement and on quit, not per page change, so each switch or quit appends one incremental save; the current page is read on demand from `pdfView` rather than cached. Pinned by `test_anima_helper.py::TestLastPage` (unset -> -1, round-trip, overwrite, out-of-range rejection) and `AnimaTests.testFitzBridgeLastPageRoundTrip` (the Swift -> Python -> fitz seam).
 
 ## Testing
 

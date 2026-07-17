@@ -112,6 +112,14 @@ Bookmark pages are stored as fitz-native 0-based indices. `BookmarkManager` keep
 
 `AppDelegate` creates `BookmarkManager` alongside `AnnotationManager`; `AnimaPDFView` owns reader key dispatch and temporary bookmark dialogs; `FitzBridge` owns the Swift -> helper subprocess calls. Bookmark persistence and state are deliberately separate from annotation CRUD, sidebar extraction, search, and emphasis.
 
+### Last-Page Restoration
+
+Anima remembers each PDF's most recently displayed page. `anima_helper.py` stores a single fitz-native 0-based page index as a PDF string under the catalog's private `/AnimaLastPage` key, independent of `/AnimaBookmarks` and of the document's native outline. The index is persisted only when the active document is replaced and on application termination -- never on every page change -- so switching PDFs or quitting appends at most one incremental save.
+
+`AppDelegate` owns the sequence: it persists the outgoing document's page (read on demand from the reader, not cached) before installing a replacement, and restores the incoming document's page after the PDF and sidebar are installed. `AnimaPDFView.restore(toPageIndex:)` clamps a stale stored index -- one saved when the PDF had more pages -- to the last page rather than failing, and navigates through the same `page(at:)` + `go(to:)` primitive as goto-page and bookmark jumps. Restoring position is transparent navigation and deliberately does not participate in any future JumpStack/`Cmd+R` history.
+
+`FitzBridge` reads return the helper's raw output (`getLastPage` -> `String?`); the caller decodes. Reader-facing page numbers remain 1-based; the stored index is 0-based.
+
 ---
 
 ## Current Status
@@ -133,6 +141,7 @@ Bookmark pages are stored as fitz-native 0-based indices. `BookmarkManager` keep
 | **Sidebar**              | ✅ Complete | Live cards, bidirectional emphasis, scroll sync                  |
 | **Bookmark Navigation**  | ✅ Complete | `Cmd+J` JumpStation: select, Enter-to-jump, `Cmd+D` deletion     |
 | **Reading ergonomics**   | ✅ Complete | Phase 1 baseline complete; later refinements return to `TODO.md` |
+| **Last-Page Restore**    | ✅ Complete | Per-PDF reading position in `/AnimaLastPage`, restored on open |
 
 ---
 
