@@ -26,7 +26,7 @@
 //    so the sidebar can rebuild the affected page's cards.
 //
 //  Sidebar integration:
-//    After any annotation mutation (create, edit comment, delete), the
+//    After any annotation mutation (create, edit, delete), the
 //    sidebarDelegate is notified so the sidebar can rebuild the affected
 //    page's cards. The delegate receives only the page index — the sidebar
 //    re-extracts all cards for that page from scratch.
@@ -811,6 +811,15 @@ class AnimaPDFView: PDFView {
         activeFindQuery = nil
         findResults.removeAll()
         activeFindResultIndex = nil
+    }
+
+    /// Clears all transient reader state tied to the current document.
+    /// Called by MainViewController before replacing the active PDF.
+    func clearSearchAndSelection() {
+        clearFindHit()
+        sidebarDelegate?.clearCommentSearch()
+        sidebarDelegate?.clearAnnotationEmphasis()
+        clearSelection()
     }
 
     /// Returns the first page index occupied by a PDFKit search result.

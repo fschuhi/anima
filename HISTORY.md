@@ -9,9 +9,14 @@
 
 ---
 
-## Test file organization (2026-07-16)
+## Active-document hot replacement (2026-07-17)
 
-Split `AnimaTests.swift` by test concern to reduce the standard `filesdump.txt` size while preserving self-documenting cross-boundary round trips. Created `SidebarExtractorTests.swift` for sidebar extraction mechanics (`testSidebarExtraction`, `testMultiPageExtraction`, `testPerPageExtraction`, `testPerPageConsistencyWithDocumentLevel`, `testInMemoryAnnotationRoundTrip`) and `AnnotationGeometryTests.swift` for pure geometry tests (`testFitzQuadYFlip`, `testQuadPointsConstruction`). The integration and behavioral tests remain in `AnimaTests.swift` (`testFitzBridgeAddHighlightRoundTrip`, `testBookmarkManagerPersistenceRoundTrip`, `testCrossPageSelectionOnlyHighlightsFirstPage`). Updated `manifest.lst` to exclude the two mechanics files from the standard dump. Result: ~6,000 tokens shaved from `filesdump.txt`; all Swift tests pass (`Cmd+U`) and `make filesdump` reflects the reduction.
+Active-document hot replacement now works through `AppDelegate.loadDocument(url:)`. The same seam handles cold launch and hot open: the incoming PDF is parsed first; outgoing reader state is cleared via `MainViewController.clearOutgoingDocumentState()` and `AnimaPDFView.clearSearchAndSelection()`; bookmarks are reloaded through `BookmarkManager`; and the new document is installed with `MainViewController.loadPDF(document:)`. Parse failures preserve the current document and show an alert instead of terminating. Modal panels block replacement via `NSApp.modalWindow != nil`. Persistent highlight mode and X-Ray mode are reset during replacement so the new document starts in the default reading state.
+
+
+## Active-document hot replacement (2026-07-17)
+
+Replaced the old `application(_:open:)` `open -n` hint with real active-document replacement. `AppDelegate.loadDocument(url:)` now serves both cold-launch and hot-open paths: it parses the incoming PDF first, clears outgoing reader state via `MainViewController.clearOutgoingDocumentState()` -> `AnimaPDFView.clearSearchAndSelection()`, reloads bookmarks via `BookmarkManager`, and installs the new document through `MainViewController.loadPDF(document:)`. If parsing fails, the current document is preserved and an alert is shown instead of terminating the app. Modal panels block replacement through the `NSApp.modalWindow != nil` check. X-Ray mode and persistent highlight mode intentionally survive across replacement. Automated test coverage / a documented manual verification matrix for state clearing and failure preservation was deferred.
 
 ## Foundation
 

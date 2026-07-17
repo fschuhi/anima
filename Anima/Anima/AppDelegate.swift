@@ -13,6 +13,12 @@
 //    3. Dev fallback: projectRoot/data/input.pdf
 //    4. Error message + exit if neither resolves
 //
+//  Hot replacement:
+//    When Anima is already running, a second open request (Finder, Dock drop,
+//    "Open With") replaces the displayed PDF via loadDocument(url:). The
+//    outgoing document's transient reader state is cleared first; if parsing
+//    fails, the current document is preserved and an alert is shown.
+//
 //  AppKit timing note:
 //    When macOS launches Anima because the user double-clicked a PDF in Finder,
 //    the call sequence is:
@@ -20,8 +26,8 @@
 //      2. applicationDidFinishLaunching(_:)  ← window gets set up
 //    So open stashes the URL in pendingFileURL, and
 //    applicationDidFinishLaunching picks it up. If Anima is already running
-//    when a second file arrives, open fires with the window fully ready —
-//    but since we're single-window, we log a hint about `open -n` instead.
+//    when a second file arrives, open fires with the window fully ready and
+//    loadDocument(url:) performs the replacement.
 //
 //  Path resolution:
 //    A single projectRoot constant is the source of truth for all derived
@@ -114,15 +120,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     ///
     /// Timing: during a cold launch this fires BEFORE applicationDidFinishLaunching.
     /// In that case we stash the URL and let applicationDidFinishLaunching pick it up.
+    /// During a hot open we replace the active document through loadDocument(url:).
     func application(_ application: NSApplication, open urls: [URL]) {
         Swift.print("📂 application(_:open:) called with: \(urls)")
 
         guard let url = urls.first else { return }
 
         if didFinishLaunching {
-            // Hot open: Anima is already running with a document.
-            // Single-window model — we don't replace the current document.
-            Swift.print("ℹ️ Anima is already showing a document. Use `open -n -a Anima` for a second instance.")
+            // Hot open: replace the active document. Multiple URLs arriving
+            // together are reduced to the first one.
+            loadDocument(url: url)
         } else {
             // Cold launch: stash the URL for applicationDidFinishLaunching.
             pendingFileURL = url
@@ -131,20 +138,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - PDF Loading
 
-    /// Loads a PDF document into the main view.
+    /// Loads a PDF document into the main view, replacing any existing document.
+    ///
+    /// This is the single seam for both cold-launch and hot-open requests.
+    /// It clears outgoing reader state, reloads bookmarks for the incoming file,
+    /// and preserves the current document if parsing or installation fails.
     private func loadDocument(url: URL) {
-        guard let document = PDFDocument(url: url) else {
-            Swift.print("❌ Failed to parse PDF: \(url.path)")
-            NSApplication.shared.terminate(nil)
+        // Guard: don't replace while an AppKit modal window is active. That covers
+        // NSAlert, CommentInputPanel, JumpStationPanel, and any future modal panel.
+        if NSApp.modalWindow != nil {
+            Swift.print("⚠️ Hot open declined while a modal dialog is active")
             return
         }
 
-        if !bookmarkManager.loadBookmarks(filePath: url.path) {
-            Swift.print("⚠️ Could not load bookmarks; continuing with an empty bookmark list")
+        let filePath = url.path
+
+        // Parse first, before touching any outgoing state. If the file is not
+        // a valid PDF, we want to preserve the current document exactly as it is.
+        guard let document = PDFDocument(url: url) else {
+            Swift.print("❌ Failed to parse PDF: \(filePath)")
+            showLoadFailureAlert(for: filePath)
+            return
         }
 
+        // From this point on we are committed to replacing the active document.
+        // Clear all transient reader state tied to the outgoing document.
+        mainViewController.clearOutgoingDocumentState()
+
+        // Load bookmarks for the incoming file. A bookmark-read failure is
+        // nonfatal and leaves the incoming document with an empty bookmark list.
+        if !bookmarkManager.loadBookmarks(filePath: filePath) {
+            Swift.print("⚠️ Could not load bookmarks for \(filePath); continuing with empty list")
+        }
+
+        // Install the new document.
         mainViewController.loadPDF(document: document)
-        Swift.print("✅ Loaded PDF: \(url.path)")
+        Swift.print("✅ Loaded PDF: \(filePath)")
+    }
+
+    /// Presents a sheet explaining that the requested PDF could not be read.
+    /// If the main window is not yet available, falls back to a modal alert.
+    private func showLoadFailureAlert(for filePath: String) {
+        let fileName = URL(fileURLWithPath: filePath).lastPathComponent
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Could not open PDF"
+        alert.informativeText = "Anima could not read \"\(fileName)\". The file may be damaged or not a valid PDF."
+        alert.addButton(withTitle: "OK")
+
+        if let window = window {
+            alert.beginSheetModal(for: window) { _ in }
+        } else {
+            alert.runModal()
+        }
     }
 
     // MARK: - PDF URL Resolution

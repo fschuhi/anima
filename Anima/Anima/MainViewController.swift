@@ -302,6 +302,15 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
         pdfView.updateWindowTitle()
     }
 
+    /// Clears document-specific transient state before loading a replacement PDF.
+    /// This includes PDF-text search hits, comment-search card borders, annotation
+    /// emphasis, text selection, and the Delete-key target.
+    func clearOutgoingDocumentState() {
+        pdfView.clearSearchAndSelection()
+        pdfView.isHighlightMode = false
+        pdfView.isXRayMode = false
+    }
+
     @objc private func pdfViewPageDidChange(_ notification: Notification) {
         pdfView.updateWindowTitle()
     }

@@ -357,6 +357,8 @@ Anima accepts PDFs through three entry points, checked in this order:
 
 3. **Dev fallback** -- If neither of the above provides a file, Anima opens `projectRoot/data/input.pdf` automatically. If that doesn't exist either, Anima prints an error and exits.
 
+**Hot replacement:** If Anima is already running, opening a different PDF via Finder, "Open With", or dropping a file onto the Dock icon replaces the displayed PDF. The outgoing document's search hits, comment-search state, annotation/card emphasis, text selection, and Delete-key target are cleared; bookmarks are reloaded for the new file. If the new file cannot be parsed, the current document stays open and an alert is shown.
+
 **Multiple instances:** Anima is single-window by design. To open several PDFs simultaneously, launch separate processes with `open -n`:
 
 ```bash
