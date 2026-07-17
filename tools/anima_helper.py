@@ -45,6 +45,12 @@ Examples:
     # Delete a bookmark by case-insensitive name:
     python3 anima_helper.py delete-bookmark \
         --file paper.pdf --name "Endnotes Start"
+
+    # Read Anima's stored last-displayed page (0-based; -1 when unset):
+    python3 anima_helper.py get-last-page --file paper.pdf
+
+    # Store the last-displayed page. Page is fitz-native and 0-based:
+    python3 anima_helper.py set-last-page --file paper.pdf --page 5
 """
 
 import argparse
@@ -70,6 +76,12 @@ POPUP_HEIGHT = 100
 # does not use the document's native /Outlines tree, which belongs to the PDF's
 # own table of contents when one exists.
 BOOKMARKS_CATALOG_KEY = "AnimaBookmarks"
+
+# Private PDF catalog key for Anima's last-displayed page. Like the bookmark
+# key above, this lives in the catalog (which always exists) rather than the
+# optional /Info dictionary. It stores a single fitz-native 0-based page index
+# as a PDF string.
+LAST_PAGE_CATALOG_KEY = "AnimaLastPage"
 
 
 # ===============================================================
@@ -164,12 +176,48 @@ def _write_bookmarks(doc: fitz.Document, bookmarks: list[dict[str, object]]) -> 
     )
 
 
-def _validate_bookmark_page(doc: fitz.Document, page: int) -> None:
+def _validate_page_in_range(doc: fitz.Document, page: int) -> None:
     """Reject pages outside fitz's native 0-based page-index range."""
     if page < 0 or page >= doc.page_count:
         raise ValueError(
             f"page {page} out of range (document has {doc.page_count} pages, indexed from 0)"
         )
+
+
+def _read_last_page(doc: fitz.Document) -> int:
+    """
+    Read Anima's stored last-displayed page from the PDF catalog.
+
+    Returns the fitz-native 0-based page index, or -1 when the private key is
+    absent (i.e. this PDF has no stored reading position yet). The value is
+    stored as a PDF string holding a decimal integer, mirroring how the
+    bookmark array is persisted.
+    """
+    value_type, value = doc.xref_get_key(doc.pdf_catalog(), LAST_PAGE_CATALOG_KEY)
+
+    if value_type == "null":
+        return -1
+
+    if value_type != "string":
+        raise ValueError(
+            f"invalid /{LAST_PAGE_CATALOG_KEY} value: expected PDF string, got {value_type}"
+        )
+
+    try:
+        return int(value)
+    except ValueError:
+        raise ValueError(
+            f"invalid /{LAST_PAGE_CATALOG_KEY} value: expected integer string, got {value!r}"
+        )
+
+
+def _write_last_page(doc: fitz.Document, page: int) -> None:
+    """Write the last-displayed page to Anima's private PDF catalog key."""
+    doc.xref_set_key(
+        doc.pdf_catalog(),
+        LAST_PAGE_CATALOG_KEY,
+        fitz.get_pdf_str(str(page)),
+    )
 
 
 # ===============================================================
@@ -351,7 +399,7 @@ def cmd_set_bookmark(args):
     doc = fitz.open(pdf_path)
 
     try:
-        _validate_bookmark_page(doc, args.page)
+        _validate_page_in_range(doc, args.page)
         bookmarks = _read_bookmarks(doc)
     except (json.JSONDecodeError, ValueError) as error:
         doc.close()
@@ -403,6 +451,59 @@ def cmd_delete_bookmark(args):
     doc.close()
 
     print(args.name)
+    return 0
+
+
+def cmd_get_last_page(args):
+    """Print Anima's stored last-displayed page (0-based), or -1 when unset."""
+    pdf_path = Path(args.file)
+    if not pdf_path.exists():
+        print(f"Error: file not found: {pdf_path}", file=sys.stderr)
+        return 1
+
+    doc = fitz.open(pdf_path)
+
+    try:
+        last_page = _read_last_page(doc)
+    except ValueError as error:
+        doc.close()
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+
+    doc.close()
+
+    print(last_page)
+    return 0
+
+
+def cmd_set_last_page(args):
+    """
+    Store the last-displayed page (fitz-native 0-based) in the PDF catalog.
+
+    The page is validated against the 0-based range and the single scalar is
+    overwritten on every call, so the newest write wins. Staleness (a stored
+    index that later exceeds a shortened document) is a restore-time concern
+    handled by the reader, not here.
+    """
+    pdf_path = Path(args.file)
+    if not pdf_path.exists():
+        print(f"Error: file not found: {pdf_path}", file=sys.stderr)
+        return 1
+
+    doc = fitz.open(pdf_path)
+
+    try:
+        _validate_page_in_range(doc, args.page)
+    except ValueError as error:
+        doc.close()
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
+
+    _write_last_page(doc, args.page)
+    doc.save(str(pdf_path), incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
+    doc.close()
+
+    print(args.page)
     return 0
 
 
@@ -481,6 +582,26 @@ def main():
     p_delete_bookmark.add_argument("--file", required=True, help="Path to the PDF file")
     p_delete_bookmark.add_argument("--name", required=True, help="Bookmark name")
 
+    # --- get-last-page ---
+    p_get_last_page = subparsers.add_parser(
+        "get-last-page",
+        help="Print Anima's stored last-displayed page (0-based), or -1 when unset",
+    )
+    p_get_last_page.add_argument("--file", required=True, help="Path to the PDF file")
+
+    # --- set-last-page ---
+    p_set_last_page = subparsers.add_parser(
+        "set-last-page",
+        help="Store the last-displayed page (0-based) in the PDF catalog",
+    )
+    p_set_last_page.add_argument("--file", required=True, help="Path to the PDF file")
+    p_set_last_page.add_argument(
+        "--page",
+        type=int,
+        required=True,
+        help="Page number (0-indexed)",
+    )
+
     args = parser.parse_args()
 
     if args.command == "add-highlight":
@@ -495,6 +616,10 @@ def main():
         sys.exit(cmd_set_bookmark(args))
     elif args.command == "delete-bookmark":
         sys.exit(cmd_delete_bookmark(args))
+    elif args.command == "get-last-page":
+        sys.exit(cmd_get_last_page(args))
+    elif args.command == "set-last-page":
+        sys.exit(cmd_set_last_page(args))
 
 
 if __name__ == "__main__":

@@ -77,6 +77,17 @@ def list_bookmarks(run_helper, pdf_path):
     return json.loads(result.stdout)
 
 
+def get_last_page(run_helper, pdf_path) -> int:
+    """Call get-last-page and return its integer stdout."""
+    result = run_helper(
+        "get-last-page",
+        "--file",
+        str(pdf_path),
+    )
+    assert result.returncode == 0, f"Helper failed: {result.stderr}"
+    return int(result.stdout)
+
+
 # ---------------------------------------------------------------------------
 #  Round-trip tests
 # ---------------------------------------------------------------------------
@@ -539,6 +550,71 @@ class TestBookmarks:
 
         assert catalog_value_type == "string"
         assert json.loads(catalog_value) == [{"name": "Endnotes Start", "page": 1}]
+
+
+# ---------------------------------------------------------------------------
+#  Last-page persistence
+# ---------------------------------------------------------------------------
+
+
+class TestLastPage:
+    """Tests for catalog-backed last-displayed-page persistence and CLI behavior."""
+
+    def test_get_missing_last_page_returns_negative_one(self, test_pdf, run_helper):
+        """A PDF without Anima's private catalog key reports -1 (unset)."""
+        assert get_last_page(run_helper, test_pdf) == -1
+
+    def test_set_last_page_roundtrip(self, test_pdf, run_helper):
+        """Storing a page makes get-last-page return that same 0-based index."""
+        result = run_helper(
+            "set-last-page",
+            "--file",
+            str(test_pdf),
+            "--page",
+            "1",
+        )
+        assert result.returncode == 0, f"Helper failed: {result.stderr}"
+
+        assert get_last_page(run_helper, test_pdf) == 1
+
+    def test_set_last_page_overwrites_previous_value(self, test_pdf, run_helper):
+        """The stored position is a single scalar: the newest write wins."""
+        first_result = run_helper(
+            "set-last-page",
+            "--file",
+            str(test_pdf),
+            "--page",
+            "1",
+        )
+        assert first_result.returncode == 0, f"Helper failed: {first_result.stderr}"
+
+        second_result = run_helper(
+            "set-last-page",
+            "--file",
+            str(test_pdf),
+            "--page",
+            "0",
+        )
+        assert second_result.returncode == 0, f"Helper failed: {second_result.stderr}"
+
+        assert get_last_page(run_helper, test_pdf) == 0
+
+    def test_set_last_page_rejects_page_outside_zero_based_range(self, test_pdf, run_helper):
+        """Last-page persistence uses fitz-native 0-based page indices."""
+        doc = fitz.open(test_pdf)
+        page_count = doc.page_count
+        doc.close()
+
+        result = run_helper(
+            "set-last-page",
+            "--file",
+            str(test_pdf),
+            "--page",
+            str(page_count),
+        )
+
+        assert result.returncode != 0
+        assert "out of range" in result.stderr.lower()
 
 
 # ---------------------------------------------------------------------------
