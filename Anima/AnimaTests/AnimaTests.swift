@@ -263,6 +263,91 @@ final class AnimaTests: XCTestCase {
         )
     }
 
+    // MARK: - FitzBridge Integration: last-page round-trip
+
+    /// Verifies the Swift -> Python -> fitz seam for last-page persistence:
+    /// FitzBridge.setLastPage writes a 0-based index into the PDF's private
+    /// /AnimaLastPage catalog key, and FitzBridge.getLastPage reads the raw
+    /// value back. This pins the contract AppDelegate.restoreLastPage depends
+    /// on: an unset document reports "-1", a stored index round-trips, and a
+    /// second write overwrites the single scalar.
+    ///
+    /// Clamping a stale index into range is pure view logic in
+    /// AnimaPDFView.restore(toPageIndex:) and is intentionally out of scope
+    /// here -- this test covers only the persistence seam.
+    func testFitzBridgeLastPageRoundTrip() throws {
+        // --- Step 1: locate the real helper and a disposable PDF fixture ---
+        let helperPath = Self.helperPath
+        guard FileManager.default.fileExists(atPath: helperPath) else {
+            XCTFail("anima_helper.py not found at expected path: \(helperPath). " +
+                    "Run `make setup` if .venv is missing.")
+            return
+        }
+
+        let bundle = Bundle(for: type(of: self))
+        guard let fixtureURL = bundle.url(
+            forResource: "sidebar_page_extract",
+            withExtension: "pdf"
+        ) else {
+            XCTFail("Missing sidebar_page_extract.pdf fixture in test bundle.")
+            return
+        }
+
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: tempDir,
+            withIntermediateDirectories: true
+        )
+
+        let workingPDF = tempDir.appendingPathComponent("sidebar_page_extract.pdf")
+        try FileManager.default.copyItem(at: fixtureURL, to: workingPDF)
+
+        defer {
+            try? FileManager.default.removeItem(at: tempDir)
+        }
+
+        // --- Step 2: an untouched fixture reports -1 (no stored position) ---
+        let unsetValue = FitzBridge.getLastPage(
+            helperPath: helperPath,
+            filePath: workingPDF.path
+        )
+        XCTAssertEqual(
+            unsetValue, "-1",
+            "A fixture with no /AnimaLastPage key must report -1 through the bridge"
+        )
+
+        // --- Step 3: store a page and read the same index back ---
+        XCTAssertTrue(
+            FitzBridge.setLastPage(
+                helperPath: helperPath,
+                filePath: workingPDF.path,
+                page: 1
+            ),
+            "setLastPage should persist a valid 0-based index and return true"
+        )
+        XCTAssertEqual(
+            FitzBridge.getLastPage(helperPath: helperPath, filePath: workingPDF.path),
+            "1",
+            "The stored page index must round-trip through the PDF catalog"
+        )
+
+        // --- Step 4: a second write overwrites the single scalar ---
+        XCTAssertTrue(
+            FitzBridge.setLastPage(
+                helperPath: helperPath,
+                filePath: workingPDF.path,
+                page: 2
+            ),
+            "Overwriting the last page should persist and return true"
+        )
+        XCTAssertEqual(
+            FitzBridge.getLastPage(helperPath: helperPath, filePath: workingPDF.path),
+            "2",
+            "The newest write must win -- last page is a single stored value"
+        )
+    }
+
     // MARK: - Cross-Page Selection: page-scoped highlight creation
 
     /// Pins the page-scoped behavior of AnimaPDFView.createHighlightFromSelection()
