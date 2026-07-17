@@ -55,6 +55,8 @@ Anima/AnimaTests/Fixtures/sidebar_basic_expected.json
 # Anima/AnimaTests/Fixtures/sidebar_page_extract.pdf
 Anima/AnimaTests/Fixtures/sidebar_page_extract_expected.json
 Anima/AnimaTests/AnimaTests.swift
+# Anima/AnimaTests/SidebarExtractorTests.swift
+# Anima/AnimaTests/AnnotationGeometryTests.swift
 
 ### --- Testing Python Tools ---
 tests/conftest.py
