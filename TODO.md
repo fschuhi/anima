@@ -11,12 +11,6 @@
 
 ---
 
-## UX Priorities (Session 2026-07-11 -- order is initial ranking, final prios pending review)
-
-~~**Bookmark navigation and deletion.** Persistence and `Cmd+B` creation are complete: bookmarks live in the PDF catalog's private `/AnimaBookmarks` key, use 0-based storage with 1-based reader display, and support case-insensitive re-pointing. `Cmd+J` now opens the two-column JumpStation picker; mouse actions select only, Up/Down moves selection, Enter jumps through `PDFView.go(to:)`, Esc closes, and `Cmd+D` confirms then deletes the selected bookmark. The picker refreshes from `BookmarkManager` after deletion and closes if the final bookmark was removed.~~ Completed 2026-07-15; the later prefix-input/filtering enhancement remains active under Cosmetic / UX Improvements.
-
----
-
 ## Refactoring
 
 - **Reduce size of `filesdump.txt`.** Prefer selective `manifest.lst` curation and test-file organization over splitting production code or deleting useful source comments solely to reduce prompt size. First candidate: split `AnimaTests.swift` so the self-documenting cross-boundary round trips remain in the standard filesdump while sidebar extraction mechanics and annotation geometry tests remain in the project but are normally excluded. Measure the result with `make filesdump`; do not make production ownership follow filesdump boundaries.
