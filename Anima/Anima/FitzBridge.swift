@@ -4,6 +4,11 @@
 // All persistent PDF mutations and catalog reads go through this bridge to
 // fitz, keeping PDFKit as a read-only renderer.
 //
+// Return convention:
+//   Reads return the helper's raw stdout as String? (nil on failure); the
+//   caller decodes. Mutations return Bool (true on success). Keep this uniform
+//   so every future read or mutation has exactly one exemplar to follow.
+//
 // Path resolution:
 //   The Python executable is derived from the helperPath passed in each call.
 //   helperPath points to tools/anima_helper.py; the project root is two levels
@@ -128,6 +133,41 @@ struct FitzBridge {
             "delete-bookmark",
             "--file", filePath,
             "--name", name
+        ]
+        return runPython(arguments: arguments) != nil
+    }
+
+    /// Read the raw last-displayed page string stored in the PDF catalog.
+    ///
+    /// The helper prints a fitz-native 0-based page index, or -1 when no
+    /// reading position has been stored yet. Like listBookmarks, this bridge
+    /// returns the helper's raw output rather than decoding it, so the caller
+    /// owns the integer conversion and the unset (-1) / stale-index semantics.
+    static func getLastPage(
+        helperPath: String,
+        filePath: String
+    ) -> String? {
+        let arguments = [
+            helperPath,
+            "get-last-page",
+            "--file", filePath
+        ]
+        return runPython(arguments: arguments)
+    }
+
+    /// Persist the last-displayed page in the PDF catalog. The page is
+    /// fitz-native and 0-based; the helper validates it against the document's
+    /// page range and overwrites any previously stored value.
+    static func setLastPage(
+        helperPath: String,
+        filePath: String,
+        page: Int
+    ) -> Bool {
+        let arguments = [
+            helperPath,
+            "set-last-page",
+            "--file", filePath,
+            "--page", String(page)
         ]
         return runPython(arguments: arguments) != nil
     }

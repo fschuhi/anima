@@ -47,6 +47,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // FitzBridge derives the venv Python path from the helperPath.
     private let projectRoot = "/Users/fschuhi/Projects/anima"
 
+    /// Absolute path to the Python helper, derived from projectRoot. Needed by
+    /// the persistence managers at launch and by last-page persistence during
+    /// document replacement and termination.
+    private var helperPath: String { "\(projectRoot)/tools/anima_helper.py" }
+
     // Stable UserDefaults key used by AppKit to persist the main window's
     // frame between launches.
     private let mainWindowFrameAutosaveName = "AnimaMainWindow"
@@ -77,7 +82,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // --- Wire up the persistence managers ---
-        let helperPath = "\(projectRoot)/tools/anima_helper.py"
         mainViewController.pdfView.annotationManager = AnnotationManager(helperPath: helperPath)
 
         bookmarkManager = BookmarkManager(helperPath: helperPath)
@@ -161,6 +165,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // Capture the outgoing document's reading position before the swap, so
+        // reopening that file later restores the page. Non-fatal if it fails.
+        persistOutgoingLastPage()
+
         // From this point on we are committed to replacing the active document.
         // Clear all transient reader state tied to the outgoing document.
         mainViewController.clearOutgoingDocumentState()
@@ -173,7 +181,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Install the new document.
         mainViewController.loadPDF(document: document)
+
+        // Restore the reading position now that the document and sidebar are
+        // installed. Skips silently when nothing is stored.
+        restoreLastPage(filePath: filePath)
+
         Swift.print("✅ Loaded PDF: \(filePath)")
+    }
+
+    /// Persists the currently displayed PDF's reading position to its private
+    /// catalog metadata, so reopening that file later restores the page. Reads
+    /// the page index on demand from the active pdfView (no cached observer).
+    ///
+    /// Non-fatal by contract: a missing document, missing URL, unreadable page,
+    /// or helper failure is logged and skipped -- last-page persistence must
+    /// never block a document switch or application termination.
+    private func persistOutgoingLastPage() {
+        guard let filePath = mainViewController.pdfView.document?.documentURL?.path,
+              let pageIndex = mainViewController.pdfView.currentPageIndex() else {
+            return
+        }
+
+        if !FitzBridge.setLastPage(helperPath: helperPath, filePath: filePath, page: pageIndex) {
+            Swift.print("⚠️ Could not persist last page for \(filePath); continuing")
+        }
+    }
+
+    /// Restores the reading position stored in the freshly loaded PDF, after
+    /// the document and sidebar are installed. Interprets the helper's raw
+    /// output: nil (read/parse failure) or -1 (no stored position) both skip;
+    /// a valid 0-based index is handed to the view, which clamps it into range.
+    private func restoreLastPage(filePath: String) {
+        guard let output = FitzBridge.getLastPage(helperPath: helperPath, filePath: filePath) else {
+            Swift.print("⚠️ Could not read stored last page for \(filePath); staying on the default page")
+            return
+        }
+
+        guard let storedIndex = Int(output), storedIndex >= 0 else {
+            return  // -1 (unset) or unparseable: nothing to restore
+        }
+
+        mainViewController.pdfView.restore(toPageIndex: storedIndex)
     }
 
     /// Presents a sheet explaining that the requested PDF could not be read.
@@ -245,6 +293,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Lifecycle
 
     func applicationWillTerminate(_ aNotification: Notification) {
+        // Persist the active document's reading position on quit.
+        persistOutgoingLastPage()
+
         if let monitor = eventMonitor {
             NSEvent.removeMonitor(monitor)
         }

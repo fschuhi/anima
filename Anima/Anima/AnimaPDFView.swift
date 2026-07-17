@@ -434,6 +434,39 @@ class AnimaPDFView: PDFView {
 
     // MARK: - Navigation
 
+    /// Returns the current page's fitz-native 0-based index, or nil when no
+    /// document or current page is available. Used to capture the reading
+    /// position for last-page persistence; the flip to a 1-based reader
+    /// number happens only in the caption (updateWindowTitle).
+    func currentPageIndex() -> Int? {
+        guard let document = document, let currentPage = currentPage else {
+            return nil
+        }
+        return document.index(for: currentPage)
+    }
+
+    /// Restores the reader to a stored 0-based page index, clamping into the
+    /// document's valid range so a stale position -- saved when the PDF had
+    /// more pages -- lands on the last page rather than failing. Uses the same
+    /// page(at:) + go(to:) primitive as goto-page and bookmark jumps.
+    ///
+    /// Restoring reading position is transparent navigation: it deliberately
+    /// does not participate in any far-jump history a future Cmd+R would pop.
+    func restore(toPageIndex index: Int) {
+        guard let document = document, document.pageCount > 0 else {
+            return
+        }
+
+        let clampedIndex = min(max(index, 0), document.pageCount - 1)
+
+        guard let page = document.page(at: clampedIndex) else {
+            return
+        }
+
+        go(to: page)
+        Swift.print("📖 Restored reading position to page \(clampedIndex + 1) of \(document.pageCount)")
+    }
+
     /// Shows the smallest useful native page-navigation interaction.
     /// The user enters a 1-based page number. Invalid input fails fast:
     /// the input alert closes, an error reports the valid range, and the
