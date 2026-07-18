@@ -19,11 +19,19 @@
 //    outgoing document's transient reader state is cleared first; if parsing
 //    fails, the current document is preserved and an alert is shown.
 //
+//  pdf:// opening:
+//    Custom-scheme URLs follow a linear pipeline: modal guard -> parse ->
+//    resolve -> same-document check -> open or jump. The resolver turns the
+//    URL host into a local PDF path; AppDelegate owns all reader presentation
+//    decisions after that boundary. During a cold launch, application(_:open:)
+//    arrives before applicationDidFinishLaunching(_:), so the custom URL is
+//    stored and handled only after the reader and persistence managers exist.
+//
 //  AppKit timing note:
 //    When macOS launches Anima because the user double-clicked a PDF in Finder,
 //    the call sequence is:
-//      1. application(_:open:)               ← file URL arrives
-//      2. applicationDidFinishLaunching(_:)  ← window gets set up
+//      1. application(_:open:)               <- file URL arrives
+//      2. applicationDidFinishLaunching(_:)  <- window gets set up
 //    So open stashes the URL in pendingFileURL, and
 //    applicationDidFinishLaunching picks it up. If Anima is already running
 //    when a second file arrives, open fires with the window fully ready and
@@ -37,7 +45,7 @@
 //    A second, independent constant (pdfAnnotationsRoot) locates the
 //    neighbouring pdf-annotations project. It is deliberately not derived
 //    from projectRoot: the two projects are joined by a frozen CLI contract,
-//    not by a shared filesystem layout.
+//    not a shared filesystem layout.
 //
 
 import Cocoa
@@ -76,9 +84,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var eventMonitor: Any?
     var bookmarkManager: BookmarkManager!
 
-    /// Set by application(_:open:) during cold launch, before the
+    /// Set by application(_:open:) during a cold file launch, before the
     /// window exists. Consumed by applicationDidFinishLaunching.
     private var pendingFileURL: URL?
+
+    /// Set by application(_:open:) during a cold custom-scheme launch, before
+    /// the reader and its persistence managers exist. It is deliberately kept
+    /// separate from pendingFileURL because a pdf:// URL is not a readable PDF
+    /// file and must first cross the resolver boundary.
+    private var pendingSchemeURL: URL?
 
     /// Tracks whether applicationDidFinishLaunching has completed.
     /// Used by application(_:open:) to distinguish cold launch from hot open.
@@ -101,14 +115,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         bookmarkManager = BookmarkManager(helperPath: helperPath)
         mainViewController.pdfView.bookmarkManager = bookmarkManager
 
-        // --- Determine which PDF to open ---
-        guard let url = resolvePDFURL() else {
-            Swift.print("❌ No PDF to open. Pass a .pdf path as argument, double-click a PDF, or place input.pdf in data/.")
-            NSApplication.shared.terminate(nil)
-            return  // never reached, but satisfies the compiler
-        }
+        // A cold pdf:// launch must not fall through to command-line or dev
+        // fallback opening. Its handler is responsible for either resolving
+        // and loading the requested document or showing an alert with no
+        // document change.
+        if let schemeURL = pendingSchemeURL {
+            pendingSchemeURL = nil
+            handleSchemeURL(schemeURL)
+        } else {
+            // --- Determine which PDF to open ---
+            guard let url = resolvePDFURL() else {
+                Swift.print("❌ No PDF to open. Pass a .pdf path as argument, double-click a PDF, or place input.pdf in data/.")
+                NSApplication.shared.terminate(nil)
+                return  // never reached, but satisfies the compiler
+            }
 
-        loadDocument(url: url)
+            loadDocument(url: url)
+        }
 
         // MainMenu.xib keeps this window hidden at launch. Present it only
         // after its restored frame, reader content, and document caption are ready.
@@ -144,14 +167,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard let url = urls.first else { return }
 
-        // Two kinds of URL reach this method now. File URLs are PDFs from
-        // Finder, "Open With", or a Dock drop, and keep the existing behavior.
+        // Two kinds of URL reach this method. File URLs are PDFs from Finder,
+        // "Open With", or a Dock drop, and keep the existing behavior.
         // Custom-scheme URLs (pdf://HASH?page=N) arrive from Launch Services
-        // after an Obsidian link click; they are never handed to
-        // loadDocument(url:), which expects a readable file on disk and would
-        // otherwise report the link as a damaged PDF.
+        // after an Obsidian link click and must resolve before they can enter
+        // the document-loading path.
         guard url.isFileURL else {
-            showSchemeProbeAlert(for: url)
+            if didFinishLaunching {
+                handleSchemeURL(url)
+            } else {
+                pendingSchemeURL = url
+            }
             return
         }
 
@@ -165,82 +191,177 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Custom URL Scheme (temporary probe -- Phase B step 5)
+    // MARK: - Custom URL Scheme
 
-    /// Resolves a non-file URL through the pdf-annotations resolver and reports
-    /// the outcome, without opening anything yet.
+    /// Processes the complete Phase B pdf:// opening pipeline:
+    /// modal guard -> parse -> resolve -> same-document check -> open or jump.
     ///
-    /// Step 4 used this to prove that Launch Services routes pdf:// links to
-    /// Anima rather than to the legacy PDFHandler.app applet. Step 5 extends it
-    /// to prove the second half of the path: that PdfAnnotationsBridge can run
-    /// the resolver in the neighbouring project's venv when Anima is launched
-    /// by Launch Services (not by Xcode), and that success and failure both
-    /// come back as intended.
-    ///
-    /// It is an alert rather than Swift.print because a link click launches or
-    /// activates Anima through Launch Services, where stdout is not visible
-    /// without Console.app -- and because a duplicate pdf_id is an everyday
-    /// library-hygiene event that must reach the user, not a log.
-    ///
-    /// runModal() is used unconditionally: during a cold launch this fires
-    /// before applicationDidFinishLaunching, so no window exists to attach a
-    /// sheet to.
-    ///
-    /// Still deliberately absent: the page query item is displayed but not
-    /// acted upon, and the resolved path is not opened. Phase B step 6 replaces
-    /// this body with the real pipeline (parse -> resolve -> open) per
-    /// TARGET_ARCHITECTURE.md §6.3, and step 7 turns the failure branch below
-    /// into the permanent alert plumbing. The seam in application(_:open:)
-    /// stays where it is.
-    private func showSchemeProbeAlert(for url: URL) {
-        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-
-        let page = components?.queryItems?
-            .first(where: { $0.name == "page" })?
-            .value ?? "(none)"
-
-        let alert = NSAlert()
-        alert.addButton(withTitle: "OK")
-
-        // No host means no hash to resolve. Step 6 treats this as a malformed
-        // URL; here it just short-circuits before touching the subprocess.
-        guard let hash = components?.host, !hash.isEmpty else {
-            alert.alertStyle = .warning
-            alert.messageText = "Anima received a URL without a PDF id"
-            alert.informativeText = url.absoluteString
-            alert.runModal()
+    /// The page conversion from the 1-based URL contract to Anima's internal
+    /// 0-based page index occurs only in parseSchemeURL(_:). The resolver
+    /// returns a filesystem path, after which AppDelegate owns reader behavior.
+    private func handleSchemeURL(_ url: URL) {
+        // TARGET_ARCHITECTURE.md §6.3 step 1: do not interrupt an active modal
+        // interaction and do not queue the request in v1.
+        guard NSApp.modalWindow == nil else {
+            NSSound.beep()
+            Swift.print("⚠️ pdf:// open declined while a modal dialog is active")
             return
         }
 
-        switch PdfAnnotationsBridge.resolve(hash: hash, pdfAnnotationsRoot: pdfAnnotationsRoot) {
-        case let .resolved(path):
-            alert.alertStyle = .informational
-            alert.messageText = "Resolved pdf://\(hash)"
-            alert.informativeText = """
-                \(path)
-
-                page: \(page) (not acted upon yet)
-                """
-
-        case let .failed(message):
-            // The resolver's stderr is shown verbatim: it is deliberate prose
-            // written for this alert (TARGET_ARCHITECTURE.md §3.3).
-            alert.alertStyle = .warning
-            alert.messageText = "Could not open the linked PDF"
-            alert.informativeText = message
+        guard let request = parseSchemeURL(url) else {
+            return
         }
 
+        switch PdfAnnotationsBridge.resolve(
+            hash: request.hash,
+            pdfAnnotationsRoot: pdfAnnotationsRoot
+        ) {
+        case let .failed(message):
+            // The resolver's stderr is deliberate prose written for the user.
+            // PdfAnnotationsBridge also supplies prose for off-contract process
+            // failures, so this branch can show its message unedited.
+            showSchemeAlert(
+                title: "Could not open the linked PDF",
+                message: message
+            )
+
+        case let .resolved(path):
+            let resolvedURL = URL(fileURLWithPath: path).standardizedFileURL
+
+            if isCurrentDocument(resolvedURL) {
+                NSApp.activate(ignoringOtherApps: true)
+
+                guard let pageIndex = request.pageIndex else {
+                    return
+                }
+
+                guard let document = mainViewController.pdfView.document else {
+                    return
+                }
+
+                guard (0..<document.pageCount).contains(pageIndex),
+                      let page = document.page(at: pageIndex) else {
+                    showLinkedPageOutOfRangeAlert(
+                        requestedPageNumber: pageIndex + 1,
+                        pageCount: document.pageCount
+                    )
+                    return
+                }
+
+                // TARGET_ARCHITECTURE.md §6.3 step 4: this is intentionally a
+                // direct navigation call in Phase B. Phase C replaces it with
+                // the shared far-jump seam so Cmd+R can return here.
+                mainViewController.pdfView.go(to: page)
+                Swift.print("🔗 pdf:// link jumped within the open document to page \(pageIndex + 1)")
+                return
+            }
+
+            // For a different document, loadDocument parses and validates the
+            // target before it persists outgoing state or clears the reader.
+            // A non-nil requested page deliberately wins over last-page restore.
+            loadDocument(
+                url: resolvedURL,
+                preferredPageIndex: request.pageIndex
+            )
+        }
+    }
+
+    /// Parses one pdf:// URL into the pieces AppDelegate needs for the opening
+    /// flow. The optional page is validated as a positive 1-based integer and
+    /// converted immediately to Anima's internal 0-based representation.
+    ///
+    /// Unknown query items are ignored in v1. The contract defines only page;
+    /// rejecting unrelated future additions here would make the scheme less
+    /// extensible without improving today's behavior.
+    private func parseSchemeURL(_ url: URL) -> (hash: String, pageIndex: Int?)? {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.scheme?.caseInsensitiveCompare("pdf") == .orderedSame,
+              let hash = components.host,
+              !hash.isEmpty else {
+            showSchemeAlert(
+                title: "Invalid pdf:// link",
+                message: "The link does not contain a PDF id.\n\n\(url.absoluteString)"
+            )
+            return nil
+        }
+
+        let pageItems = components.queryItems?.filter { $0.name == "page" } ?? []
+
+        guard pageItems.count <= 1 else {
+            showSchemeAlert(
+                title: "Invalid pdf:// link",
+                message: "The link contains more than one page value.\n\n\(url.absoluteString)"
+            )
+            return nil
+        }
+
+        guard let pageItem = pageItems.first else {
+            return (hash: hash, pageIndex: nil)
+        }
+
+        guard let pageValue = pageItem.value,
+              let displayedPageNumber = Int(pageValue),
+              displayedPageNumber >= 1 else {
+            showSchemeAlert(
+                title: "Invalid page number",
+                message: "The page in a pdf:// link must be a positive 1-based integer.\n\n\(url.absoluteString)"
+            )
+            return nil
+        }
+
+        return (hash: hash, pageIndex: displayedPageNumber - 1)
+    }
+
+    /// Returns true when the resolver path identifies the PDF currently shown
+    /// in the reader. Standardizing both URLs handles ordinary path spelling
+    /// differences without introducing symlink-resolution policy at this seam.
+    private func isCurrentDocument(_ resolvedURL: URL) -> Bool {
+        guard let currentURL = mainViewController.pdfView.document?.documentURL else {
+            return false
+        }
+
+        return currentURL.standardizedFileURL == resolvedURL.standardizedFileURL
+    }
+
+    /// Shows an opening-flow alert as a modal dialog. This intentionally works
+    /// both before the main window is shown during a cold pdf:// launch and
+    /// while an already-running Anima receives a hot link click.
+    private func showSchemeAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    /// Explains a page range failure after a resolver success. The document is
+    /// left untouched: for a different resolved PDF, loadDocument validates
+    /// before it clears the outgoing reader; for the current PDF, the guard in
+    /// handleSchemeURL(_:) prevents the direct jump.
+    private func showLinkedPageOutOfRangeAlert(
+        requestedPageNumber: Int,
+        pageCount: Int
+    ) {
+        showSchemeAlert(
+            title: "Page unavailable",
+            message: "The link requests page \(requestedPageNumber), but this PDF has \(pageCount) page(s)."
+        )
     }
 
     // MARK: - PDF Loading
 
     /// Loads a PDF document into the main view, replacing any existing document.
     ///
-    /// This is the single seam for both cold-launch and hot-open requests.
-    /// It clears outgoing reader state, reloads bookmarks for the incoming file,
-    /// and preserves the current document if parsing or installation fails.
-    private func loadDocument(url: URL) {
+    /// This is the single seam for cold-launch and hot-open file requests, and
+    /// for resolved pdf:// links. It parses and validates the incoming document
+    /// before clearing outgoing reader state, reloads bookmarks for the incoming
+    /// file, and preserves the current document if parsing or installation fails.
+    ///
+    /// A preferredPageIndex comes only from a parsed pdf:// page query and is
+    /// already 0-based. When supplied, it takes precedence over stored last-page
+    /// restoration. The range check happens before the outgoing document changes.
+    private func loadDocument(url: URL, preferredPageIndex: Int? = nil) {
         // Guard: don't replace while an AppKit modal window is active. That covers
         // NSAlert, CommentInputPanel, JumpStationPanel, and any future modal panel.
         if NSApp.modalWindow != nil {
@@ -255,6 +376,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let document = PDFDocument(url: url) else {
             Swift.print("❌ Failed to parse PDF: \(filePath)")
             showLoadFailureAlert(for: filePath)
+            return
+        }
+
+        // A page requested by a pdf:// link must be valid in the incoming
+        // document. Do this before saving the outgoing position or clearing the
+        // current reader so an invalid link is a complete no-op.
+        if let preferredPageIndex = preferredPageIndex,
+           !(0..<document.pageCount).contains(preferredPageIndex) {
+            showLinkedPageOutOfRangeAlert(
+                requestedPageNumber: preferredPageIndex + 1,
+                pageCount: document.pageCount
+            )
             return
         }
 
@@ -275,9 +408,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Install the new document.
         mainViewController.loadPDF(document: document)
 
-        // Restore the reading position now that the document and sidebar are
-        // installed. Skips silently when nothing is stored.
-        restoreLastPage(filePath: filePath)
+        if let preferredPageIndex = preferredPageIndex {
+            // TARGET_ARCHITECTURE.md §6.3 step 5: document installation is not
+            // a far jump. The future JumpStack is cleared on document change,
+            // so no pre-jump reader position exists to record here.
+            mainViewController.pdfView.restore(toPageIndex: preferredPageIndex)
+            Swift.print("🔗 pdf:// link opened \(filePath) at page \(preferredPageIndex + 1)")
+        } else {
+            // Ordinary Finder, command-line, and fallback opens preserve the
+            // established last-page restoration behavior.
+            restoreLastPage(filePath: filePath)
+        }
 
         Swift.print("✅ Loaded PDF: \(filePath)")
     }
