@@ -165,43 +165,71 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Custom URL Scheme (temporary probe — Phase B step 4)
+    // MARK: - Custom URL Scheme (temporary probe — Phase B step 5)
 
-    /// Reports what arrived through a non-file URL, without acting on it.
+    /// Resolves a non-file URL through the pdf-annotations resolver and reports
+    /// the outcome, without opening anything yet.
     ///
-    /// This exists to prove exactly one thing: that Launch Services routes
-    /// pdf:// links to Anima rather than to the legacy PDFHandler.app applet.
+    /// Step 4 used this to prove that Launch Services routes pdf:// links to
+    /// Anima rather than to the legacy PDFHandler.app applet. Step 5 extends it
+    /// to prove the second half of the path: that PdfAnnotationsBridge can run
+    /// the resolver in the neighbouring project's venv when Anima is launched
+    /// by Launch Services (not by Xcode), and that success and failure both
+    /// come back as intended.
+    ///
     /// It is an alert rather than Swift.print because a link click launches or
     /// activates Anima through Launch Services, where stdout is not visible
-    /// without Console.app.
+    /// without Console.app — and because a duplicate pdf_id is an everyday
+    /// library-hygiene event that must reach the user, not a log.
     ///
     /// runModal() is used unconditionally: during a cold launch this fires
     /// before applicationDidFinishLaunching, so no window exists to attach a
     /// sheet to.
     ///
-    /// Phase B step 6 replaces this body with the real pipeline (parse ->
-    /// resolve -> open) per TARGET_ARCHITECTURE.md §6.3. The seam in
-    /// application(_:open:) stays where it is.
+    /// Still deliberately absent: the page query item is displayed but not
+    /// acted upon, and the resolved path is not opened. Phase B step 6 replaces
+    /// this body with the real pipeline (parse -> resolve -> open) per
+    /// TARGET_ARCHITECTURE.md §6.3, and step 7 turns the failure branch below
+    /// into the permanent alert plumbing. The seam in application(_:open:)
+    /// stays where it is.
     private func showSchemeProbeAlert(for url: URL) {
         let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
 
-        let scheme = components?.scheme ?? "(none)"
-        let host = components?.host ?? "(none)"
         let page = components?.queryItems?
             .first(where: { $0.name == "page" })?
             .value ?? "(none)"
 
         let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = "Anima received a URL"
-        alert.informativeText = """
-            scheme: \(scheme)
-            host (hash): \(host)
-            page: \(page)
-
-            \(url.absoluteString)
-            """
         alert.addButton(withTitle: "OK")
+
+        // No host means no hash to resolve. Step 6 treats this as a malformed
+        // URL; here it just short-circuits before touching the subprocess.
+        guard let hash = components?.host, !hash.isEmpty else {
+            alert.alertStyle = .warning
+            alert.messageText = "Anima received a URL without a PDF id"
+            alert.informativeText = url.absoluteString
+            alert.runModal()
+            return
+        }
+
+        switch PdfAnnotationsBridge.resolve(hash: hash, pdfAnnotationsRoot: pdfAnnotationsRoot) {
+        case let .resolved(path):
+            alert.alertStyle = .informational
+            alert.messageText = "Resolved pdf://\(hash)"
+            alert.informativeText = """
+                \(path)
+
+                page: \(page) (not acted upon yet)
+                """
+
+        case let .failed(message):
+            // The resolver's stderr is shown verbatim: it is deliberate prose
+            // written for this alert (TARGET_ARCHITECTURE.md §3.3).
+            alert.alertStyle = .warning
+            alert.messageText = "Could not open the linked PDF"
+            alert.informativeText = message
+        }
+
         alert.runModal()
     }
 
