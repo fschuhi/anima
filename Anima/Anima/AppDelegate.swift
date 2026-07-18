@@ -34,6 +34,10 @@
 //    paths (helper script, dev fallback PDF). FitzBridge independently
 //    derives the venv Python path from the helperPath it receives.
 //    To move the project, change projectRoot here — nothing else.
+//    A second, independent constant (pdfAnnotationsRoot) locates the
+//    neighbouring pdf-annotations project. It is deliberately not derived
+//    from projectRoot: the two projects are joined by a frozen CLI contract,
+//    not by a shared filesystem layout.
 //
 
 import Cocoa
@@ -46,6 +50,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Change this one constant if the project moves.
     // FitzBridge derives the venv Python path from the helperPath.
     private let projectRoot = "/Users/fschuhi/Projects/anima"
+
+    // --- Location of the pdf-annotations project ---
+    // Deliberately a second absolute path rather than a sibling derived from
+    // projectRoot. Anima consumes pdf-annotations only through its resolver
+    // CLI (TARGET_ARCHITECTURE.md §2, §3); their co-location in ~/Projects is
+    // a convenience, not part of the contract, and either project may move
+    // independently. Consumed from Phase B step 5 onwards by
+    // PdfAnnotationsBridge, which runs the resolver in this project's own
+    // venv with this path as the process working directory.
+    private let pdfAnnotationsRoot = "/Users/fschuhi/Projects/pdf-annotations"
 
     /// Absolute path to the Python helper, derived from projectRoot. Needed by
     /// the persistence managers at launch and by last-page persistence during
@@ -130,6 +144,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         guard let url = urls.first else { return }
 
+        // Two kinds of URL reach this method now. File URLs are PDFs from
+        // Finder, "Open With", or a Dock drop, and keep the existing behavior.
+        // Custom-scheme URLs (pdf://HASH?page=N) arrive from Launch Services
+        // after an Obsidian link click; they are never handed to
+        // loadDocument(url:), which expects a readable file on disk and would
+        // otherwise report the link as a damaged PDF.
+        guard url.isFileURL else {
+            showSchemeProbeAlert(for: url)
+            return
+        }
+
         if didFinishLaunching {
             // Hot open: replace the active document. Multiple URLs arriving
             // together are reduced to the first one.
@@ -138,6 +163,46 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Cold launch: stash the URL for applicationDidFinishLaunching.
             pendingFileURL = url
         }
+    }
+
+    // MARK: - Custom URL Scheme (temporary probe — Phase B step 4)
+
+    /// Reports what arrived through a non-file URL, without acting on it.
+    ///
+    /// This exists to prove exactly one thing: that Launch Services routes
+    /// pdf:// links to Anima rather than to the legacy PDFHandler.app applet.
+    /// It is an alert rather than Swift.print because a link click launches or
+    /// activates Anima through Launch Services, where stdout is not visible
+    /// without Console.app.
+    ///
+    /// runModal() is used unconditionally: during a cold launch this fires
+    /// before applicationDidFinishLaunching, so no window exists to attach a
+    /// sheet to.
+    ///
+    /// Phase B step 6 replaces this body with the real pipeline (parse ->
+    /// resolve -> open) per TARGET_ARCHITECTURE.md §6.3. The seam in
+    /// application(_:open:) stays where it is.
+    private func showSchemeProbeAlert(for url: URL) {
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+
+        let scheme = components?.scheme ?? "(none)"
+        let host = components?.host ?? "(none)"
+        let page = components?.queryItems?
+            .first(where: { $0.name == "page" })?
+            .value ?? "(none)"
+
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Anima received a URL"
+        alert.informativeText = """
+            scheme: \(scheme)
+            host (hash): \(host)
+            page: \(page)
+
+            \(url.absoluteString)
+            """
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     // MARK: - PDF Loading

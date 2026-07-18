@@ -396,6 +396,14 @@ venv python  = derived by FitzBridge from helperPath      (two levels up + .venv
 
 To move the project, change `projectRoot` in AppDelegate -- nothing else.
 
+A second constant in the same place locates the neighbouring pdf-annotations project, whose resolver CLI Anima calls as a subprocess:
+
+```
+pdfAnnotationsRoot = /Users/fschuhi/Projects/pdf-annotations
+```
+
+It is deliberately an independent absolute path, not a sibling derived from `projectRoot`. The two projects are joined by a frozen CLI contract (see `TARGET_ARCHITECTURE.md`), not by a shared filesystem layout, and either may move without the other.
+
 ### Code Formatting
 
 ```bash
