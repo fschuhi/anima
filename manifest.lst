@@ -16,6 +16,9 @@ GOALS.md
 TODO.md
 # HISTORY.md
 
+# Plan to combine `anima` and `pdf-annotations` to arrive at a fully macOS-native workflow.
+TARGET_ARCHITECTURE.md
+
 # Historical design notes for bookmark management and navigation. Actively maintained until 2026-07-16.
 # docs/BOOKMARKS_DESIGN.md
 # docs/JumpStation.bas

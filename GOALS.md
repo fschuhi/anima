@@ -8,7 +8,7 @@
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Phase 1 is complete. Phase 2 (Opening PDFs) is substantially done -- safe active-document replacement and last-page restoration both landed (2026-07-17); its remaining entry points (drag-and-drop, `Cmd+O`) are deliberately parked as lower-value. The pdf:// toolchain work is Phase 3 below, which corresponds to Phases B and C of `TARGET_ARCHITECTURE.md` (the cross-project pdf:// plan). Its counterpart, Phase A, is now complete on the pdf-annotations side: the resolver CLI (`pdf_annot.resolve`) is implemented, tested, and accepted, and its contract is frozen.
+**Where we are:** Phase 1 is complete. Phase 2 (Opening PDFs) is substantially done -- safe active-document replacement and last-page restoration both landed (2026-07-17); its remaining entry points (drag-and-drop, `Cmd+O`, multiple windows/tabs) are deliberately parked as lower-value. The `pdf://` toolchain work is Phase 3 below, which corresponds to Phases B and C of `TARGET_ARCHITECTURE.md` (the cross-project `pdf://` plan). Its counterpart, Phase A, is now complete on the pdf-annotations side: the resolver CLI (`pdf_annot.resolve`) is implemented, tested, and accepted, and its contract is frozen.
 
 **What's next:** Begin Phase 3 == `TARGET_ARCHITECTURE.md` Phase B, starting with section 8 step 4 -- claim the `pdf` URL scheme in `Info.plist` and add the `pdfAnnotationsRoot` constant alongside `projectRoot`. The pdf-annotations resolver contract is frozen: Anima consumes it as a subprocess (§6.2), and must not reach back into or modify it. Steps 5-7 (the bridge, the opening flow, alert plumbing) follow within Phase B. Everything else sits in the phases below and in `TODO.md` until it earns the pointer.
 
@@ -26,14 +26,9 @@ Anima exists to serve one workflow: reading academic papers and wisdom tradition
 
 ---
 
-## Phase 2 -- Opening PDFs
+## Phase 2 -- Opening PDFs (complete)
 
-Phase 2 makes switching between PDFs reliable before adding more ways to initiate an open request. Anima's near-term model remains one active PDF per process: fast document replacement, restored reading position, and later restored JumpStack state provide the practical proxy for keeping several PDFs open.
-
-1. ~~**Safe active-document replacement.** Clicking another PDF in Finder, using "Open With", or dropping a PDF onto the Dock icon while Anima is running should replace the displayed PDF rather than merely focus the existing window. Replacement must retire document-specific search, emphasis, selection, and mutation-target state. Failed hot opens preserve the current PDF and report the failure.~~ Completed on 2026-07-17.
-2. ~~**Last-page restoration.** Persist the most recently displayed page in private PDF metadata and restore it when that PDF is reopened. This is the highest-priority enhancement after safe replacement because it makes rapid external switching useful in practice.~~ Completed on 2026-07-17.
-3. **Additional opening entry points.** Add reader-window drag-and-drop and `Cmd+O` only after replacement and restoration are reliable; neither is currently as valuable as preserving reading position.
-4. **Same-process multiple documents remain parked.** Multiple windows or tabs would require first-class per-document reader sessions with independent PDF views, sidebars, bookmarks, search, emphasis, and modal ownership. Do not build that infrastructure unless replacement-based switching proves insufficient. Separate simultaneous instances remain available through `open -n`.
+~~Phase 2 makes switching between PDFs reliable before adding more ways to initiate an open request. Anima's near-term model remains one active PDF per process: fast document replacement, restored reading position, and later restored JumpStack state provide the practical proxy for keeping several PDFs open.~~ Safe active-document replacement complete on 2026-07-17. Last-page restoration complete on 2026-07-17.
 
 ---
 
@@ -41,5 +36,5 @@ Phase 2 makes switching between PDFs reliable before adding more ways to initiat
 
 Retire the Windows/Parallels PDF route; Anima becomes the target of the `pdf://` flow.
 
-- **`pdf://` URL handler** -- register the scheme, resolve `pdf://HASH?page=N` via `pdf_registry.build_pdf_index`, open at page. See `TODO.md` -> Toolchain Integration.
+- **`pdf://` URL handler** -- register the scheme, resolve `pdf://HASH?page=N` via `pdf_registry.build_pdf_index`, open at page. See `TARGET_ARCHITECTURE.md`.
 - **`pdf-annot` compatibility** -- verify the full extract pipeline and Obsidian bibnote generation against Anima-written annotations.
