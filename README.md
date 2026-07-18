@@ -122,29 +122,6 @@ Anima remembers each PDF's most recently displayed page. `anima_helper.py` store
 
 ---
 
-## Current Status
-
-| Feature                  | Status      | Notes                                                            |
-|--------------------------|-------------|------------------------------------------------------------------|
-| **PDF Rendering**        | ✅ Complete | PDFKit, including Internet Archive layered PDFs                  |
-| **Continuous Scroll**    | ✅ Complete | Native trackpad scrolling                                        |
-| **Text Selection**       | ✅ Complete | Drag to select, per-line quad extraction                         |
-| **Highlight Creation**   | ✅ Complete | `Enter` with selection, dual-write, no reload                    |
-| **Persistent Highlight** | ✅ Complete | `Cmd+H` toggles mode; mouseUp = instant highlight                |
-| **Goto Page**            | ✅ Complete | `Cmd+G`, native modal input, fail-fast range validation          |
-| **Bookmark Creation**    | ✅ Complete | `Cmd+B`, catalog-backed persistence, duplicate re-point prompt   |
-| **Comment Editing**      | ✅ Complete | Modal input panel (CommentInputPanel), card-styled               |
-| **Highlight Deletion**   | ✅ Complete | Click + Delete key, dual-write removal                           |
-| **Incremental Save**     | ✅ Complete | fitz preserves all existing annotations                          |
-| **pdf-annot Compatible** | ✅ Complete | Round-trip verified with extraction pipeline                     |
-| **Xcode Project**        | ✅ Complete | .app bundle, menu bar, Cmd+Q                                     |
-| **Sidebar**              | ✅ Complete | Live cards, bidirectional emphasis, scroll sync                  |
-| **Bookmark Navigation**  | ✅ Complete | `Cmd+J` JumpStation: select, Enter-to-jump, `Cmd+D` deletion     |
-| **Reading ergonomics**   | ✅ Complete | Phase 1 baseline complete; later refinements return to `TODO.md` |
-| **Last-Page Restore**    | ✅ Complete | Per-PDF reading position in `/AnimaLastPage`, restored on open |
-
----
-
 ## How to Use
 
 ### Highlight and comment

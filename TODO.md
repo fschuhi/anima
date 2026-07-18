@@ -31,9 +31,6 @@
 
 ## Opening PDFs
 
-- ~~**Persist and restore the last displayed page for each PDF.** Reuse the current-page information already observed through `.PDFViewPageChanged` for the window caption; do not add a second page-movement observer. Keep the latest 0-based page index in memory, persist the outgoing PDF's value in private PDF metadata during document replacement and application termination, and restore it after the PDF and sidebar are installed. Reader-facing page numbers remain 1-based. If persistence fails during replacement, log the failure and continue opening the requested PDF. Define safe behavior for a stale stored index when the PDF's page count has changed. This is the highest-priority Phase 2 enhancement after safe hot replacement and comes before window drag-and-drop or `Cmd+O`.~~
-  *Completed 2026-07-17: `/AnimaLastPage` catalog scalar via `anima_helper.py` `get-`/`set-last-page`; `FitzBridge.getLastPage`/`setLastPage`; `AnimaPDFView.currentPageIndex()`/`restore(toPageIndex:)` with clamp-to-last for stale indices; `AppDelegate` persists the outgoing page before the swap and on quit, restores after `loadPDF`, page read on demand (no cached index). Pinned by `TestLastPage` (pytest) and `testFitzBridgeLastPageRoundTrip` (Swift).*
-
 - **Open a PDF by dropping it onto the reader window.** Dock-icon drops already arrive through `application(_:open:)`; this item concerns registering the reader window as a drag destination.
 
 - **Open a PDF with `Cmd+O`.** Inspect `MainMenu.xib` before designing the action or menu wiring.
@@ -44,7 +41,7 @@
 
 ## Navigation
 
-- **Centralize far-jump execution before implementing JumpStack.** `Cmd+G`, PDF find/F3, comment find/F3, and JumpStation currently resolve their targets in the correct local owners but perform the final `PDFView.go(to:)` transition through separate paths. Keep target discovery where it is, but route the final non-local transition through one small shared seam so JumpStack can consistently record the current position before every far jump. Ordinary scrolling and page changes remain outside this seam. Do not introduce a `NavigationManager` unless the seam later gains enough independent responsibility to justify one.
+- **Centralize far-jump execution before implementing JumpStack.** `Cmd+G`, PDF find/F3, comment find/F3, and JumpStation currently resolve their targets in the correct local owners but perform the final `PDFView.go(to:)` transition through separate paths. Keep target discovery where it is, but route the final non-local transition through one small shared seam so JumpStack can consistently record the current position before every far jump. Ordinary scrolling and page changes remain outside this seam. Do not introduce a `NavigationManager` unless the seam later gains enough independent responsibility to justify one. **NOTE** that `TARGET_ARCHITECTURE.md` §6.4 has elevated this point as a step-6 prerequisite.
 
 - **JumpStack.** A far jump is the target of (a) go to page, (b) find in PDF, (c) find in comments, (d) `F3` in either search mode, or (e) jump to bookmark. Before executing a far jump, push the current page onto a bounded stack, provisionally retaining no more than five targets; `Cmd+R` pops the previous position and returns there. Persist the stack in private PDF metadata and restore it when reopening that PDF, so replacement-based document switching retains recent navigation context. Record only defined far jumps, not ordinary scrolling or page changes. Implement only after the Refactoring item "Centralize far-jump execution before implementing JumpStack"; design and test duplicate/consecutive-page behavior before wiring it into the reader.
 
