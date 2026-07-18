@@ -2,9 +2,11 @@
 
 (Note: "I" in the following paragraphs refers to the user, "you" to you as the AI model.)
 
-**Charter:** The resolved-work record: *what* shipped, *when*. This file answers exactly one question -- "has X been done already, and in which session?" -- and nothing else. It lives in the repo but **outside the per-session filesdump**: it is uploaded only at the end of a session, at the moment the conversation is longest, the context budget tightest, and the remaining work most judgement-heavy. Every word here is paid for at that most expensive moment, so this file is deliberately the tersest artefact in the project.
+## Charter
 
-**Entry rules:**
+The resolved-work record: *what* shipped, *when*. This file answers exactly one question -- "has X been done already, and in which session?" -- and nothing else. It lives in the repo but **outside the per-session filesdump**: it is uploaded only at the end of a session, at the moment the conversation is longest, the context budget tightest, and the remaining work most judgement-heavy. Every word here is paid for at that most expensive moment, so this file is deliberately the tersest artefact in the project.
+
+## Entry rules
 
 - One bullet per resolved item: date + what shipped. One line preferred, two lines maximum.
 - No rationale, no alternatives-considered, no design narrative. Durable contracts and their "why" belong in `README.md` or `TARGET_ARCHITECTURE.md`; open work in `TODO.md`; direction in `GOALS.md`. An entry may *end* with a pointer to where the reasoning lives; it may never *contain* the reasoning.
@@ -76,6 +78,7 @@ See "Workflow for the Whole Session (CRITICAL)" in `LLM_INSTRUCTIONS.md` for whe
 - Active-document hot replacement (2026-07-17): `loadDocument(url:)` is the single seam for cold launch and hot open; outgoing search/emphasis/selection state cleared, parse failure preserves the current document
 - `pdf://` URL scheme claimed (2026-07-18): `CFBundleURLTypes` entry independent of the document-type claim; legacy `PDFHandler.app` route retired. Details: `README.md`, `TARGET_ARCHITECTURE.md`
 - `PdfAnnotationsBridge` (2026-07-18): resolver subprocess seam per `TARGET_ARCHITECTURE.md` §6.2; `ResolveOutcome` carries the resolver's stderr verbatim to the user. Details: `README.md` §The pdf-annotations Boundary
+- `pdf://` opening flow (2026-07-18): Obsidian links now resolve, activate or replace the reader document, honor explicit page targets, restore position without one, and surface resolver or URL failures. Details: `README.md`, `TARGET_ARCHITECTURE.md`
 
 ## Testing
 

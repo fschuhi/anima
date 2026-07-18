@@ -126,7 +126,7 @@ Anima has a second subprocess seam, distinct from `FitzBridge`. `PdfAnnotationsB
 
 The two bridges deliberately differ in how they fail. `FitzBridge` calls Anima's own helper in Anima's own venv, so a failure is a developer failure and is logged through `Swift.print`. `PdfAnnotationsBridge` consumes another project's declared interface, where an unknown hash or a duplicate `pdf_id` is an everyday outcome of library hygiene; it returns `ResolveOutcome` (`.resolved(path:)` / `.failed(message:)`) and the resolver's stderr reaches the user verbatim, because that text is written to be read.
 
-Status: the scheme is claimed and resolution works end to end, but `application(_:open:)` still only reports the outcome in a temporary probe alert. Wiring it into the opening flow is `TARGET_ARCHITECTURE.md` step 6.
+`application(_:open:)` owns the reader-facing `pdf://` pipeline: it rejects opens behind a modal dialog, parses the URL's hash and optional 1-based page, resolves the hash through `PdfAnnotationsBridge`, then either activates the already open document or replaces it through the normal safe loading path. An explicit page query wins over stored last-page restoration; a link without one restores the incoming document's last position, while a no-page link for the already open document only activates Anima. Resolver failures and malformed or unavailable pages appear in alerts without changing the reader document. The same-document page jump is a direct `go(to:)` call in Phase B and is marked as the future far-jump seam call site for Phase C.
 
 ---
 
@@ -207,7 +207,7 @@ Zettelkasten: idea notes, workbenches, Folgezettel sequences
 
 - **`pdf-annotations`**: Extracts highlights and comments from PDFs into Obsidian Markdown notes. Uses fitz -- Anima's annotations are fully compatible. Standard `/Annot` with `/Subtype /Highlight`, `/Contents` for comments, `QuadPoints` for precise multi-line highlighting.
 
-- **`pdf://` URL scheme**: Obsidian bibnotes reference PDFs via `pdf://HASH?page=N`. Anima claims the scheme on macOS and resolves the hash through the `pdf-annotations` resolver CLI; the legacy route through a Windows Parallels bridge to PDF-XChange Viewer is retired. Opening the resolved PDF at the requested page is the remaining step -- see `TARGET_ARCHITECTURE.md` and `GOALS.md`.
+- **`pdf://` URL scheme**: Obsidian bibnotes reference PDFs via `pdf://HASH?page=N`. Anima claims the scheme on macOS and resolves the hash through the `pdf-annotations` resolver CLI. A page query is 1-based and opens or activates the PDF at that page; without a page query, a newly opened document restores its last page while an already open document is simply activated. Unknown hashes, duplicate IDs, and malformed or unavailable pages report their failures in Anima rather than returning through the retired Windows Parallels route.
 
 - **Obsidian "The Studio"**: The Zettelkasten knowledge management system where bibnotes, idea notes, and workbenches live. Anima serves as the PDF reading layer that feeds this system.
 
@@ -345,7 +345,7 @@ Current Swift test suite:
 
 ### Opening PDFs
 
-Anima accepts PDFs through three entry points, checked in this order:
+Anima accepts PDFs through four entry points, checked in this order:
 
 1. **Finder** -- Double-click a PDF (or right-click -> Open With -> Anima). Requires the Info.plist `CFBundleDocumentTypes` registration. To make Anima the default viewer: right-click any PDF -> Get Info -> Open With -> Anima -> Change All.
 
@@ -354,7 +354,9 @@ Anima accepts PDFs through three entry points, checked in this order:
    open -a Anima --args ~/Papers/some-paper.pdf
    ```
 
-3. **Dev fallback** -- If neither of the above provides a file, Anima opens `projectRoot/data/input.pdf` automatically. If that doesn't exist either, Anima prints an error and exits.
+3. **`pdf://` links** -- Obsidian links use `pdf://HASH` or `pdf://HASH?page=N`, where `N` is a 1-based page number. Anima resolves the hash through the `pdf-annotations` resolver CLI. A link with `?page=N` opens or activates the PDF at page `N`; without `page`, a newly opened PDF restores its stored last page, while an already open PDF is only activated. Unknown hashes, duplicate IDs, malformed pages, and unavailable pages show an alert without changing the reader document.
+
+4. **Dev fallback** -- If none of the above provides a file, Anima opens `projectRoot/data/input.pdf` automatically. If that doesn't exist either, Anima prints an error and exits.
 
 **Hot replacement:** If Anima is already running, opening a different PDF via Finder, "Open With", or dropping a file onto the Dock icon replaces the displayed PDF. The outgoing document's search hits, comment-search state, annotation/card emphasis, text selection, and Delete-key target are cleared; bookmarks are reloaded for the new file. If the new file cannot be parsed, the current document stays open and an alert is shown.
 
@@ -365,7 +367,7 @@ open -n -a Anima --args ~/Papers/paper-a.pdf
 open -n -a Anima --args ~/Papers/paper-b.pdf
 ```
 
-Each instance is fully independent (separate window, sidebar, annotation state, comment panel geometry). `pdf://` links from Obsidian deliberately do not use this path: they are delivered to the running instance and will replace the active document (`TARGET_ARCHITECTURE.md` §6.3).
+Each instance is fully independent (separate window, sidebar, bookmarks, search, emphasis, comment panel geometry). `pdf://` links from Obsidian deliberately do not use this path: they are delivered to the running instance and will replace the active document (`TARGET_ARCHITECTURE.md` §6.3).
 
 **Shell alias** (optional convenience for `~/.zshrc`):
 

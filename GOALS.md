@@ -2,15 +2,17 @@
 
 (Note: "I" in the following paragraphs refer to the user, "you" to you as the AI model.)
 
-**Charter:** This file answers: where is the project going, in what order, and what happens next. It holds the strategic vision, the phased roadmap, and goals that need a strategy discussion before they are actionable. The _Current Session Pointer_ below is the single canonical "where we are / what's next" -- keep it to a few lines, update it, don't grow it; `FIRST_PROMPT.md` sends the reader here first. Concrete, startable work lives in `TODO.md`; the resolved-work record lives in `HISTORY.md` (on the heap, out of the per-session dump); architecture, contract, and settled decisions live in `README.md`.
+## Charter
+
+This file answers: where is the project going, in what order, and what happens next. It holds the strategic vision, the phased roadmap, and goals that need a strategy discussion before they are actionable. The _Current Session Pointer_ below is the single canonical "where we are / what's next" -- keep it to a few lines, update it, don't grow it; `FIRST_PROMPT.md` sends the reader here first. Concrete, startable work lives in `TODO.md`; the resolved-work record lives in `HISTORY.md` (on the heap, out of the per-session dump); architecture, contract, and settled decisions live in `README.md`.
 
 ---
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Phases 1 and 2 are complete. Phase 3 is underway: `TARGET_ARCHITECTURE.md` step 5 landed 2026-07-18 -- `PdfAnnotationsBridge` runs the frozen resolver CLI (§3) in the pdf-annotations venv, and the temporary probe alert in `AppDelegate` now reports either the resolved path or the resolver's stderr verbatim. Accepted from Terminal and from real Obsidian links, duplicate case included.
+**Where we are:** Phases 1 and 2 are complete. Phase 3, `pdf://` Toolchain Integration, completed its Phase B opening flow on 2026-07-18: real Obsidian links resolve through `PdfAnnotationsBridge`, safely activate or replace Anima's active document, honor explicit 1-based `page` queries over stored positions, restore last position without a page query, and surface resolver and URL validation failures to the user.
 
-**What's next:** `TARGET_ARCHITECTURE.md` step 6 -- the URL handler and opening flow per §6.3, replacing the probe alert with the real pipeline. Steps 7 (alert plumbing) and 8 (acceptance) follow.
+**What's next:** `TARGET_ARCHITECTURE.md` Phase C step 9 -- introduce the small shared far-jump seam described in §6.4. Keep target discovery in its existing local owners, but route the final non-local transitions for goto page, both finds, F3, bookmark jumps, and same-document `pdf://` page links through one shared execution point. Step 10 then builds the in-memory JumpStack on that seam.
 
 ---
 
