@@ -8,11 +8,9 @@
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Phases 1 and 2 are complete. Phase 3 == `TARGET_ARCHITECTURE.md` Phase B is underway: step 4 landed 2026-07-18 -- Anima claims the `pdf` URL scheme, `application(_:open:)` separates file URLs from scheme URLs, `pdfAnnotationsRoot` sits beside `projectRoot`, and the legacy `PDFHandler.app` applet is decommissioned, so Anima is now the sole claimant of `pdf://`. Accepted from Terminal and from a real Obsidian link. The applet is in the Trash but the Trash is deliberately not yet emptied (Phase C step 11); empty it once the pipeline is genuinely in daily use.
+**Where we are:** Phases 1 and 2 are complete. Phase 3 is underway: `TARGET_ARCHITECTURE.md` step 5 landed 2026-07-18 -- `PdfAnnotationsBridge` runs the frozen resolver CLI (§3) in the pdf-annotations venv, and the temporary probe alert in `AppDelegate` now reports either the resolved path or the resolver's stderr verbatim. Accepted from Terminal and from real Obsidian links, duplicate case included.
 
-**What's next:** Phase B step 5 -- `PdfAnnotationsBridge`, mirroring `FitzBridge`'s subprocess pattern, invoking the frozen resolver CLI (§3) through the pdf-annotations venv with `pdfAnnotationsRoot` as working directory. The contract is frozen: Anima consumes it as a subprocess (§6.2) and must not reach back into or modify it. Step 6 (opening flow) and step 7 (alert plumbing) follow, and the temporary probe alert in `AppDelegate` is what step 6 replaces.
-
-**Open question, decide before step 6:** §6.4 requires the `pdf://` far jump to route through the shared far-jump seam, which does not exist yet -- it is the `TODO.md` Navigation item "Centralize far-jump execution before implementing JumpStack". Either build the seam first (honors §6.4, unblocks JumpStack, but inserts a five-call-site refactoring mid-Phase-B), or let step 6 call `go(to:)` directly and add the seam afterwards (links work sooner, costs a second pass through the opening flow, and defers `Cmd+R`-undo of an Obsidian jump). Step 5 is independent of this either way.
+**What's next:** `TARGET_ARCHITECTURE.md` step 6 -- the URL handler and opening flow per §6.3, replacing the probe alert with the real pipeline. Steps 7 (alert plumbing) and 8 (acceptance) follow.
 
 ---
 
@@ -38,5 +36,15 @@ Anima exists to serve one workflow: reading academic papers and wisdom tradition
 
 Retire the Windows/Parallels PDF route; Anima becomes the target of the `pdf://` flow.
 
+Scope: `TARGET_ARCHITECTURE.md` Phases A, B, and D. Its Phase C -- the far-jump seam and the JumpStack -- is Phase 4 here.
+
 - **`pdf://` URL handler** -- register the scheme, resolve `pdf://HASH?page=N` via `pdf_registry.build_pdf_index`, open at page. See `TARGET_ARCHITECTURE.md`.
 - **`pdf-annot` compatibility** -- verify the full extract pipeline and Obsidian bibnote generation against Anima-written annotations.
+
+---
+
+## Phase 4 -- Navigation Depth
+
+Centralize far-jump execution, then build the JumpStack on top of it. Specced in `TARGET_ARCHITECTURE.md` §6.4 and §6.5, with the work plan and acceptance in its Phase C (steps 9-11); deliberately not restated here.
+
+Its own phase rather than part of Phase 3 because the seam serves the five far-jump sources that predate `pdf://` -- goto-page, both finds, `F3`, bookmark jumps -- and the JumpStack was a Navigation backlog item before this architecture existed. `pdf://` is the sixth consumer, not the reason. `TODO.md`'s remaining Navigation item, JumpStation prefix input/filtering, is this phase's natural neighbour.

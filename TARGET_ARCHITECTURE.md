@@ -30,8 +30,9 @@ Anima never imports `pdf_annot`. The boundary is a subprocess: Anima runs the re
 
     <pdfAnnotationsRoot>/.venv/bin/python3 -m pdf_annot.resolve <HASH>
 
-- Working directory MUST be `<pdfAnnotationsRoot>` so that `load_env`finds `pdf_annot.toml` (default-filename-in-CWD resolution).
-- `<HASH>` is the `crc32_az7` string as it appears in the URL host. Matching is case-insensitive; the resolver normalizes before comparison.- A console script `pdf-annot-resolve = "pdf_annot.resolve:main"` is also registered in `pyproject.toml` for human terminal use. The bridge uses the `-m` form (no dependence on script installation).
+- Working directory MUST be `<pdfAnnotationsRoot>` so that `load_env` finds `pdf_annot.toml` (default-filename-in-CWD resolution).
+- `<HASH>` is the `crc32_az7` string as it appears in the URL host. Matching is case-insensitive; the resolver normalizes before comparison.
+- A console script `pdf-annot-resolve = "pdf_annot.resolve:main"` is also registered in `pyproject.toml` for human terminal use. The bridge uses the `-m` form (no dependence on script installation).
 
 ### 3.2 Success
 
@@ -94,7 +95,7 @@ Provide the user with exact copy-pasteable commands and interpret the output for
 
 ### 6.2 PdfAnnotationsBridge
 
-New type, named for what it is: Anima's dependency on the pdf-annotations project. Header comment states: *the contract is the CLI (§3), not the code*. It is NOT a sibling of `FitzBridge` -- FitzBridge calls Anima's own backend (same repo, same venv); this bridge consumes another project's declared interface. One method: `resolve(hash:) -> path or error-message`, implemented as `Process()` with CWD = `pdfAnnotationsRoot`, capturing stdout and stderr.
+New type, named for what it is: Anima's dependency on the pdf-annotations project. Header comment states: *the contract is the CLI (§3), not the code*. It is NOT a sibling of `FitzBridge` -- FitzBridge calls Anima's own backend (same repo, same venv); this bridge consumes another project's declared interface. One method: `resolve(hash:pdfAnnotationsRoot:) -> path or error-message`, implemented as `Process()` with CWD = `pdfAnnotationsRoot`, capturing stdout and stderr.
 
 ### 6.3 URL handler and opening flow
 
@@ -103,23 +104,31 @@ New type, named for what it is: Anima's dependency on the pdf-annotations projec
 1. **Modal guard** -- if a modal alert/sheet is up, reject the open (beep; no queueing in v1).
 2. **Parse URL** -- extract hash and optional page; convert page to 0-based here and only here. Malformed -> alert, stop.
 3. **Resolve** -- via bridge. Failure -> alert whose body is the resolver's stderr verbatim, stop. (Launch Services has activated Anima, so the alert appears exactly where the user is looking. This alert IS the replacement for the Windows server console.)
-4. **Same-document check** -- if the resolved path equals the currently open document: with `page`, execute a far jump (§6.4); without, just activate. Done.
-5. **Different document** -- persist outgoing document's page, clear per-document state (including the in-memory JumpStack, §6.5), load document, load bookmarks, install, then: `page` present -> jump to it; absent -> restore last position.
+4. **Same-document check** -- if the resolved path equals the currently open document: activate Anima, and if `page` is present, change to that page. In Phase B this is a direct `PDFView.go(to:)` call, marked in the code as the future seam call site (§6.4). It adds a sixth call site rather than rerouting the existing five, so it does not anticipate the Phase C refactoring. Without `page`: activate only. Done.
+5. **Different document** -- persist outgoing document's page, clear per-document state, load document, load bookmarks, install, then: `page` present -> jump to it; absent -> restore last position.
 
 ### 6.4 Far-jump integration
 
-The `pdf://` jump is the **sixth** far-jump source, joining goto-page, both finds, F3, and bookmark jumps. It MUST route through the shared far-jump seam that the refactoring TODO already mandates as a prerequisite for JumpStack. `Cmd+R` after a link click returns to the pre-jump page -- "undoing the Obsidian click."
+**Background:** The `pdf://` jump is the _sixth_ far-jump source, joining goto-page, both finds, F3, and bookmark jumps. Assuming the far-jump mechanics are established, a `pdf://` jump should route through the shared far-jump seam; the refactoring TODO already mandates it as prerequisite for JumpStack.
+
+**Action Items:**
+- Implement far-jump seam.
+- Amend §6.3 4.: route its direct `go(to:)` call through the seam.
+- §6.3 5. stays outside the seam (decided): the JumpStack is cleared on document change (§6.5), so a jump performed while installing a new document has no pre-jump position to record. Document loading positions the reader; it does not far-jump.
 
 ### 6.5 JumpStack contract (decided; supersedes TODO.md)
 
-In-memory only. Cleared on document change. Therefore `Cmd+R` is within-document **by construction** -- no cross-document history exists or is needed; last-page restore is the cross-document return path (the Obsidian ↔ PDF back-and-forth workflow composes from these pieces).
+**Background:** `Cmd+R` after a far-jump returns to the pre-jump page. In-memory only; cleared on document change. Therefore `Cmd+R` is within-document **by construction** -- no cross-document history exists or is needed; last-page restore is the cross-document return path (the Obsidian ↔ PDF back-and-forth workflow composes from these pieces).
 
-**Action item:** revise the `TODO.md` JumpStack entry, which currently specifies persistence in private PDF metadata, to in-memory-first with persistence explicitly deferred.
+**Action items:**
+- Revise the `TODO.md` JumpStack entry, which currently specifies persistence in private PDF metadata, to in-memory-first with persistence explicitly deferred.
+- Implement JumpStack with `Cmd+R`.
+- Amend §6.3 5.: clear internal JumpStack as part of clearing the per-document state
 
 ## 7. Decommissioning
 
 - **PDFHandler.app** is an AppleScript applet in `/Applications` that currently claims the `pdf://` scheme (created in an earlier LLM-assisted session; treat it as a black box -- nothing in it needs to be understood or preserved). Decommission procedure: quit it if running, move it to the Trash, empty the Trash, launch Anima once from Finder, then re-run acceptance 8(a)–(c). If clicks still route to the deleted app, log out and log back in -- Launch Services caches scheme routing, and a session restart rebuilds it.
-- **Timing note:** while both apps claim the scheme, macOS picks one arbitrarily. If Phase B acceptance clicks open PDFHandler.app instead of Anima, perform this decommissioning immediately (pulling step 11 forward) and continue Phase B testing afterwards.
+- **Timing note:** while both apps claim the scheme, macOS picks one arbitrarily. If Phase B acceptance clicks open PDFHandler.app instead of Anima, perform this decommissioning immediately (pulling step 13 forward) and continue Phase B testing afterwards.
 - **windows_server/README.md**: add a note that the macOS path is now served by Anima + `pdf_annot.resolve`; the server remains Windows-only legacy. Its "restart to rebuild the index" troubleshooting has no macOS equivalent -- the resolver is stateless.
 
 ## 8. Work Plan -- Locus of Attention
@@ -138,18 +147,23 @@ Rule: one project per session. Contract changes flow pdf-annotations-first, term
 
 4. `Info.plist` URL type; `pdfAnnotationsRoot` constant.
 5. `PdfAnnotationsBridge` per §6.2.
-6. URL handler + opening-flow integration per §6.3–6.4.
+6. URL handler + opening-flow integration per §6.3
 7. Alert plumbing: resolver stderr verbatim as alert body.
-8. Acceptance (clicking real links in Obsidian): (a) link to open document + page -> far jump, `Cmd+R` returns; (b) link to different document + page -> opens at page; reopening the previous document restores its last page; (c) link without page -> opens with restore; (d) unknown hash -> alert with §3.3 text; (e) staged duplicate -> alert with both paths; (f) malformed page -> alert, no action.
+8. Acceptance (clicking real links in Obsidian): (a) link to open document + page -> jumps to page; (b) link to different document + page -> opens at page; reopening the previous document restores its last page; (c) link without page -> opens with restore; (d) unknown hash -> alert with §3.3 text; (e) staged duplicate -> alert with both paths; (f) malformed page -> alert, no action.
 
 **-> SWITCH back to pdf-annotations ONLY if a contract inadequacy surfaces in Phase B; fix and re-verify there first.**
 
-**Phase C -- cleanup (either project's session, doc-only + Anima):**
+**Phase C -- Far-jump, JumpStack (Anima):**
 
-9.  Revise `TODO.md` JumpStack entry per §6.5.
-10. Windows server README note per §7.
-11. Decommission PDFHandler.app per §7.
-12. Re-run acceptance 8(a)–(c) once more after decommissioning (Launch Services can misroute schemes after handler changes).
+9.  Introduce far-jump seam per §6.4.
+10. Introduce JumpStack per §6.5.
+11. Acceptance: (a) after step 9, all five pre-existing far-jump sources still work -- goto-page, find in PDF, find in comments, `F3` in either search mode, jump to bookmark; (b) link to open document + page -> far jump, `Cmd+R` returns to the pre-jump page; (c) `Cmd+R` with an empty stack is a no-op, not a beep or a crash; (d) after switching documents via a link, `Cmd+R` does nothing -- the stack was cleared.
+
+**Phase D -- cleanup (either project's session, doc-only + Anima):**
+
+12. Windows server README note per §7.
+13. Decommission PDFHandler.app per §7.
+14. Re-run acceptance 8(a)–(c) once more after decommissioning (Launch Services can misroute schemes after handler changes).
 
 ## 9. Deferred Decisions Ledger
 

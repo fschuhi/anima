@@ -120,6 +120,14 @@ Anima remembers each PDF's most recently displayed page. `anima_helper.py` store
 
 `FitzBridge` reads return the helper's raw output (`getLastPage` -> `String?`); the caller decodes. Reader-facing page numbers remain 1-based; the stored index is 0-based.
 
+### The pdf-annotations Boundary
+
+Anima has a second subprocess seam, distinct from `FitzBridge`. `PdfAnnotationsBridge` calls the neighbouring `pdf-annotations` project's resolver CLI to turn a `pdf://HASH` link into a file path. The contract is the CLI, not the code (`TARGET_ARCHITECTURE.md` §3): Anima never imports `pdf_annot`, runs the resolver inside that project's own venv with its root as the working directory, and consumes stdout and stderr. Resolution is stateless -- the hash-to-path index is rebuilt per invocation from filenames, so every click sees current truth.
+
+The two bridges deliberately differ in how they fail. `FitzBridge` calls Anima's own helper in Anima's own venv, so a failure is a developer failure and is logged through `Swift.print`. `PdfAnnotationsBridge` consumes another project's declared interface, where an unknown hash or a duplicate `pdf_id` is an everyday outcome of library hygiene; it returns `ResolveOutcome` (`.resolved(path:)` / `.failed(message:)`) and the resolver's stderr reaches the user verbatim, because that text is written to be read.
+
+Status: the scheme is claimed and resolution works end to end, but `application(_:open:)` still only reports the outcome in a temporary probe alert. Wiring it into the opening flow is `TARGET_ARCHITECTURE.md` step 6.
+
 ---
 
 ## How to Use
@@ -199,7 +207,7 @@ Zettelkasten: idea notes, workbenches, Folgezettel sequences
 
 - **`pdf-annotations`**: Extracts highlights and comments from PDFs into Obsidian Markdown notes. Uses fitz -- Anima's annotations are fully compatible. Standard `/Annot` with `/Subtype /Highlight`, `/Contents` for comments, `QuadPoints` for precise multi-line highlighting.
 
-- **`pdf://` URL scheme**: Obsidian bibnotes reference PDFs via `pdf://HASH?page=N`. Currently routes through a Windows Parallels bridge to PDF-XChange Viewer. Phase 3 registers Anima as the native macOS handler, eliminating the Parallels dependency entirely, see `GOALS.md`.
+- **`pdf://` URL scheme**: Obsidian bibnotes reference PDFs via `pdf://HASH?page=N`. Anima claims the scheme on macOS and resolves the hash through the `pdf-annotations` resolver CLI; the legacy route through a Windows Parallels bridge to PDF-XChange Viewer is retired. Opening the resolved PDF at the requested page is the remaining step -- see `TARGET_ARCHITECTURE.md` and `GOALS.md`.
 
 - **Obsidian "The Studio"**: The Zettelkasten knowledge management system where bibnotes, idea notes, and workbenches live. Anima serves as the PDF reading layer that feeds this system.
 
@@ -217,6 +225,7 @@ anima/
 │   ├── BookmarkManager.swift       ← Bookmark session state and catalog persistence coordination
 │   ├── AppDelegate.swift           ← Window setup, PDF loading, manager wiring
 │   ├── FitzBridge.swift            ← Subprocess bridge to Python helper
+│   ├── PdfAnnotationsBridge.swift  ← Subprocess bridge to the pdf-annotations resolver CLI
 │   ├── JumpStationPanel.swift      ← Modal bookmark navigation and deletion picker
 │   ├── MainViewController.swift    ← NSSplitView layout, sidebar sync & emphasis
 │   ├── SidebarExtractor.swift      ← Parses annotations into sidebar CommentCard structs
@@ -240,6 +249,7 @@ anima/
 ├── HISTORY.md                      ← Resolved-work record (on the heap)
 ├── LLM_INSTRUCTIONS.md             ← AI session context and conventions
 ├── SIDEBAR_DESIGN.md               ← Sidebar design document (historical)
+├── TARGET_ARCHITECTURE.md          ← `pdf://` link resolution: contract, work plan, acceptance
 ├── TODO.md                         ← Forward-looking task scratchpad
 ├── HANDOVER.md                     ← Session handover notes
 ├── Makefile                        ← Build, setup, and utility targets
@@ -262,6 +272,8 @@ anima/
 **`SidebarExtractor.swift`** -- The pure data layer for the sidebar. Scans the PDFDocument for highlight annotations and safely extracts their text, UUID (/NM), author (/T), modification date, and vertical anchor points. Converts this raw PDFKit data into sorted `CommentCard` structs, keeping the extraction logic completely decoupled from the UI. Supports both document-level and per-page extraction (the latter used by the live-update path to rebuild a single page efficiently). Tested with `AnimaTests.swift`.
 
 **`FitzBridge.swift`** -- Static methods that call `anima_helper.py` via `Process()` (Swift's subprocess equivalent). Captures stdout/stderr, checks exit codes, and resolves the Python executable from the project's `.venv`. It provides annotation mutation calls plus bookmark list/set/delete calls; raw bookmark-list JSON is decoded by `BookmarkManager`, which owns the Swift data model and session state.
+
+**`PdfAnnotationsBridge.swift`** -- One static method, `resolve(hash:pdfAnnotationsRoot:)`, running the pdf-annotations resolver as a subprocess and returning `.resolved(path:)` or `.failed(message:)`. Like `FitzBridge` it holds no paths of its own: `AppDelegate` passes the project root per call. It reads both pipes before waiting for exit, and guards the two off-contract cases (nonzero exit with silent stderr, exit 0 with no path) so a protocol violation surfaces as prose rather than as an empty alert.
 
 **`anima_helper.py`** -- Standalone CLI tool with three subcommands: `add-highlight`, `edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save preserves existing annotations. Tested with pytest, covering round-trips, contract verification (UUID in /NM, opacity survival), and error handling.
 
@@ -352,7 +364,7 @@ open -n -a Anima --args ~/Papers/paper-a.pdf
 open -n -a Anima --args ~/Papers/paper-b.pdf
 ```
 
-Each instance is fully independent (separate window, sidebar, annotation state, comment panel geometry). This is also how the future `pdf://` URL server will open PDFs from Obsidian links.
+Each instance is fully independent (separate window, sidebar, annotation state, comment panel geometry). `pdf://` links from Obsidian deliberately do not use this path: they are delivered to the running instance and will replace the active document (`TARGET_ARCHITECTURE.md` §6.3).
 
 **Shell alias** (optional convenience for `~/.zshrc`):
 
