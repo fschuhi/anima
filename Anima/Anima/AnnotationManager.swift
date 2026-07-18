@@ -7,7 +7,7 @@
 //  PDFAnnotation) and the coordinate conversion from PDFKit space to fitz space.
 //
 //  Design:
-//    This is a toolbox class — it does not hold references to the PDFView,
+//    This is a toolbox class -- it does not hold references to the PDFView,
 //    the document, or any UI state. All context is passed per-call. This keeps
 //    the class testable and avoids stale references if multi-document support
 //    (tabs) is added later.
@@ -31,7 +31,7 @@ import Quartz
 
 class AnnotationManager {
 
-    // Path to the Python helper — absolute path for Xcode-launched app
+    // Path to the Python helper -- absolute path for Xcode-launched app
     let helperPath: String
 
     // Default author for in-memory annotations. Must match anima_helper.py's
@@ -67,7 +67,7 @@ class AnnotationManager {
     /// Coordinate contract (must match anima_helper.py's docstring):
     ///     y_fitz = page_height - y_pdfkit
     ///
-    /// x is unaffected by the flip — only y inverts, because fitz measures
+    /// x is unaffected by the flip -- only y inverts, because fitz measures
     /// from the top of the page and PDFKit measures from the bottom.
     ///
     /// - Parameters:
@@ -90,7 +90,7 @@ class AnnotationManager {
     /// four points per quad (one quad per selection line). Order: bottom-left,
     /// bottom-right, top-left, top-right (the PDF spec order for QuadPoints).
     ///
-    /// This is a pure geometry function — it does not filter degenerate
+    /// This is a pure geometry function -- it does not filter degenerate
     /// (zero-width or zero-height) rects. That filtering is a policy decision
     /// made upstream, in `createHighlight`.
     ///
@@ -147,10 +147,10 @@ class AnnotationManager {
                 continue
             }
 
-            // PDFKit-space bounds — keep as-is for in-memory annotation
+            // PDFKit-space bounds -- keep as-is for in-memory annotation
             pdfkitBounds.append(bounds)
 
-            // Fitz-space quad — see fitzQuad(from:pageHeight:) for the y-flip contract
+            // Fitz-space quad -- see fitzQuad(from:pageHeight:) for the y-flip contract
             fitzQuads.append(AnnotationManager.fitzQuad(from: bounds, pageHeight: pageHeight))
         }
 
@@ -226,7 +226,7 @@ class AnnotationManager {
     ) -> Bool {
 
         guard let uuid = annotationUUID(annotation) else {
-            Swift.print("⚠️  Highlight has no UUID — cannot edit")
+            Swift.print("⚠️  Highlight has no UUID -- cannot edit")
             return false
         }
 
@@ -239,7 +239,7 @@ class AnnotationManager {
         Swift.print("🖱️  Editing comment: \(uuid)")
         Swift.print("   Existing comment: \(existingComment.isEmpty ? "(none)" : existingComment)")
 
-        // Show the modal input panel. The panel always returns a string —
+        // Show the modal input panel. The panel always returns a string --
         // there is no "cancel". Escape saves whatever text is in the editor.
         let newComment = CommentInputPanel.showModal(existingText: existingComment)
 
@@ -305,7 +305,7 @@ class AnnotationManager {
     ) -> Bool {
 
         guard let uuid = annotationUUID(annotation) else {
-            Swift.print("⚠️  Highlight has no UUID — cannot delete")
+            Swift.print("⚠️  Highlight has no UUID -- cannot delete")
             return false
         }
 
@@ -377,18 +377,18 @@ class AnnotationManager {
             annot.contents = isXRayMode ? comment : ""
         }
 
-        // Set UUID — both via /NM (primary, used by annotationUUID) and
+        // Set UUID -- both via /NM (primary, used by annotationUUID) and
         // userName (backup). /NM must be set explicitly because PDFKit
         // does not populate it from userName.
         annot.setValue(uuid, forAnnotationKey: PDFAnnotationKey(rawValue: "/NM"))
         annot.userName = uuid
 
-        // Set author — matches anima_helper.py's DEFAULT_AUTHOR.
+        // Set author -- matches anima_helper.py's DEFAULT_AUTHOR.
         // Must be set AFTER userName to avoid PDFKit's internal
         // userName ↔ /T mapping from overwriting the author with the UUID.
         annot.setValue(AnnotationManager.authorName, forAnnotationKey: PDFAnnotationKey(rawValue: "/T"))
 
-        // Build QuadPoints — one quad (4 points) per selection line.
+        // Build QuadPoints -- one quad (4 points) per selection line.
         // See quadPoints(for:) for the corner-order contract.
         var quadPoints: [NSValue] = []
         for rect in bounds {
@@ -398,7 +398,7 @@ class AnnotationManager {
         // Set QuadPoints via the annotation key
         annot.setValue(quadPoints, forAnnotationKey: PDFAnnotationKey(rawValue: "/QuadPoints"))
 
-        // Add to the page — PDFKit renders it immediately
+        // Add to the page -- PDFKit renders it immediately
         page.addAnnotation(annot)
 
         // Now that it's on the page, link the popup if necessary

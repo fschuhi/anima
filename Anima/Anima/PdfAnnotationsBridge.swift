@@ -1,4 +1,4 @@
-// PdfAnnotationsBridge.swift — Anima
+// PdfAnnotationsBridge.swift -- Anima
 //
 // Anima's dependency on the neighbouring pdf-annotations project.
 //
@@ -19,7 +19,7 @@
 //               this bridge passes it through unmodified.
 //
 // Not a sibling of FitzBridge:
-//   FitzBridge calls Anima's own backend — same repo, same venv — and a
+//   FitzBridge calls Anima's own backend -- same repo, same venv -- and a
 //   failure there is a developer failure, logged with Swift.print. This bridge
 //   consumes another project's declared interface, where a failure (unknown
 //   hash, duplicate pdf_id) is a normal, user-facing outcome of everyday
@@ -27,7 +27,7 @@
 //
 // Path resolution:
 //   No hardcoded paths. pdfAnnotationsRoot is passed in per call by
-//   AppDelegate, which owns it as a constant — the same philosophy that keeps
+//   AppDelegate, which owns it as a constant -- the same philosophy that keeps
 //   FitzBridge free of paths of its own.
 
 import Foundation
@@ -37,8 +37,8 @@ struct PdfAnnotationsBridge {
     /// The two outcomes of a resolution attempt, mirroring the CLI contract.
     ///
     /// `failed` carries prose intended for the user's eyes: either the
-    /// resolver's stderr verbatim, or — when the subprocess never produced any
-    /// — a sentence composed here. Callers may show it without editing.
+    /// resolver's stderr verbatim, or -- when the subprocess never produced any
+    /// -- a sentence composed here. Callers may show it without editing.
     enum ResolveOutcome {
         case resolved(path: String)
         case failed(message: String)
@@ -94,13 +94,13 @@ struct PdfAnnotationsBridge {
 
         // Read the pipes BEFORE waiting for exit. FitzBridge.runPython does the
         // reverse (waitUntilExit, then read), which deadlocks if a child ever
-        // fills a pipe buffer while we wait for it to die — a latent bug noted
+        // fills a pipe buffer while we wait for it to die -- a latent bug noted
         // in TODO.md under "FitzBridge redesign". Not replicated here.
         //
         // Sequential reads are safe at this size: the resolver writes one path
         // on stdout, or a few lines on stderr, both far below the ~64 KB pipe
         // buffer. Reading stdout to EOF cannot block long enough for stderr to
-        // back up. The fully general fix — draining both pipes concurrently —
+        // back up. The fully general fix -- draining both pipes concurrently --
         // is unnecessary ceremony for output this small.
         let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()

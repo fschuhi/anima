@@ -33,7 +33,7 @@
 //    A single projectRoot constant is the source of truth for all derived
 //    paths (helper script, dev fallback PDF). FitzBridge independently
 //    derives the venv Python path from the helperPath it receives.
-//    To move the project, change projectRoot here — nothing else.
+//    To move the project, change projectRoot here -- nothing else.
 //    A second, independent constant (pdfAnnotationsRoot) locates the
 //    neighbouring pdf-annotations project. It is deliberately not derived
 //    from projectRoot: the two projects are joined by a frozen CLI contract,
@@ -134,7 +134,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// "Open With", or drags a file onto the Dock icon.
     ///
     /// This is the modern URL-based variant (macOS 10.13+). macOS delivers
-    /// file URLs directly — no string-to-URL conversion needed.
+    /// file URLs directly -- no string-to-URL conversion needed.
     ///
     /// Timing: during a cold launch this fires BEFORE applicationDidFinishLaunching.
     /// In that case we stash the URL and let applicationDidFinishLaunching pick it up.
@@ -165,7 +165,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Custom URL Scheme (temporary probe — Phase B step 5)
+    // MARK: - Custom URL Scheme (temporary probe -- Phase B step 5)
 
     /// Resolves a non-file URL through the pdf-annotations resolver and reports
     /// the outcome, without opening anything yet.
@@ -179,7 +179,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     ///
     /// It is an alert rather than Swift.print because a link click launches or
     /// activates Anima through Launch Services, where stdout is not visible
-    /// without Console.app — and because a duplicate pdf_id is an everyday
+    /// without Console.app -- and because a duplicate pdf_id is an everyday
     /// library-hygiene event that must reach the user, not a log.
     ///
     /// runModal() is used unconditionally: during a cold launch this fires

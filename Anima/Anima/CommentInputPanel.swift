@@ -8,12 +8,12 @@
 //  Design philosophy (modal-by-conviction):
 //    This panel is deliberately modal. Editing a comment is a focused act:
 //    the user's attention is on one highlight and its annotation text.
-//    Modality enforces this focus at the UI level. There is no cancel —
+//    Modality enforces this focus at the UI level. There is no cancel --
 //    Escape always saves the current text ("always autosave" philosophy).
 //    Enter inserts newlines (comments are often multi-line).
 //
 //  Visual design:
-//    The panel is styled to match CommentCardView — same background color,
+//    The panel is styled to match CommentCardView -- same background color,
 //    corner radius, fonts, and color palette. A custom title label ("Add
 //    comment" / "Edit comment") replaces the native window title, rendered
 //    in the same muted style as the card's date/author line. A thin divider
@@ -31,7 +31,7 @@
 //
 //  Lifecycle:
 //    showModal() creates the panel, runs it as a modal session, and tears
-//    it down after Escape. The panel is not reused across invocations —
+//    it down after Escape. The panel is not reused across invocations --
 //    each call creates a fresh instance.
 //
 
@@ -57,7 +57,7 @@ class CommentInputPanel: NSPanel {
     private static let dividerTopSpacing: CGFloat = 4
     private static let dividerBottomSpacing: CGFloat = 4
 
-    // Leading padding for the title label — aligned with the text view's
+    // Leading padding for the title label -- aligned with the text view's
     // effective left edge (internalPadding 6 + textContainerInset.width 2 = 8).
     private static let titleLeadingPadding: CGFloat = 8
 
@@ -118,7 +118,7 @@ class CommentInputPanel: NSPanel {
         self.level = .modalPanel
         self.isReleasedWhenClosed = false
 
-        // Hide the native title text — we render our own title label
+        // Hide the native title text -- we render our own title label
         self.titleVisibility = .hidden
         self.titlebarAppearsTransparent = true
 
@@ -197,7 +197,7 @@ class CommentInputPanel: NSPanel {
         // With .fullSizeContentView, our content extends behind the
         // transparent title bar. We place the title label at the same
         // internalPadding (6pt) as the card, sitting inside the title
-        // bar zone — which is fine since the title bar is invisible.
+        // bar zone -- which is fine since the title bar is invisible.
         NSLayoutConstraint.activate([
             // Title label: tight to top, left-aligned with text content
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: CommentInputPanel.internalPadding),
@@ -240,7 +240,7 @@ class CommentInputPanel: NSPanel {
     }
 
     // Also handle via cancelOperation (the Cocoa-standard Escape handler).
-    // Belt and suspenders — some code paths send cancelOperation: instead
+    // Belt and suspenders -- some code paths send cancelOperation: instead
     // of a raw keyDown for Escape.
     override func cancelOperation(_ sender: Any?) {
         NSApp.stopModal()

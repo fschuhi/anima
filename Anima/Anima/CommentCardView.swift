@@ -8,7 +8,7 @@
 //    Clicking a card triggers the onClicked closure, which MainViewController
 //    uses to emphasize the corresponding highlight in the PDF.
 //    Double-clicking triggers onDoubleClicked, used to open the edit dialog.
-//    The card itself does not manage emphasis state — MainViewController calls
+//    The card itself does not manage emphasis state -- MainViewController calls
 //    setActive() and setInactive() to control the visual indication.
 //
 //  Comment search:

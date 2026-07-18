@@ -102,7 +102,7 @@ The coordinate flip happens in Swift (`AnimaPDFView`) before calling the helper.
 
 Every annotation gets a UUID stored in the PDF `/NM` field. Swift generates UUIDs, passes them to the helper via CLI arguments, and uses them for hit-testing and identification. The helper sets `/NM` via fitz's xref API (`doc.xref_set_key`).
 
-**Important:** On in-memory annotations, `/NM` must be set explicitly via `setValue(_:forAnnotationKey:)`. PDFKit maps `userName` to `/T` (the author field), not to `/NM`. Relying on `userName` alone for UUID storage causes the author field to overwrite the UUID. See SIDEBAR_DESIGN.md "Known Gotchas" for full details.
+**Important:** On in-memory annotations, `/NM` must be set explicitly via `setValue(_:forAnnotationKey:)`. PDFKit maps `userName` to `/T` (the author field), not to `/NM`. Relying on `userName` alone for UUID storage causes the author field to overwrite the UUID. See `docs/SIDEBAR_DESIGN.md` "Known Gotchas" for full details.
 
 ### Bookmarks
 
@@ -244,14 +244,15 @@ anima/
 │   └── test_anima_helper.py        ← round-trip, contracts, edge cases
 ├── data/
 │   └── input_original.pdf          ← Test PDF (unmodified backup)
+├── docs/                           ← Design notes, historical unless marked current
+│   ├── BOOKMARKS_DESIGN.md         ← Bookmark and navigation design (to 2026-07-16)
+│   └── SIDEBAR_DESIGN.md           ← Sidebar design and known gotchas (historical)
 ├── CRITICAL_RULES.md               ← Non-negotiable collaboration rules
 ├── GOALS.md                        ← Strategic direction & roadmap
 ├── HISTORY.md                      ← Resolved-work record (on the heap)
 ├── LLM_INSTRUCTIONS.md             ← AI session context and conventions
-├── SIDEBAR_DESIGN.md               ← Sidebar design document (historical)
 ├── TARGET_ARCHITECTURE.md          ← `pdf://` link resolution: contract, work plan, acceptance
 ├── TODO.md                         ← Forward-looking task scratchpad
-├── HANDOVER.md                     ← Session handover notes
 ├── Makefile                        ← Build, setup, and utility targets
 ├── pyproject.toml                  ← Project metadata, pytest & black config
 └── manifest.lst                    ← File list for filesdump generation
@@ -271,11 +272,11 @@ anima/
 
 **`SidebarExtractor.swift`** -- The pure data layer for the sidebar. Scans the PDFDocument for highlight annotations and safely extracts their text, UUID (/NM), author (/T), modification date, and vertical anchor points. Converts this raw PDFKit data into sorted `CommentCard` structs, keeping the extraction logic completely decoupled from the UI. Supports both document-level and per-page extraction (the latter used by the live-update path to rebuild a single page efficiently). Tested with `AnimaTests.swift`.
 
-**`FitzBridge.swift`** -- Static methods that call `anima_helper.py` via `Process()` (Swift's subprocess equivalent). Captures stdout/stderr, checks exit codes, and resolves the Python executable from the project's `.venv`. It provides annotation mutation calls plus bookmark list/set/delete calls; raw bookmark-list JSON is decoded by `BookmarkManager`, which owns the Swift data model and session state.
+**`FitzBridge.swift`** -- Static methods that call `anima_helper.py` via `Process()` (Swift's subprocess equivalent). Captures stdout/stderr, checks exit codes, and resolves the Python executable from the project's `.venv`. It provides annotation mutation calls, bookmark list/set/delete calls, and last-page get/set. Reads return the helper's raw stdout as `String?` and mutations return `Bool`, so decoding stays with the caller: raw bookmark-list JSON is decoded by `BookmarkManager`, which owns the Swift data model and session state, and the last-page string is decoded by `AppDelegate`.
 
 **`PdfAnnotationsBridge.swift`** -- One static method, `resolve(hash:pdfAnnotationsRoot:)`, running the pdf-annotations resolver as a subprocess and returning `.resolved(path:)` or `.failed(message:)`. Like `FitzBridge` it holds no paths of its own: `AppDelegate` passes the project root per call. It reads both pipes before waiting for exit, and guards the two off-contract cases (nonzero exit with silent stderr, exit 0 with no path) so a protocol violation surfaces as prose rather than as an empty alert.
 
-**`anima_helper.py`** -- Standalone CLI tool with three subcommands: `add-highlight`, `edit-comment`, `delete-highlight`. All coordinates in fitz space. Incremental save preserves existing annotations. Tested with pytest, covering round-trips, contract verification (UUID in /NM, opacity survival), and error handling.
+**`anima_helper.py`** -- Standalone CLI tool with eight subcommands across three concerns: annotations (`add-highlight`, `edit-comment`, `delete-highlight`), bookmarks (`list-bookmarks`, `set-bookmark`, `delete-bookmark`), and reading position (`get-last-page`, `set-last-page`).
 
 **`CommentCardView.swift`** -- The visual representation of a single annotation in the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based on the length of the comment text. Handles all visual styling, including the muted typography applied to structural pipeline commands (e.g., "link" or "H2"). Reports clicks via an `onClicked` closure and supports active/inactive visual states for the emphasis feature.
 

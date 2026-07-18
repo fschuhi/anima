@@ -5,19 +5,19 @@
 //  Subclass of PDFView that intercepts keyboard and mouse events.
 //
 //  Current capabilities:
-//    - ENTER with selection → create highlight (via AnnotationManager)
-//    - `Cmd+H` → toggle persistent highlight mode (mouseUp creates highlight)
-//    - `Cmd+P` → toggle X-Ray mode (reveals native popups for comments)
-//    - `Cmd+G` key → go to a page through a native modal input field
-//    - `Cmd+B` → add a named bookmark for the current page
-//    - `Cmd+J` → open JumpStation bookmark navigation
-//    - `Cmd+F` → find text forward from the current page
-//    - `Cmd+Shift+F` → find matching annotation comments forward from the current page
-//    - `F3` → advance to the next active find hit
-//    - `Esc` → clear PDF-text search, comment search, or annotation emphasis
-//    - Double-click on highlight (or card via delegate) → edit comment (via AnnotationManager)
-//    - Single-click highlight → toggle emphasis
-//    - `Delete` → remove the currently emphasized highlight (via AnnotationManager)
+//    - ENTER with selection -> create highlight (via AnnotationManager)
+//    - `Cmd+H` -> toggle persistent highlight mode (mouseUp creates highlight)
+//    - `Cmd+P` -> toggle X-Ray mode (reveals native popups for comments)
+//    - `Cmd+G` key -> go to a page through a native modal input field
+//    - `Cmd+B` -> add a named bookmark for the current page
+//    - `Cmd+J` -> open JumpStation bookmark navigation
+//    - `Cmd+F` -> find text forward from the current page
+//    - `Cmd+Shift+F` -> find matching annotation comments forward from the current page
+//    - `F3` -> advance to the next active find hit
+//    - `Esc` -> clear PDF-text search, comment search, or annotation emphasis
+//    - Double-click on highlight (or card via delegate) -> edit comment (via AnnotationManager)
+//    - Single-click highlight -> toggle emphasis
+//    - `Delete` -> remove the currently emphasized highlight (via AnnotationManager)
 //
 //  Annotation CRUD:
 //    All highlight creation, comment editing, and deletion are delegated to
@@ -28,7 +28,7 @@
 //  Sidebar integration:
 //    After any annotation mutation (create, edit, delete), the
 //    sidebarDelegate is notified so the sidebar can rebuild the affected
-//    page's cards. The delegate receives only the page index — the sidebar
+//    page's cards. The delegate receives only the page index -- the sidebar
 //    re-extracts all cards for that page from scratch.
 //
 //    Single-clicking a highlight notifies the delegate via
@@ -156,7 +156,7 @@ class AnimaPDFView: PDFView {
             return true
         }
 
-        // Don't handle keys while a dialog is open — the Enter that
+        // Don't handle keys while a dialog is open -- the Enter that
         // dismisses the dialog would otherwise trigger a new highlight
         if isShowingDialog {
             return false
@@ -949,7 +949,7 @@ class AnimaPDFView: PDFView {
         if event.clickCount == 2 {
             // Double-click: check if we hit a highlight annotation
             if handleDoubleClickOnHighlight(event) {
-                return  // consumed — don't let PDFKit do word-selection
+                return  // consumed -- don't let PDFKit do word-selection
             }
         }
 
@@ -1019,14 +1019,14 @@ class AnimaPDFView: PDFView {
         }
 
         guard let uuid = annotationManager.annotationUUID(annot) else {
-            Swift.print("⚠️  Highlight has no UUID — cannot edit")
+            Swift.print("⚠️  Highlight has no UUID -- cannot edit")
             return false
         }
 
         clearFindModesForAnnotationInteraction()
 
         // Ensure emphasis is on before opening the dialog (toggle: false
-        // means "ensure on" — if already emphasized on this annotation,
+        // means "ensure on" -- if already emphasized on this annotation,
         // it's a no-op rather than toggling off).
         if let document = self.document {
             let pageIndex = document.index(for: page)
@@ -1066,7 +1066,7 @@ class AnimaPDFView: PDFView {
 
     func handleSingleClickOnHighlight(_ event: NSEvent) {
         guard let (page, pagePoint) = pageAndPoint(for: event) else {
-            // Clicked outside any page — clear emphasis
+            // Clicked outside any page -- clear emphasis
             sidebarDelegate?.highlightWasClicked(uuid: "", onPageIndex: -1, toggle: true)
             selectedAnnotation = nil
             selectedAnnotationPage = nil
@@ -1076,7 +1076,7 @@ class AnimaPDFView: PDFView {
         if let annot = highlightAnnotation(at: pagePoint, on: page) {
             clearFindModesForAnnotationInteraction()
 
-            // Hit a highlight — notify delegate for emphasis toggle.
+            // Hit a highlight -- notify delegate for emphasis toggle.
             // selectedAnnotation/Page will be set by MainViewController
             // via applyEmphasis/clearEmphasis (unified with emphasis state).
             if let uuid = annotationManager.annotationUUID(annot) {
@@ -1087,7 +1087,7 @@ class AnimaPDFView: PDFView {
                 Swift.print("🔵 Clicked highlight: \(uuid)")
             }
         } else {
-            // Clicked on page but not on a highlight — clear emphasis
+            // Clicked on page but not on a highlight -- clear emphasis
             sidebarDelegate?.highlightWasClicked(uuid: "", onPageIndex: -1, toggle: true)
             selectedAnnotation = nil
             selectedAnnotationPage = nil
@@ -1106,7 +1106,7 @@ class AnimaPDFView: PDFView {
     func deleteSelectedHighlight() -> Bool {
         guard let annot = selectedAnnotation,
               let page = selectedAnnotationPage else {
-            Swift.print("⚠️  No highlight selected — click a highlight first")
+            Swift.print("⚠️  No highlight selected -- click a highlight first")
             return false
         }
 
@@ -1168,7 +1168,7 @@ class AnimaPDFView: PDFView {
         if uuid != nil {
             clearSelection()
 
-            // Notify sidebar — currently a no-op since highlights start without
+            // Notify sidebar -- currently a no-op since highlights start without
             // comments (no card to show), but this ensures the sidebar stays
             // correct if we ever change the default or add in-place editing.
             sidebarDelegate?.annotationsDidChange(onPageIndex: pageIndex)

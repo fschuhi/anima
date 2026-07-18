@@ -1,4 +1,4 @@
-// FitzBridge.swift — Anima PoC
+// FitzBridge.swift -- Anima PoC
 //
 // Calls anima_helper.py via Process() (Swift's equivalent of subprocess).
 // All persistent PDF mutations and catalog reads go through this bridge to
@@ -13,7 +13,7 @@
 //   The Python executable is derived from the helperPath passed in each call.
 //   helperPath points to tools/anima_helper.py; the project root is two levels
 //   up, and the venv Python lives at .venv/bin/python3 relative to that root.
-//   This means FitzBridge has no hardcoded paths of its own — everything flows
+//   This means FitzBridge has no hardcoded paths of its own -- everything flows
 //   from the helperPath that AppDelegate sets on AnnotationManager and
 //   BookmarkManager.
 
