@@ -249,9 +249,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
 
                 // TARGET_ARCHITECTURE.md §6.3 step 4: a same-document link is a
-                // far jump, so it routes through the shared seam and Cmd+R will
-                // return here. The different-document path below stays outside
-                // the seam permanently (§6.3 step 5).
+                // far jump, so it routes through the shared seam and is recorded
+                // in the JumpStack. The different-document path below stays
+                // outside the seam permanently (§6.3 step 5).
                 mainViewController.pdfView.farJump(to: page)
                 Swift.print("🔗 pdf:// link jumped within the open document to page \(pageIndex + 1)")
                 return
