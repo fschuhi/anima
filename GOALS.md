@@ -10,9 +10,9 @@ This file answers: where is the project going, in what order, and what happens n
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Phases 1 and 2 are complete. Phase 3, `pdf://` Toolchain Integration, completed its Phase B opening flow on 2026-07-18: real Obsidian links resolve through `PdfAnnotationsBridge`, safely activate or replace Anima's active document, honor explicit 1-based `page` queries over stored positions, restore last position without a page query, and surface resolver and URL validation failures to the user.
+**Where we are:** Phases 1 and 2 are complete. Phase 3's Phase B opening flow completed on 2026-07-18. `TARGET_ARCHITECTURE.md` Phase C step 9 completed on 2026-07-19: `AnimaPDFView` exposes the shared far-jump seam, and all five call sites -- goto page, both finds and their `F3`, bookmark jump, and the same-document `pdf://` link -- execute through it. The step changed no observable behavior by construction; acceptance 11(a) verified manually.
 
-**What's next:** `TARGET_ARCHITECTURE.md` Phase C step 9 -- introduce the small shared far-jump seam described in §6.4. Keep target discovery in its existing local owners, but route the final non-local transitions for goto page, both finds, F3, bookmark jumps, and same-document `pdf://` page links through one shared execution point. Step 10 then builds the in-memory JumpStack on that seam.
+**What's next:** `TARGET_ARCHITECTURE.md` Phase C step 10 -- the in-memory JumpStack per §6.5. Fill the `recordPreJumpPosition()` stub to push the current page onto a bounded stack (provisionally five entries), wire `Cmd+R` to pop and return, and clear the stack on document change. Design duplicate and consecutive-page behavior before wiring it into the reader. Acceptance is 11(b)-(d).
 
 ---
 

@@ -70,6 +70,7 @@ See "Workflow for the Whole Session (CRITICAL)" in `LLM_INSTRUCTIONS.md` for whe
 - Clean launch: window hidden until restore + load complete, no empty-window flash (2026-07-14)
 - Forward-only search (2026-07-14): `Cmd+F` PDF text, `Cmd+Shift+F` comments, `F3` next hit, no wrapping; `Esc` clears transient state in ladder order; search can never create a highlight
 - Per-PDF last-page persistence (2026-07-17): `/AnimaLastPage` catalog key; persisted only on document replacement and quit. Details: `README.md` §Last-Page Restoration
+- Far-jump seam (2026-07-19): `AnimaPDFView.farJump(to:)` overloads are the single execution point for goto page, both finds, `F3`, bookmark jumps, and same-document `pdf://` links; `restore(toPageIndex:)` bypasses it deliberately. Details: `TARGET_ARCHITECTURE.md` §6.4
 
 ## macOS Integration
 

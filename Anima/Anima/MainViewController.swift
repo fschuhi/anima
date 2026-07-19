@@ -580,7 +580,7 @@ class MainViewController: NSViewController, SidebarUpdateDelegate {
             page: page,
             at: NSPoint(x: annotation.bounds.midX, y: annotation.bounds.midY)
         )
-        pdfView.go(to: destination)
+        pdfView.farJump(to: destination)
     }
 
     /// Public seam for the approved ordered-Esc behavior. MainViewController

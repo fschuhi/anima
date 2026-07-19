@@ -104,7 +104,7 @@ New type, named for what it is: Anima's dependency on the pdf-annotations projec
 1. **Modal guard** -- if a modal alert/sheet is up, reject the open (beep; no queueing in v1).
 2. **Parse URL** -- extract hash and optional page; convert page to 0-based here and only here. Malformed -> alert, stop.
 3. **Resolve** -- via bridge. Failure -> alert whose body is the resolver's stderr verbatim, stop. (Launch Services has activated Anima, so the alert appears exactly where the user is looking. This alert IS the replacement for the Windows server console.)
-4. **Same-document check** -- if the resolved path equals the currently open document: activate Anima, and if `page` is present, change to that page. In Phase B this is a direct `PDFView.go(to:)` call, marked in the code as the future seam call site (§6.4). It adds a sixth call site rather than rerouting the existing five, so it does not anticipate the Phase C refactoring. Without `page`: activate only. Done.
+4. **Same-document check** -- if the resolved path equals the currently open document: activate Anima, and if `page` is present, change to that page. As of Phase C step 9 this routes through the shared far-jump seam (§6.4). In Phase B it was a direct `PDFView.go(to:)` call, marked in the code as the future seam call site.
 5. **Different document** -- persist outgoing document's page, clear per-document state, load document, load bookmarks, install, then: `page` present -> jump to it; absent -> restore last position.
 
 ### 6.4 Far-jump integration
@@ -167,4 +167,4 @@ Rule: one project per session. Contract changes flow pdf-annotations-first, term
 
 ## 9. Deferred Decisions Ledger
 
-Tolerant duplicate resolution; JumpStack persistence in PDF metadata; multi-window/tabs; queueing URL opens behind modals; exit-code taxonomy; state-machine formalization of the opening flow. Each was consciously skipped, not forgotten.
+Tolerant duplicate resolution; JumpStack persistence in PDF metadata; single-destination consolidation of the far-jump seam (§6.4 -- revisit only if step 10 needs a target richer than a page index, or a fourth target type appears); multi-window/tabs; queueing URL opens behind modals; exit-code taxonomy; state-machine formalization of the opening flow. Each was consciously skipped, not forgotten.

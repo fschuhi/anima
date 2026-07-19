@@ -445,6 +445,59 @@ class AnimaPDFView: PDFView {
         return document.index(for: currentPage)
     }
 
+    // MARK: - Far-Jump Seam
+
+    // The single execution point for far jumps (TARGET_ARCHITECTURE.md §6.4).
+    //
+    // A far jump is a defined non-local reader transition: goto page, find in
+    // PDF, find in comments, F3 in either search mode, jump to bookmark, and a
+    // same-document pdf:// page link. Target discovery stays with its local
+    // owners; every one of them ends its transition here.
+    //
+    // The overloads mirror PDFKit's own go(to:) vocabulary so each caller keeps
+    // the exact primitive it uses today: a page jump lands at the top of the
+    // page, a find hit gets PDFKit's reveal-the-selection scrolling, and a
+    // comment hit centers a constructed destination. Flattening these into one
+    // target type would change scroll behavior, so the seam is singular where
+    // step 10 needs it -- in recordPreJumpPosition() -- not in the dispatch.
+    //
+    // Deliberately outside the seam: restore(toPageIndex:) below, and the
+    // document install path in AppDelegate (§6.3 step 5), because a jump that
+    // positions a freshly loaded document has no pre-jump position to record.
+    // Ordinary scrolling and page changes are not far jumps either.
+
+    /// Far-jumps to a whole page: goto page, bookmark jump, pdf:// page link.
+    func farJump(to page: PDFPage) {
+        recordPreJumpPosition()
+        go(to: page)
+    }
+
+    /// Far-jumps to a PDF-text find hit, preserving PDFKit's selection scrolling.
+    func farJump(to selection: PDFSelection) {
+        recordPreJumpPosition()
+        go(to: selection)
+    }
+
+    /// Far-jumps to a constructed destination: comment-search hits.
+    func farJump(to destination: PDFDestination) {
+        recordPreJumpPosition()
+        go(to: destination)
+    }
+
+    /// Captures the position a far jump departs from, so that Cmd+R can later
+    /// return to it.
+    ///
+    /// Step 9 establishes the call site only. The bounded in-memory JumpStack
+    /// itself is step 10 (§6.5), which fills this body and clears the stack on
+    /// document change. Leaving the hook empty here is what makes step 9
+    /// behavior-neutral: every far jump still performs the same PDFKit call
+    /// with the same argument it performed before.
+    private func recordPreJumpPosition() {
+        // Step 10: push currentPageIndex() onto the JumpStack.
+    }
+
+    // MARK: - Navigation Actions
+
     /// Restores the reader to a stored 0-based page index, clamping into the
     /// document's valid range so a stale position -- saved when the PDF had
     /// more pages -- lands on the last page rather than failing. Uses the same
@@ -452,6 +505,7 @@ class AnimaPDFView: PDFView {
     ///
     /// Restoring reading position is transparent navigation: it deliberately
     /// does not participate in any far-jump history a future Cmd+R would pop.
+    /// It therefore bypasses farJump(to:) and keeps its own direct go(to:) call.
     func restore(toPageIndex index: Int) {
         guard let document = document, document.pageCount > 0 else {
             return
@@ -505,7 +559,7 @@ class AnimaPDFView: PDFView {
             return
         }
 
-        go(to: page)
+        farJump(to: page)
         Swift.print("📖 Navigated to page \(pageNumber) of \(pageCount)")
     }
 
@@ -702,7 +756,7 @@ class AnimaPDFView: PDFView {
             return
         }
 
-        go(to: page)
+        farJump(to: page)
         Swift.print("🔖 Jumped to bookmark \"\(bookmark.name)\" on page \(bookmark.page + 1)")
     }
 
@@ -829,7 +883,7 @@ class AnimaPDFView: PDFView {
 
         highlightedSelections = [selection]
         activeFindResultIndex = resultIndex
-        go(to: selection)
+        farJump(to: selection)
 
         if let document = document {
             let pageNumber = pageIndex(for: selection, in: document) + 1
