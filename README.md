@@ -116,9 +116,17 @@ Bookmark pages are stored as fitz-native 0-based indices. `BookmarkManager` keep
 
 Anima remembers each PDF's most recently displayed page. `anima_helper.py` stores a single fitz-native 0-based page index as a PDF string under the catalog's private `/AnimaLastPage` key, independent of `/AnimaBookmarks` and of the document's native outline. The index is persisted only when the active document is replaced and on application termination -- never on every page change -- so switching PDFs or quitting appends at most one incremental save.
 
-`AppDelegate` owns the sequence: it persists the outgoing document's page (read on demand from the reader, not cached) before installing a replacement, and restores the incoming document's page after the PDF and sidebar are installed. `AnimaPDFView.restore(toPageIndex:)` clamps a stale stored index -- one saved when the PDF had more pages -- to the last page rather than failing. Restoring position is transparent navigation: it deliberately bypasses the far-jump seam that goto-page, both finds, bookmark jumps, and same-document `pdf://` links route through, and so does not participate in the future JumpStack history specified in `docs/JUMPSTACK_DESIGN.md`.
+`AppDelegate` owns the sequence: it persists the outgoing document's page (read on demand from the reader, not cached) before installing a replacement, and restores the incoming document's page after the PDF and sidebar are installed. `AnimaPDFView.restore(toPageIndex:)` clamps a stale stored index -- one saved when the PDF had more pages -- to the last page rather than failing. Restoring position is transparent navigation: it deliberately bypasses the far-jump seam that goto-page, both finds, bookmark jumps, and same-document `pdf://` links route through, and so does not enter the far-jump history described below.
 
 `FitzBridge` reads return the helper's raw output (`getLastPage` -> `String?`); the caller decodes. Reader-facing page numbers remain 1-based; the stored index is 0-based.
+
+### Far-Jump History
+
+A far jump is a defined non-local reader transition: goto page, find in PDF, find in comments, `F3` in either search mode, jump to bookmark, and a same-document `pdf://` link. All six execute through `AnimaPDFView.farJump(to:)`, whose overloads mirror PDFKit's own `go(to:)` vocabulary so each caller keeps its existing scroll behavior. That seam is the only place the history is written.
+
+`JumpStack` holds the history: a list of 0-based page indices with a pointer into it, owned by `AnimaPDFView`. Every far jump records two entries -- the page the reader is leaving, read from the reader rather than from the pointer, and the page it arrives at -- with either push declined when it would duplicate the previous entry. Ordinary scrolling records nothing; it only changes where a later far jump departs from. Recording is all-or-nothing: when a page index cannot be derived, the jump still happens and nothing is recorded, because a half-written entry would misstate where the reader stands and mislead every later walk.
+
+`Cmd+E` and `Cmd+R` move the pointer first and then navigate, and they deliberately bypass the seam -- routing them through it would record every return as a new jump. They never modify the entries. The history is in-memory only and is cleared by `clearSearchAndSelection()` on document change, so a stored index can never address a page outside the current document; last-page restoration is the cross-document return path and stays outside the seam. The model, its traces, and the conventions considered and rejected are in `docs/JUMPSTACK_DESIGN.md`.
 
 ### The pdf-annotations Boundary
 
@@ -147,6 +155,10 @@ Highlights start without comments by design. Add a comment later by double-click
 - **`Cmd+G`** -- go to a 1-based page number.
 - **`Home` / `End`** and **`Cmd+Home` / `Cmd+End`** -- jump to the beginning or end of the document.
 - **`Page Up` / `Page Down`** -- move by one screenful.
+- **`Cmd+E`** -- walk back along the far-jump history: return to where the previous jump departed from, then further back.
+- **`Cmd+R`** -- walk forward along the same history, up to the most recent jump target.
+
+Every far jump records where it left and where it arrived, so a walk stops at both. Several search hits on one page count as a single stop. Walking back and then jumping somewhere new discards whatever lay ahead, exactly as a browser's back/forward pair does. The history is per-document and vanishes when a different PDF is opened; it never disturbs an active search, so a walk leaves the current find hit and its highlight in place.
 
 ### Bookmarks
 
@@ -226,6 +238,7 @@ anima/
 │   ├── AppDelegate.swift           ← Window setup, PDF loading, manager wiring
 │   ├── FitzBridge.swift            ← Subprocess bridge to Python helper
 │   ├── PdfAnnotationsBridge.swift  ← Subprocess bridge to the pdf-annotations resolver CLI
+│   ├── JumpStack.swift             ← Far-jump history: page-index list, pointer, back/forward
 │   ├── JumpStationPanel.swift      ← Modal bookmark navigation and deletion picker
 │   ├── MainViewController.swift    ← NSSplitView layout, sidebar sync & emphasis
 │   ├── SidebarExtractor.swift      ← Parses annotations into sidebar CommentCard structs
@@ -233,6 +246,7 @@ anima/
 │   └── CommentInputPanel.swift     ← Modal comment editor (replaces NSAlert)
 ├── Anima/AnimaTests/               ← Swift Testing unit tests
 │   ├── AnimaTests.swift            ← Cross-boundary integration tests
+│   ├── JumpStackTests.swift        ← Far-jump history traces as pure unit tests
 │   ├── SidebarExtractorTests.swift ← Sidebar extraction mechanics (normally excluded from filesdump)
 │   └── AnnotationGeometryTests.swift ← Pure coordinate/geometry tests (normally excluded from filesdump)
 ├── tools/
@@ -260,7 +274,7 @@ anima/
 
 ### Module Overview
 
-`AnimaPDFView.swift` -- Subclasses `PDFView` to intercept keyboard and mouse events. Handles persistent highlight mode (`Cmd+H`, mouseUp auto-highlight), X-Ray mode (`Cmd+P` for popup visibility), goto page (`Cmd+G`), bookmark creation (`Cmd+B`), JumpStation presentation (`Cmd+J`), hit-testing for highlight clicks, and emphasis/selection coordination via `SidebarUpdateDelegate`. All annotation CRUD (create, edit, delete) is delegated to `AnnotationManager`; bookmark persistence is delegated to `BookmarkManager`. Defines the `SidebarUpdateDelegate` protocol and notifies its delegate after every annotation mutation and highlight click so the sidebar stays in sync.
+`AnimaPDFView.swift` -- Subclasses `PDFView` to intercept keyboard and mouse events. Handles persistent highlight mode (`Cmd+H`, mouseUp auto-highlight), X-Ray mode (`Cmd+P` for popup visibility), goto page (`Cmd+G`), bookmark creation (`Cmd+B`), JumpStation presentation (`Cmd+J`), far-jump history walks (`Cmd+E` / `Cmd+R`), hit-testing for highlight clicks, and emphasis/selection coordination via `SidebarUpdateDelegate`. All annotation CRUD (create, edit, delete) is delegated to `AnnotationManager`; bookmark persistence is delegated to `BookmarkManager`. Defines the `SidebarUpdateDelegate` protocol and notifies its delegate after every annotation mutation and highlight click so the sidebar stays in sync.
 
 **`AnnotationManager.swift`** -- Toolbox class that owns all annotation CRUD operations and the dual-write pattern. Creates highlights (with quad math and coordinate conversion from PDFKit to fitz space), edits comments (showing the modal `CommentInputPanel`, writing via fitz, updating in-memory `/AnimaComment`), and deletes highlights. Holds no references to the view or document -- all context is passed per-call, keeping the class testable and safe for multi-document (tabs) support. Also owns shared constants (`authorName`, `highlightColor`, `highlightOpacity`) and helpers (`annotationUUID`, `ensurePopupExists`).
 
@@ -281,6 +295,8 @@ anima/
 **`CommentCardView.swift`** -- The visual representation of a single annotation in the sidebar. A custom NSView that uses Auto Layout to dynamically size itself based on the length of the comment text. Handles all visual styling, including the muted typography applied to structural pipeline commands (e.g., "link" or "H2"). Reports clicks via an `onClicked` closure and supports active/inactive visual states for the emphasis feature.
 
 **`CommentInputPanel.swift`** -- A modal `NSPanel` for adding and editing highlight comments. Replaces the previous `NSAlert`-based dialog with a proper multi-line text editor (`NSTextView`). Styled to match `CommentCardView` -- same background color, corner radius, fonts, and color palette. Escape saves and closes (no cancel), Enter inserts newlines. The panel is resizable and draggable. Each invocation creates a fresh instance; the panel is not reused across calls.
+
+**`JumpStack.swift`** -- A small value type holding the far-jump history: an unbounded list of 0-based page indices and a pointer into it, with operations to record a jump, walk back, walk forward, and clear. It knows nothing of PDFKit or AppKit -- `back()` and `forward()` return the page to navigate to, or `nil` when the walk has reached an end, leaving navigation and the beep to `AnimaPDFView`. That independence is what lets the design document's traces be pinned as pure unit tests without a fixture PDF.
 
 **`JumpStationPanel.swift`** -- A modal `NSPanel` for bookmark navigation and deletion. It renders the active document's bookmarks in name and 1-based page columns, owns temporary table selection and local keyboard dispatch, and reports Enter-to-jump or confirmed deletion through callbacks. It deliberately has no PDFKit, file-path, or persistence knowledge: `AnimaPDFView` owns navigation and delegates deletion to `BookmarkManager`. The future prefix-input/filtering behavior will extend this panel rather than replace it.
 
@@ -358,7 +374,7 @@ Anima accepts PDFs through four entry points, checked in this order:
 
 4. **Dev fallback** -- If none of the above provides a file, Anima opens `projectRoot/data/input.pdf` automatically. If that doesn't exist either, Anima prints an error and exits.
 
-**Hot replacement:** If Anima is already running, opening a different PDF via Finder, "Open With", or dropping a file onto the Dock icon replaces the displayed PDF. The outgoing document's search hits, comment-search state, annotation/card emphasis, text selection, and Delete-key target are cleared; bookmarks are reloaded for the new file. If the new file cannot be parsed, the current document stays open and an alert is shown.
+**Hot replacement:** If Anima is already running, opening a different PDF via Finder, "Open With", or dropping a file onto the Dock icon replaces the displayed PDF. The outgoing document's search hits, comment-search state, annotation/card emphasis, text selection, and Delete-key target are cleared; bookmarks are reloaded for the new file. If the new file cannot be parsed, the current document stays open and an alert is shown. Reopening the file already displayed is declined rather than reloaded, so the reading position, search state, emphasis, selection, and far-jump history all survive the gesture.
 
 **Multiple instances:** Anima is single-window by design. To open several PDFs simultaneously, launch separate processes with `open -n`:
 

@@ -71,6 +71,7 @@ See "Workflow for the Whole Session (CRITICAL)" in `LLM_INSTRUCTIONS.md` for whe
 - Forward-only search (2026-07-14): `Cmd+F` PDF text, `Cmd+Shift+F` comments, `F3` next hit, no wrapping; `Esc` clears transient state in ladder order; search can never create a highlight
 - Per-PDF last-page persistence (2026-07-17): `/AnimaLastPage` catalog key; persisted only on document replacement and quit. Details: `README.md` §Last-Page Restoration
 - Far-jump seam (2026-07-19): `AnimaPDFView.farJump(to:)` overloads are the single execution point for goto page, both finds, `F3`, bookmark jumps, and same-document `pdf://` links; `restore(toPageIndex:)` bypasses it deliberately. Details: `TARGET_ARCHITECTURE.md` §6.4
+- JumpStack (2026-07-19): `Cmd+E` / `Cmd+R` walk an unbounded in-memory history of page indices, recorded by the far-jump seam for all six far-jump sources and cleared on document change; an active find is left untouched. Details: `docs/JUMPSTACK_DESIGN.md
 
 ## macOS Integration
 
@@ -80,6 +81,7 @@ See "Workflow for the Whole Session (CRITICAL)" in `LLM_INSTRUCTIONS.md` for whe
 - `pdf://` URL scheme claimed (2026-07-18): `CFBundleURLTypes` entry independent of the document-type claim; legacy `PDFHandler.app` route retired. Details: `README.md`, `TARGET_ARCHITECTURE.md`
 - `PdfAnnotationsBridge` (2026-07-18): resolver subprocess seam per `TARGET_ARCHITECTURE.md` §6.2; `ResolveOutcome` carries the resolver's stderr verbatim to the user. Details: `README.md` §The pdf-annotations Boundary
 - `pdf://` opening flow (2026-07-18): Obsidian links now resolve, activate or replace the reader document, honor explicit page targets, restore position without one, and surface resolver or URL failures. Details: `README.md`, `TARGET_ARCHITECTURE.md`
+- Same-file reopen is a no-op (2026-07-19): `loadDocument(url:)` declines an unpaged open of the document already in the reader, preserving page, find, emphasis, selection, and JumpStack.
 
 ## Testing
 
@@ -88,11 +90,12 @@ See "Workflow for the Whole Session (CRITICAL)" in `LLM_INSTRUCTIONS.md` for whe
 - Bookmark and last-page commands covered incl. invalid pages and native-TOC preservation
 - Comment-clear pinned for popup-less annotations, the guard `GOALS.md` names for the parked lifecycle redesign (2026-07-15)
 
-### Swift (Swift Testing)
+### Swift (XCTest)
 - `SidebarExtractor`: golden JSON, multi-page and per-page extraction, reassembly parity
 - In-memory annotation round-trip; y-flip and QuadPoints construction pinned as pure-function tests (2026-07-11)
 - Real subprocess boundaries pinned: `FitzBridge` add-highlight and last-page round-trips, `BookmarkManager` persistence (2026-07-15/17)
 - Cross-page selection pinned as intentionally page-scoped (2026-07-15)
+- JumpStack traces pinned as pure value-type unit tests (2026-07-19): `JumpStackTests.swift`, no `PDFView` and no fixture PDF.
 
 ## Refactoring
 

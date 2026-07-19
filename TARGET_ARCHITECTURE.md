@@ -157,7 +157,7 @@ Rule: one project per session. Contract changes flow pdf-annotations-first, term
 
 9.  Introduce far-jump seam per §6.4.
 10. Introduce JumpStack per `docs/JUMPSTACK_DESIGN.md`.
-11. Acceptance: (a) after step 9, all five pre-existing far-jump sources still work -- goto-page, find in PDF, find in comments, `F3` in either search mode, jump to bookmark (verified 2026-07-19); (b) through (f) per `docs/JUMPSTACK_DESIGN.md` §7, which supersedes the `Cmd+R`-as-back wording this list originally carried.
+11. Acceptance: (a) after step 9, all five pre-existing far-jump sources still work -- goto-page, find in PDF, find in comments, `F3` in either search mode, jump to bookmark (verified 2026-07-19); (b) through (f) per `docs/JUMPSTACK_DESIGN.md` §7, which supersedes the `Cmd+R`-as-back wording this list originally carried. Verified in the reader 2026-07-19; Phase C complete.
 
 **Phase D -- cleanup (either project's session, doc-only + Anima):**
 

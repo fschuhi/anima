@@ -44,7 +44,7 @@
 
 ## Navigation
 
-- **JumpStack.** Far-jump history with `Cmd+E` (back) and `Cmd+R` (forward), fully specified in `docs/JUMPSTACK_DESIGN.md`: an unbounded in-memory list of page indices with a pointer, recording both the origin and the destination of every far jump, cleared on document change. Design settled 2026-07-19; no code written. This is `TARGET_ARCHITECTURE.md` Phase C step 10, with acceptance in the design document's §7. Begin with the history type and the traces in its §4 transcribed as unit tests, with no reader wiring at all, so nothing can regress. Its §8 lists what the design deliberately leaves open (whether back and forward disturb an active find) and its §9 what it leaves to the implementing session.
+- ~~**JumpStack.** Far-jump history with `Cmd+E` (back) and `Cmd+R` (forward), specified in `docs/JUMPSTACK_DESIGN.md`.~~ Done 2026-07-19. `JumpStack.swift` plus `JumpStackTests.swift` (traces 1-5 as pure unit tests); seam records origin and target, both keys walk without re-recording, history cleared on document change. §8's open question decided: a walk leaves an active find untouched. Contract in `README.md` §Far-Jump History.
 
 - **Extend JumpStation with prefix input/filtering.** Add the display-only prefix panel and VBA-inspired keyboard behavior: case-insensitive prefix matching against bookmark names, repeated Backspace, selection independent from prefix text, and two-stage Escape (clear prefix, then close). Design and test the non-visual state machine before wiring it into `JumpStationPanel`.
 
@@ -59,3 +59,8 @@
 
 - Proper .app bundle with icon.
 - Make target to regenerate AppIcon.appiconset from a source PNG (sips + iconutil) -- enables icon experiments without touching Xcode. Caveat: Launch Services may need a nudge before Finder shows changes.
+
+### Tooling
+
+- **`make format` does not reach the Swift tests.** SwiftFormat runs on `Anima/Anima/` only, so `Anima/AnimaTests/` drifts from the formatter. Either extend the target or decide test sources are deliberately excluded.
+- **Console output has no home.** Every reader event logs through `Swift.print`, visible only with Xcode's debug area open (`Cmd+Shift+Y`) or via Console.app for a standalone launch. Decide whether to keep it developer-only, route it somewhere visible in the reader, or thin it out. Related: the parked status-bar item under Cosmetic / UX.
