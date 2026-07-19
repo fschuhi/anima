@@ -116,14 +116,14 @@ New type, named for what it is: Anima's dependency on the pdf-annotations projec
 - Amend §6.3 4.: route its direct `go(to:)` call through the seam.
 - §6.3 5. stays outside the seam (decided): the JumpStack is cleared on document change (§6.5), so a jump performed while installing a new document has no pre-jump position to record. Document loading positions the reader; it does not far-jump.
 
-### 6.5 JumpStack contract (decided; supersedes TODO.md)
+### 6.5 JumpStack contract (moved)
 
-**Background:** `Cmd+R` after a far-jump returns to the pre-jump page. In-memory only; cleared on document change. Therefore `Cmd+R` is within-document **by construction** -- no cross-document history exists or is needed; last-page restore is the cross-document return path (the Obsidian ↔ PDF back-and-forth workflow composes from these pieces).
+The JumpStack is specified in `docs/JUMPSTACK_DESIGN.md`, which supersedes both the contract sketched here and the `TODO.md` entry that preceded it. Settled 2026-07-19: an unbounded in-memory list of page indices with a pointer, `Cmd+E` walking back and `Cmd+R` walking forward, cleared on document change. Both keys are therefore within-document by construction -- no cross-document history exists or is needed; last-page restore is the cross-document return path, and the Obsidian <-> PDF back-and-forth workflow composes from these two pieces.
 
-**Action items:**
-- Revise the `TODO.md` JumpStack entry, which currently specifies persistence in private PDF metadata, to in-memory-first with persistence explicitly deferred.
-- Implement JumpStack with `Cmd+R`.
-- Amend §6.3 5.: clear internal JumpStack as part of clearing the per-document state
+Two consequences land in this document rather than in the design document:
+
+- §6.3 step 5 clears the JumpStack as part of clearing per-document state.
+- §6.4's seam gains the target page index. The design records both the origin and the destination of a far jump, so `recordPreJumpPosition()` must be told where the jump is going -- the page-granularity revisit reserved in §9.
 
 ## 7. Decommissioning
 
@@ -156,8 +156,8 @@ Rule: one project per session. Contract changes flow pdf-annotations-first, term
 **Phase C -- Far-jump, JumpStack (Anima):**
 
 9.  Introduce far-jump seam per §6.4.
-10. Introduce JumpStack per §6.5.
-11. Acceptance: (a) after step 9, all five pre-existing far-jump sources still work -- goto-page, find in PDF, find in comments, `F3` in either search mode, jump to bookmark; (b) link to open document + page -> far jump, `Cmd+R` returns to the pre-jump page; (c) `Cmd+R` with an empty stack is a no-op, not a beep or a crash; (d) after switching documents via a link, `Cmd+R` does nothing -- the stack was cleared.
+10. Introduce JumpStack per `docs/JUMPSTACK_DESIGN.md`.
+11. Acceptance: (a) after step 9, all five pre-existing far-jump sources still work -- goto-page, find in PDF, find in comments, `F3` in either search mode, jump to bookmark (verified 2026-07-19); (b) through (f) per `docs/JUMPSTACK_DESIGN.md` §7, which supersedes the `Cmd+R`-as-back wording this list originally carried.
 
 **Phase D -- cleanup (either project's session, doc-only + Anima):**
 

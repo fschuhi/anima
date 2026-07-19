@@ -10,9 +10,9 @@ This file answers: where is the project going, in what order, and what happens n
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Phases 1 and 2 are complete. Phase 3's Phase B opening flow completed on 2026-07-18. `TARGET_ARCHITECTURE.md` Phase C step 9 completed on 2026-07-19: `AnimaPDFView` exposes the shared far-jump seam, and all five call sites -- goto page, both finds and their `F3`, bookmark jump, and the same-document `pdf://` link -- execute through it. The step changed no observable behavior by construction; acceptance 11(a) verified manually.
+**Where we are:** Phases 1 and 2 are complete. Phase 3's Phase B opening flow completed on 2026-07-18, and `TARGET_ARCHITECTURE.md` Phase C step 9 -- the shared far-jump seam -- earlier on 2026-07-19. The session that followed produced no code: it settled the JumpStack design and recorded it in `docs/JUMPSTACK_DESIGN.md`, which supersedes `TARGET_ARCHITECTURE.md` §6.5 and the previous `TODO.md` entry. The cap of five is gone, `Cmd+E` walks back and `Cmd+R` walks forward, and the seam will need the target page.
 
-**What's next:** `TARGET_ARCHITECTURE.md` Phase C step 10 -- the in-memory JumpStack per §6.5. Fill the `recordPreJumpPosition()` stub to push the current page onto a bounded stack (provisionally five entries), wire `Cmd+R` to pop and return, and clear the stack on document change. Design duplicate and consecutive-page behavior before wiring it into the reader. Acceptance is 11(b)-(d).
+**What's next:** Implement Phase C step 10 per `docs/JUMPSTACK_DESIGN.md` -- read that document before anything else; its §9 lists what it leaves to the implementing session. Suggested order: the history type plus its §4 traces as unit tests with no reader wiring, then the seam, the two keys, and the clearing, then acceptance per its §7. While wiring, correct the stale `Cmd+R`-as-back comments in the code: the doc comments on `AnimaPDFView.recordPreJumpPosition()` and `restore(toPageIndex:)`, and the same-document `pdf://` branch in `AppDelegate.handleSchemeURL(_:)`. The key list in `AnimaPDFView.swift`'s header comment gains both new keys.
 
 ---
 
