@@ -50,6 +50,7 @@ Anima/Anima/BookmarkManager.swift
 Anima/Anima/CommentCardView.swift
 Anima/Anima/CommentInputPanel.swift
 Anima/Anima/FitzBridge.swift
+Anima/Anima/JumpStack.swift
 Anima/Anima/JumpStationPanel.swift
 Anima/Anima/MainViewController.swift
 Anima/Anima/PdfAnnotationsBridge.swift
@@ -66,6 +67,7 @@ Anima/AnimaTests/Fixtures/sidebar_basic_expected.json
 # Anima/AnimaTests/Fixtures/sidebar_page_extract.pdf
 Anima/AnimaTests/Fixtures/sidebar_page_extract_expected.json
 Anima/AnimaTests/AnimaTests.swift
+Anima/AnimaTests/JumpStackTests.swift
 # Anima/AnimaTests/SidebarExtractorTests.swift
 # Anima/AnimaTests/AnnotationGeometryTests.swift
 
