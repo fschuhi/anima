@@ -1,6 +1,8 @@
 # TARGET_ARCHITECTURE.md -- `pdf://` Link Resolution (Obsidian -> Anima)
 
-Status: agreed design, ready for implementation.
+Status: COMPLETE as of 2026-07-19. All phases (A-D) implemented and accepted.
+Archived copy moved to `anima/docs/TARGET_ARCHITECTURE.md`.
+This file is retained in pdf-annotations for historical reference only.
 
 This document is self-contained. Implementation sessions should not require any conversational context beyond this file plus the respective project's filedump.
 
