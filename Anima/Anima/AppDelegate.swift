@@ -362,11 +362,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// A preferredPageIndex comes only from a parsed pdf:// page query and is
     /// already 0-based. When supplied, it takes precedence over stored last-page
     /// restoration. The range check happens before the outgoing document changes.
+    ///
+    /// Reopening the document already in the reader is a no-op rather than a
+    /// reload, so the reading position and all transient reader state survive
+    /// the gesture.
     private func loadDocument(url: URL, preferredPageIndex: Int? = nil) {
         // Guard: don't replace while an AppKit modal window is active. That covers
         // NSAlert, CommentInputPanel, JumpStationPanel, and any future modal panel.
         if NSApp.modalWindow != nil {
             Swift.print("⚠️ Hot open declined while a modal dialog is active")
+            return
+        }
+
+        // Reopening the file already on screen -- from Finder, "Open With", a
+        // Dock drop -- would otherwise run the full replacement sequence on the
+        // same bytes, discarding the find state, the annotation emphasis, the
+        // selection, and the JumpStack while the page number quietly survives
+        // via persist-then-restore. Declining the request keeps all of it.
+        //
+        // Restricted to unpaged opens: a pdf:// link carrying a page must still
+        // be honored. handleSchemeURL(_:) already routes the same-document case
+        // to the far-jump seam before it reaches here, so this condition is a
+        // safeguard for future callers rather than a live path today.
+        if preferredPageIndex == nil, isCurrentDocument(url) {
+            Swift.print("📂 Reopen of the current document ignored: \(url.path)")
             return
         }
 

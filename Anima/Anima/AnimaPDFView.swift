@@ -11,6 +11,8 @@
 //    - `Cmd+G` key -> go to a page through a native modal input field
 //    - `Cmd+B` -> add a named bookmark for the current page
 //    - `Cmd+J` -> open JumpStation bookmark navigation
+//    - `Cmd+E` -> walk back along the far-jump history
+//    - `Cmd+R` -> walk forward along the far-jump history
 //    - `Cmd+F` -> find text forward from the current page
 //    - `Cmd+Shift+F` -> find matching annotation comments forward from the current page
 //    - `F3` -> advance to the next active find hit
@@ -305,6 +307,29 @@ class AnimaPDFView: PDFView {
             return true
         }
 
+        // `Cmd+E` = walk back along the far-jump history
+        // (docs/JUMPSTACK_DESIGN.md §6.4).
+        if event.keyCode == 14,
+            modifiers.contains(.command),
+            !modifiers.contains(.shift),
+            !modifiers.contains(.control),
+            !modifiers.contains(.option) {
+            goToJumpStackEntry(jumpStack.back(), direction: "back")
+            lastHandledEvent = event
+            return true
+        }
+
+        // `Cmd+R` = walk forward along the far-jump history.
+        if event.keyCode == 15,
+            modifiers.contains(.command),
+            !modifiers.contains(.shift),
+            !modifiers.contains(.control),
+            !modifiers.contains(.option) {
+            goToJumpStackEntry(jumpStack.forward(), direction: "forward")
+            lastHandledEvent = event
+            return true
+        }
+
         // `Enter` = create highlight from current selection
         if event.keyCode == 36 || event.keyCode == 76 {
             if createHighlightFromSelection() {
@@ -527,6 +552,35 @@ class AnimaPDFView: PDFView {
 
         let index = document.index(for: page)
         return index == NSNotFound ? nil : index
+    }
+
+    /// Navigates to a page the JumpStack handed back, or beeps when the walk
+    /// has reached the end of the history (JUMPSTACK_DESIGN.md §3).
+    ///
+    /// Deliberately not routed through farJump(to:): walking the history is
+    /// not a new far jump, and recording it as one would push every return
+    /// back onto the stack the walk is trying to traverse. It uses the same
+    /// page(at:) + go(to:) primitive the seam ultimately reaches.
+    ///
+    /// A nil index is the ordinary end-of-history case rather than an error.
+    /// The page lookup failing is defensive only: the history is cleared on
+    /// document change, so every stored index addresses the current document.
+    ///
+    /// Find state is left untouched in both directions -- an active hit keeps
+    /// its highlight and F3 still resumes from it, not from wherever the walk
+    /// left the reader.
+    ///
+    /// - Parameter direction: "back" or "forward", used only in the log line.
+    private func goToJumpStackEntry(_ pageIndex: Int?, direction: String) {
+        guard let pageIndex = pageIndex,
+              let document = document,
+              let page = document.page(at: pageIndex) else {
+            NSSound.beep()
+            return
+        }
+
+        go(to: page)
+        Swift.print("🧭 JumpStack \(direction) to page \(pageIndex + 1) of \(document.pageCount)")
     }
 
     // MARK: - Navigation Actions
