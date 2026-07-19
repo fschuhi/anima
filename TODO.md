@@ -44,8 +44,6 @@
 
 ## Navigation
 
-- ~~**JumpStack.** Far-jump history with `Cmd+E` (back) and `Cmd+R` (forward), specified in `docs/JUMPSTACK_DESIGN.md`.~~ Done 2026-07-19. `JumpStack.swift` plus `JumpStackTests.swift` (traces 1-5 as pure unit tests); seam records origin and target, both keys walk without re-recording, history cleared on document change. §8's open question decided: a walk leaves an active find untouched. Contract in `README.md` §Far-Jump History.
-
 - **Extend JumpStation with prefix input/filtering.** Add the display-only prefix panel and VBA-inspired keyboard behavior: case-insensitive prefix matching against bookmark names, repeated Backspace, selection independent from prefix text, and two-stage Escape (clear prefix, then close). Design and test the non-visual state machine before wiring it into `JumpStationPanel`.
 
 ## Cosmetic / UX Improvements

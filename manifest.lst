@@ -19,8 +19,8 @@ TODO.md
 # Plan to combine `anima` and `pdf-annotations` to arrive at a fully macOS-native workflow.
 TARGET_ARCHITECTURE.md
 
-# Far-jump history design (Cmd+E / Cmd+R). Current -- specifies Phase C step 10.
-docs/JUMPSTACK_DESIGN.md
+# Historical far-jump history design (Cmd+E / Cmd+R). Completed on 2027-07-19.
+# docs/JUMPSTACK_DESIGN.md
 
 # Historical design notes for bookmark management and navigation. Actively maintained until 2026-07-16.
 # docs/BOOKMARKS_DESIGN.md

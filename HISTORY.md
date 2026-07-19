@@ -82,6 +82,7 @@ See "Workflow for the Whole Session (CRITICAL)" in `LLM_INSTRUCTIONS.md` for whe
 - `PdfAnnotationsBridge` (2026-07-18): resolver subprocess seam per `TARGET_ARCHITECTURE.md` §6.2; `ResolveOutcome` carries the resolver's stderr verbatim to the user. Details: `README.md` §The pdf-annotations Boundary
 - `pdf://` opening flow (2026-07-18): Obsidian links now resolve, activate or replace the reader document, honor explicit page targets, restore position without one, and surface resolver or URL failures. Details: `README.md`, `TARGET_ARCHITECTURE.md`
 - Same-file reopen is a no-op (2026-07-19): `loadDocument(url:)` declines an unpaged open of the document already in the reader, preserving page, find, emphasis, selection, and JumpStack.
+- 2026-07-19: Phase D (`TARGET_ARCHITECTURE.md` cleanup) complete. `windows_server/README.md` banner added in pdf-annotations; `PDFHandler.app` decommissioned and trashed; Anima re-registered as sole `pdf://` handler via Finder launch; acceptance 8(a)-(c) passed. `TARGET_ARCHITECTURE.md` moved to `docs/` and marked complete. The macOS-native toolchain -- Anima + `pdf_annot.resolve` + Obsidian -- is now fully established.
 
 ## Testing
 
