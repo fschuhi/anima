@@ -10,9 +10,9 @@ This file answers: where is the project going, in what order, and what happens n
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Phases 1 and 2 are complete. Phase 3's Phase B opening flow completed on 2026-07-18. `TARGET_ARCHITECTURE.md` Phase C is now complete: the shared far-jump seam (step 9) and the JumpStack (step 10) both landed on 2026-07-19, with acceptance per `docs/JUMPSTACK_DESIGN.md` §7 verified in the reader. `Cmd+E` and `Cmd+R` walk the far-jump history; the contract lives in `README.md` §Far-Jump History. One gap surfaced and was closed along the way: reopening the file already displayed is now declined rather than reloaded.
+**Where we are:** Phase D (`TARGET_ARCHITECTURE.md` cleanup) complete. `windows_server/README.md` banner added in pdf-annotations; `PDFHandler.app` decommissioned and trashed; Anima re-registered as sole `pdf://` handler via Finder launch; acceptance 8(a)-(c) passed. `TARGET_ARCHITECTURE.md` moved to `docs/` and marked complete. The macOS-native toolchain -- Anima + `pdf_annot.resolve` + Obsidian -- is now fully established.
 
-**What's next:** `TARGET_ARCHITECTURE.md` Phase D -- step 12, the Windows server README note per its §7 -- then step 13, decommissioning `PDFHandler.app`, and step 14, re-running acceptance 8(a)-(c) afterwards, since Launch Services can misroute schemes after a handler change. Steps 13 and 14 belong together in one sitting.
+**What's next:** Here: Review `TODO.md` backlog and prioritize. Regarding `pdf-annotations`, use Anima for PDF work.
 
 ---
 
