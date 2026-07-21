@@ -16,10 +16,10 @@ GOALS.md
 TODO.md
 # HISTORY.md
 
-# Plan to combine `anima` and `pdf-annotations` to arrive at a fully macOS-native workflow.
-TARGET_ARCHITECTURE.md
+# Historical plan to combine `anima` and `pdf-annotations` for a fully macOS-native workflow. Completed on 2026-07-19.
+# docs/TARGET_ARCHITECTURE.md
 
-# Historical far-jump history design (Cmd+E / Cmd+R). Completed on 2027-07-19.
+# Historical far-jump history design (Cmd+E / Cmd+R). Completed on 2026-07-19.
 # docs/JUMPSTACK_DESIGN.md
 
 # Historical design notes for bookmark management and navigation. Actively maintained until 2026-07-16.
