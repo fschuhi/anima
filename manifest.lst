@@ -16,6 +16,9 @@ GOALS.md
 TODO.md
 # HISTORY.md
 
+# Goal: `Cmd+O` modeless pdf open
+OPEN_DIALOG_DESIGN.md
+
 # Historical plan to combine `anima` and `pdf-annotations` for a fully macOS-native workflow. Completed on 2026-07-19.
 # docs/TARGET_ARCHITECTURE.md
 

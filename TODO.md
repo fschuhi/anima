@@ -34,9 +34,11 @@
 
 ## Opening PDFs
 
+- **Implement the open dialog per `docs/OPEN_DIALOG_DESIGN.md`.** Modeless filter/selection state machine as a plain testable type first, then the panel as a `JumpStationPanel` sibling, then the `openDocument(_:)` entry point and the `make` target seeding the `UserDefaults` search path.
+
 - **Open a PDF by dropping it onto the reader window.** Dock-icon drops already arrive through `application(_:open:)`; this item concerns registering the reader window as a drag destination.
 
-- **Open a PDF with `Cmd+O`.** Inspect `MainMenu.xib` before designing the action or menu wiring.
+- ~~**Open a PDF with `Cmd+O`.** Inspect `MainMenu.xib` before designing the action or menu wiring.~~ Absorbed into `docs/OPEN_DIALOG_DESIGN.md` (approved 2026-07-28). Xib inspection done: the "Open..." item with `Cmd+O` already exists, wired to `openDocument:` via First Responder -- implementation needs zero xib changes.
 
 - **Same-process multiple documents remain parked.** Multiple windows or tabs would require first-class per-document reader sessions with independent PDF views, sidebars, bookmarks, search, emphasis, and modal ownership. Do not build that infrastructure unless replacement-based switching proves insufficient. Separate simultaneous instances remain available through `open -n`.
 
@@ -44,7 +46,7 @@
 
 ## Navigation
 
-- **Extend JumpStation with prefix input/filtering.** Add the display-only prefix panel and VBA-inspired keyboard behavior: case-insensitive prefix matching against bookmark names, repeated Backspace, selection independent from prefix text, and two-stage Escape (clear prefix, then close). Design and test the non-visual state machine before wiring it into `JumpStationPanel`.
+- **Transfer the open-dialog UX paradigm to JumpStation.** After the open dialog has proven itself in daily use, replace the planned prefix-matching design with the tested paradigm from `docs/OPEN_DIALOG_DESIGN.md`: case-insensitive substring filter instead of prefix matching, modeless key map (letters filter, arrows select, two-stage Escape), filter label. Additionally fix: bookmark list must be ordered by page number, not by time of adding. At that point, evaluate extracting the shared filtering-panel shape from the two concrete implementations.
 
 ## Cosmetic / UX Improvements
 

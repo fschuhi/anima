@@ -10,9 +10,9 @@ This file answers: where is the project going, in what order, and what happens n
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Phase D (`TARGET_ARCHITECTURE.md` cleanup) complete. `windows_server/README.md` banner added in pdf-annotations; `PDFHandler.app` decommissioned and trashed; Anima re-registered as sole `pdf://` handler via Finder launch; acceptance 8(a)-(c) passed. `TARGET_ARCHITECTURE.md` moved to `docs/` and marked complete. The macOS-native toolchain -- Anima + `pdf_annot.resolve` + Obsidian -- is now fully established.
+**Where we are:** Backlog reviewed 2026-07-28; no reprioritization needed. `docs/OPEN_DIALOG_DESIGN.md` approved: modeless keyboard launcher over the controlled collection, absorbing the `Cmd+O` item. JumpStation's filtering extension redefined as a later transfer of this paradigm (see `TODO.md`).
 
-**What's next:** Here: Review `TODO.md` backlog and prioritize. Regarding `pdf-annotations`, use Anima for PDF work.
+**What's next:** Implement the open dialog per `docs/OPEN_DIALOG_DESIGN.md`, state machine first. Regarding `pdf-annotations`, use Anima for PDF work.
 
 ---
 
