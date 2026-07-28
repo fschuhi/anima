@@ -21,6 +21,9 @@ TODO.md
 
 # Historical far-jump history design (Cmd+E / Cmd+R). Completed on 2026-07-19.
 # docs/JUMPSTACK_DESIGN.md
+# docs/JumpStack-seam-Claude-on-Poe.md
+# docs/JumpStack-seam-GPT-on-Poe.md
+# docs/JumpStack-seam-Kimi-on-Poe.md
 
 # Historical design notes for bookmark management and navigation. Actively maintained until 2026-07-16.
 # docs/BOOKMARKS_DESIGN.md
@@ -35,11 +38,11 @@ TODO.md
 # Anima/Anima/Info.plist
 Makefile
 # pyproject.toml
-tools/requirements.txt
-#.editorconfig
+# tools/requirements.txt
+# .editorconfig
 # .gitignore
-#.gitattributes
-#.pre-commit-config.yaml
+# .gitattributes
+# .pre-commit-config.yaml
 
 ### --- Swift ---
 
@@ -63,18 +66,18 @@ tools/anima_helper.py
 ### --- Testing Swift---
 
 # Anima/AnimaTests/Fixtures/sidebar_basic.pdf
-Anima/AnimaTests/Fixtures/sidebar_basic_expected.json
+# Anima/AnimaTests/Fixtures/sidebar_basic_expected.json
 # Anima/AnimaTests/Fixtures/sidebar_page_extract.pdf
-Anima/AnimaTests/Fixtures/sidebar_page_extract_expected.json
+# Anima/AnimaTests/Fixtures/sidebar_page_extract_expected.json
 Anima/AnimaTests/AnimaTests.swift
-Anima/AnimaTests/JumpStackTests.swift
+# Anima/AnimaTests/JumpStackTests.swift
 # Anima/AnimaTests/SidebarExtractorTests.swift
 # Anima/AnimaTests/AnnotationGeometryTests.swift
 
 ### --- Testing Python Tools ---
 
-tests/conftest.py
-tests/test_anima_helper.py
+# tests/conftest.py
+# tests/test_anima_helper.py
 
 # stubs
 # Anima/AnimaUITests/AnimaUITests.swift
