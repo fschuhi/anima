@@ -16,8 +16,8 @@ GOALS.md
 TODO.md
 # HISTORY.md
 
-# Goal: `Cmd+O` modeless pdf open
-OPEN_DIALOG_DESIGN.md
+# Historical design for the Cmd+O modeless open dialog. Completed on 2026-07-28.
+# docs/OPEN_DIALOG_DESIGN.md
 
 # Historical plan to combine `anima` and `pdf-annotations` for a fully macOS-native workflow. Completed on 2026-07-19.
 # docs/TARGET_ARCHITECTURE.md
@@ -59,7 +59,11 @@ Anima/Anima/FitzBridge.swift
 Anima/Anima/JumpStack.swift
 Anima/Anima/JumpStationPanel.swift
 Anima/Anima/MainViewController.swift
+Anima/Anima/OpenDialogKeyTranslator.swift
+Anima/Anima/OpenDialogPanel.swift
+Anima/Anima/OpenDialogState.swift
 Anima/Anima/PdfAnnotationsBridge.swift
+Anima/Anima/PDFCollectionScanner.swift
 Anima/Anima/SidebarExtractor.swift
 
 ### --- Tools ---
@@ -74,6 +78,9 @@ tools/anima_helper.py
 # Anima/AnimaTests/Fixtures/sidebar_page_extract_expected.json
 Anima/AnimaTests/AnimaTests.swift
 # Anima/AnimaTests/JumpStackTests.swift
+# Anima/AnimaTests/OpenDialogStateTests.swift
+# Anima/AnimaTests/OpenDialogKeyTranslatorTests.swift
+# Anima/AnimaTests/PDFCollectionScannerTests.swift
 # Anima/AnimaTests/SidebarExtractorTests.swift
 # Anima/AnimaTests/AnnotationGeometryTests.swift
 

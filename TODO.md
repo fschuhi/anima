@@ -28,17 +28,25 @@
 
 - **Revisit the `SidebarUpdateDelegate` name if its coordination role grows further.** Added comment search and emphasis behavior have outgrown the original sidebar-update name: the protocol now coordinates rebuilds, highlight clicks, comment-search state, and annotation-emphasis state. Parked for now because it still has one consumer and one implementation; renaming or splitting it today would add ceremony without changing ownership.
 
+- **`JumpStationPanel`'s `onJump` timing.** `OpenDialogPanel` needed a fix for calling its `onOpen` callback synchronously after `NSApp.stopModal()`, before `NSApp.modalWindow` actually clears -- a caller checking the modal guard (like `loadDocument`'s) declines. `JumpStationPanel.onJump` has the identical call order and hasn't shown the symptom only because `farJump(to:)` doesn't check `NSApp.modalWindow`. Trigger: if `onJump`'s target ever routes through something that does check the modal guard, apply the same fix (defer the callback until after `runModal(for:)` returns).
+
 - **`MainMenu.xib` housekeeping.** Review and clean up `MainMenu.xib` (remove unused Font/Format/Text menus).
 
 ---
 
 ## Opening PDFs
 
-- **Implement the open dialog per `docs/OPEN_DIALOG_DESIGN.md`.** Modeless filter/selection state machine as a plain testable type first, then the panel as a `JumpStationPanel` sibling, then the `openDocument(_:)` entry point and the `make` target seeding the `UserDefaults` search path.
+- ~~**Implement the open dialog per `docs/OPEN_DIALOG_DESIGN.md`.** Modeless filter/selection state machine as a plain testable type first, then the panel as a `JumpStationPanel` sibling, then the `openDocument(_:)` entry point and the `make` target seeding the `UserDefaults` search path.~~ Done 2026-07-28 -- `Cmd+O` opens the collection launcher end to end, sorted by most-recently-touched PDF. See `HISTORY.md` for the two implementation bugs found along the way.
 
 - **Open a PDF by dropping it onto the reader window.** Dock-icon drops already arrive through `application(_:open:)`; this item concerns registering the reader window as a drag destination.
 
-- ~~**Open a PDF with `Cmd+O`.** Inspect `MainMenu.xib` before designing the action or menu wiring.~~ Absorbed into `docs/OPEN_DIALOG_DESIGN.md` (approved 2026-07-28). Xib inspection done: the "Open..." item with `Cmd+O` already exists, wired to `openDocument:` via First Responder -- implementation needs zero xib changes.
+- **Backchannel to the Obsidian bibnote (open via CLI).** From the currently displayed PDF, resolve its `pdf_id` and have Obsidian open the matching bibnote directly, instead of a manual lookup. _Needs investigation:_ a keybinding (`Cmd+P` is already X-Ray toggle -- needs a different key or a decision to repurpose it); whether the lookup runs through a new `pdf-annotations` CLI direction (path/hash -> bibnote) or Anima calls Obsidian directly; and the failure case for a PDF with no `pdf_id` (likely beep-and-log, consistent with the app's other resolve guards).
+
+- **Multiple PDF collection search paths / recursive scanning.** Deferred in `docs/OPEN_DIALOG_DESIGN.md` v1 (§8). Revisit if the collection outgrows a single flat directory; the `UserDefaults` key would become an array of strings.
+
+- **Open dialog settings UI.** Deferred in `docs/OPEN_DIALOG_DESIGN.md` v1 (§8); `make set-pdf-collection-path` is sufficient for a single user today.
+
+- **Open Recent menu integration.** `docs/OPEN_DIALOG_DESIGN.md` (§8) left open whether Anima should feed the xib's stock "Open Recent" submenu -- unexamined.
 
 - **Same-process multiple documents remain parked.** Multiple windows or tabs would require first-class per-document reader sessions with independent PDF views, sidebars, bookmarks, search, emphasis, and modal ownership. Do not build that infrastructure unless replacement-based switching proves insufficient. Separate simultaneous instances remain available through `open -n`.
 

@@ -10,9 +10,9 @@ This file answers: where is the project going, in what order, and what happens n
 
 ## 📍 Current Session Pointer
 
-**Where we are:** Backlog reviewed 2026-07-28; no reprioritization needed. `docs/OPEN_DIALOG_DESIGN.md` approved: modeless keyboard launcher over the controlled collection, absorbing the `Cmd+O` item. JumpStation's filtering extension redefined as a later transfer of this paradigm (see `TODO.md`).
+**Where we are:** `docs/OPEN_DIALOG_DESIGN.md` implemented and working end-to-end (2026-07-28) -- `Cmd+O` opens the collection launcher; all new unit tests pass. Two bugs found and fixed along the way are recorded in `HISTORY.md`.
 
-**What's next:** Implement the open dialog per `docs/OPEN_DIALOG_DESIGN.md`, state machine first. Regarding `pdf-annotations`, use Anima for PDF work.
+**What's next:** No approved design pending. Candidates for the next strategy discussion are in `TODO.md`'s Opening PDFs section: a backchannel opening the current PDF's Obsidian bibnote, plus `OPEN_DIALOG_DESIGN.md`'s deferred items (multiple search paths, settings UI).
 
 ---
 

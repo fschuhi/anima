@@ -2,7 +2,7 @@
 
 (Note: "I" in the following paragraphs refers to the user, "you" to the AI model.)
 
-Status: Approved design, not yet implemented. This document absorbs the `TODO.md` item "Open a PDF with `Cmd+O`".
+Status: Implemented 2026-07-28. This document absorbs the `TODO.md` item "Open a PDF with `Cmd+O`"; retained as historical design reference in `docs/`.
 
 ---
 

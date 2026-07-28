@@ -243,10 +243,17 @@ anima/
 │   ├── MainViewController.swift    ← NSSplitView layout, sidebar sync & emphasis
 │   ├── SidebarExtractor.swift      ← Parses annotations into sidebar CommentCard structs
 │   ├── CommentCardView.swift       ← Custom NSView for rendering sidebar cards
-│   └── CommentInputPanel.swift     ← Modal comment editor (replaces NSAlert)
+│   ├── CommentInputPanel.swift     ← Modal comment editor (replaces NSAlert)
+│   ├── OpenDialogState.swift       ← Cmd+O open dialog: pure filter/selection reducer
+│   ├── OpenDialogKeyTranslator.swift ← NSEvent -> OpenDialogKey translation
+│   ├── OpenDialogPanel.swift       ← Cmd+O open dialog: modal panel (JumpStationPanel sibling)
+│   └── PDFCollectionScanner.swift  ← Non-recursive PDF directory scan, mtime-sorted
 ├── Anima/AnimaTests/               ← Swift Testing unit tests
 │   ├── AnimaTests.swift            ← Cross-boundary integration tests
 │   ├── JumpStackTests.swift        ← Far-jump history traces as pure unit tests
+│   ├── OpenDialogStateTests.swift  ← Open dialog reducer traces as pure unit tests
+│   ├── OpenDialogKeyTranslatorTests.swift ← NSEvent -> OpenDialogKey translation tests
+│   ├── PDFCollectionScannerTests.swift ← Directory-scan and mtime-sort tests
 │   ├── SidebarExtractorTests.swift ← Sidebar extraction mechanics (normally excluded from filesdump)
 │   └── AnnotationGeometryTests.swift ← Pure coordinate/geometry tests (normally excluded from filesdump)
 ├── tools/
@@ -300,6 +307,14 @@ anima/
 
 **`JumpStationPanel.swift`** -- A modal `NSPanel` for bookmark navigation and deletion. It renders the active document's bookmarks in name and 1-based page columns, owns temporary table selection and local keyboard dispatch, and reports Enter-to-jump or confirmed deletion through callbacks. It deliberately has no PDFKit, file-path, or persistence knowledge: `AnimaPDFView` owns navigation and delegates deletion to `BookmarkManager`. The future prefix-input/filtering behavior will extend this panel rather than replace it.
 
+**`OpenDialogState.swift`** -- Pure reducer for the `Cmd+O` open dialog's filter/selection state. `applying(_:to:)` takes an `OpenDialogKey` and the current state and returns an `OpenDialogOutcome` (`.updated`, `.open`, `.close`, or `.beep`) rather than mutating in place, mirroring the key map in `docs/OPEN_DIALOG_DESIGN.md` section 5. Knows nothing of AppKit; `OpenDialogPanel` is the only consumer.
+
+**`OpenDialogKeyTranslator.swift`** -- Translates a raw `NSEvent` into an `OpenDialogKey`, or `nil` if the event isn't the dialog's to handle -- any event carrying Command, Control, or Option falls through untouched so app-level shortcuts keep working while the dialog is open.
+
+**`PDFCollectionScanner.swift`** -- Non-recursive directory scan producing the open dialog's candidate filename list, sorted by modification date descending with alphabetical, case-insensitive tiebreak. Returns the two degenerate states from `docs/OPEN_DIALOG_DESIGN.md` section 3 (missing path, empty collection) as explicit result cases rather than throwing.
+
+**`OpenDialogPanel.swift`** -- Modal `NSPanel`, a sibling of `JumpStationPanel`, rendering `OpenDialogState` and forwarding translated key events and mouse clicks into it. Sizes its single column to the widest visible filename so long names get a horizontal scrollbar rather than wrapping; renders the first case-insensitive filter match in bold.
+
 ---
 
 ## Development
@@ -347,6 +362,15 @@ Current Swift test suite:
   - `testBookmarkManagerPersistenceRoundTrip` -- Swift bookmark manager -> helper -> PDF catalog round-trip
   - `testCrossPageSelectionOnlyHighlightsFirstPage` -- Page-scoped highlight creation for cross-page selections
 
+- In `OpenDialogStateTests.swift` (pure reducer traces):
+  - Character append / Backspace transitions, snap-to-first after every filter change, two-stage Escape, Enter with/without a selection, empty-match entry and recovery, first-occurrence match-range computation
+
+- In `OpenDialogKeyTranslatorTests.swift` (event translation):
+  - Printable and Shift-modified characters, Command/Control/Option exclusion, all six named key codes, Tab and function-key exclusion
+
+- In `PDFCollectionScannerTests.swift` (directory scan):
+  - Missing-path and empty-directory result cases, modification-date-descending sort, alphabetical tiebreak, case-insensitive `.pdf` matching
+
 - In `SidebarExtractorTests.swift` (extraction mechanics):
   - `testSidebarExtraction` -- Golden JSON test against `sidebar_basic.pdf`
   - `testMultiPageExtraction` -- Multi-page extraction against `sidebar_page_extract.pdf`
@@ -374,7 +398,9 @@ Anima accepts PDFs through four entry points, checked in this order:
 
 4. **Dev fallback** -- If none of the above provides a file, Anima opens `projectRoot/data/input.pdf` automatically. If that doesn't exist either, Anima prints an error and exits.
 
-**Hot replacement:** If Anima is already running, opening a different PDF via Finder, "Open With", or dropping a file onto the Dock icon replaces the displayed PDF. The outgoing document's search hits, comment-search state, annotation/card emphasis, text selection, and Delete-key target are cleared; bookmarks are reloaded for the new file. If the new file cannot be parsed, the current document stays open and an alert is shown. Reopening the file already displayed is declined rather than reloaded, so the reading position, search state, emphasis, selection, and far-jump history all survive the gesture.
+Independently of these four, **`Cmd+O`** opens a modeless keyboard launcher over a curated PDF collection (configured via `UserDefaults`, seeded with `make set-pdf-collection-path`; default `~/Obsidian/Papers/Collection/PDFs`). The list is sorted by modification time, most recent first -- since Anima touches a PDF's `pdf_mtime` on every open, the file most recently worked with is always at the top. Type to filter by substring, arrows to move the selection, Enter to open, Escape to clear the filter or close the dialog. See `docs/OPEN_DIALOG_DESIGN.md`.
+
+**Hot replacement:**If Anima is already running, opening a different PDF via Finder, "Open With", or dropping a file onto the Dock icon replaces the displayed PDF. The outgoing document's search hits, comment-search state, annotation/card emphasis, text selection, and Delete-key target are cleared; bookmarks are reloaded for the new file. If the new file cannot be parsed, the current document stays open and an alert is shown. Reopening the file already displayed is declined rather than reloaded, so the reading position, search state, emphasis, selection, and far-jump history all survive the gesture.
 
 **Multiple instances:** Anima is single-window by design. To open several PDFs simultaneously, launch separate processes with `open -n`:
 

@@ -12,6 +12,15 @@
 //  OpenDialogKeyTranslator; this file only renders that state and forwards
 //  events, per section 7's "thin enough that manual testing covers it."
 //
+//  Opening timing: NSApp.stopModal() only flags the modal run loop to stop
+//  on its next iteration -- NSApp.modalWindow is not cleared synchronously.
+//  Calling the caller's onOpen callback immediately after stopModal(), still
+//  inside the same key-event handler, would therefore reach loadDocument(url:)
+//  while NSApp.modalWindow is still non-nil, tripping its own modal guard and
+//  silently declining the open. So this panel only remembers which filename
+//  was chosen; showModal() calls onOpen after runModal(for:) has actually
+//  returned and the modal session is fully torn down.
+//
 
 import Cocoa
 
@@ -68,7 +77,10 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
     /// `state` outside the reducer.
     private var state: OpenDialogState
 
-    private let onOpen: (String) -> Void
+    /// The filename chosen via Enter, if any. Read by showModal() after the
+    /// modal session has fully ended -- see the timing note at the top of
+    /// this file for why the caller's onOpen is not invoked from here directly.
+    private var filenameToOpen: String?
 
     private let filterLabel = NSTextField(labelWithString: "")
     private let tableView = FilenameTableView()
@@ -85,18 +97,21 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
         filenames: [String],
         onOpen: @escaping (String) -> Void
     ) {
-        let panel = OpenDialogPanel(filenames: filenames, onOpen: onOpen)
+        let panel = OpenDialogPanel(filenames: filenames)
 
         panel.makeKeyAndOrderFront(nil)
         NSApp.runModal(for: panel)
         panel.orderOut(nil)
+
+        if let filename = panel.filenameToOpen {
+            onOpen(filename)
+        }
     }
 
     // MARK: - Initialization
 
-    private init(filenames: [String], onOpen: @escaping (String) -> Void) {
+    private init(filenames: [String]) {
         self.state = .initial(fullFilenames: filenames)
-        self.onOpen = onOpen
 
         let styleMask: NSWindow.StyleMask = [.titled, .fullSizeContentView]
 
@@ -147,6 +162,7 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
 
         tableView.delegate = self
         tableView.dataSource = self
+        tableView.style = .plain  // opt out of Big Sur's automatic inset row style
         tableView.headerView = nil
         tableView.rowHeight = OpenDialogPanel.rowHeight
         tableView.intercellSpacing = NSSize(width: 0, height: 1)
@@ -364,8 +380,8 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
             refresh()
 
         case .open(let filename):
+            filenameToOpen = filename
             closeModal()
-            onOpen(filename)
 
         case .close:
             closeModal()
