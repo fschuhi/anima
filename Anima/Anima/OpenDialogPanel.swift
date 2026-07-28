@@ -55,7 +55,8 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
     private static let borderWidth: CGFloat = 1
     private static let internalPadding: CGFloat = 6
     private static let filterLabelFont = NSFont.systemFont(ofSize: 9, weight: .medium)
-    private static let rowHeight: CGFloat = 26
+    private static let rowFont = NSFont.systemFont(ofSize: 11)  // matches CommentCardView's commentLabel
+    private static let rowHeight: CGFloat = 16
     private static let filterPlaceholder = "type to filter"
 
     // MARK: - State
@@ -141,7 +142,6 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
         let filenameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("filename"))
         filenameColumn.width = 400
         filenameColumn.minWidth = 200
-        filenameColumn.resizingMask = .autoresizingMask
 
         tableView.addTableColumn(filenameColumn)
 
@@ -167,7 +167,7 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
 
         scrollView.documentView = tableView
         scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
+        scrollView.hasHorizontalScroller = true
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
@@ -263,7 +263,7 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
         cell.identifier = identifier
 
         let textField = NSTextField(labelWithString: "")
-        textField.lineBreakMode = .byTruncatingTail
+        textField.lineBreakMode = .byClipping
         textField.translatesAutoresizingMaskIntoConstraints = false
 
         cell.addSubview(textField)
@@ -278,17 +278,47 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
         return cell
     }
 
+    /// Sizes the single column to fit the widest currently-visible filename,
+    /// so rows render on one line and overflow becomes a genuine horizontal
+    /// scrollbar instead of wrapping. Recomputed on every refresh(), since
+    /// the widest entry changes as the filter narrows the visible list.
+    private func updateColumnWidth() {
+        guard let column = tableView.tableColumns.first else { return }
+
+        let widths = state.visibleFilenames.map {
+            ($0 as NSString).size(withAttributes: [.font: OpenDialogPanel.rowFont]).width
+        }
+        let contentWidth = (widths.max() ?? 0) + 12  // matches the cell's 6pt leading/trailing insets
+
+        column.width = max(contentWidth, OpenDialogPanel.defaultWidth - (2 * OpenDialogPanel.internalPadding))
+    }
+
     /// Section 6: the first case-insensitive occurrence of `filterString` in
     /// `filename` rendered bold; first occurrence only. An empty filter
     /// renders the filename as a plain string with no marking. Converts
     /// OpenDialogState's String.Index range to the NSRange an
     /// NSAttributedString needs.
     private static func attributedFilename(_ filename: String, filterString: String) -> NSAttributedString {
+        let fullRange = NSRange(location: 0, length: filename.utf16.count)
+
+        // NSTextField ignores its own lineBreakMode once attributedStringValue
+        // is assigned directly -- the attributed string's own paragraph style
+        // takes over, and NSParagraphStyle's default wraps by word. Setting
+        // .byClipping here is what actually stops rows from wrapping; it
+        // doesn't truncate with an ellipsis either, since updateColumnWidth()
+        // sizes the column to fit the full text and a horizontal scrollbar
+        // handles anything wider than the panel itself.
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byClipping
+
         let result = NSMutableAttributedString(string: filename)
-        result.addAttribute(
-            .foregroundColor,
-            value: NSColor.labelColor,
-            range: NSRange(location: 0, length: filename.utf16.count)
+        result.addAttributes(
+            [
+                .foregroundColor: NSColor.labelColor,
+                .font: OpenDialogPanel.rowFont,
+                .paragraphStyle: paragraphStyle,
+            ],
+            range: fullRange
         )
 
         guard let matchRange = OpenDialogState.firstMatchRange(of: filterString, in: filename) else {
@@ -297,7 +327,7 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
 
         result.addAttribute(
             .font,
-            value: NSFont.boldSystemFont(ofSize: NSFont.systemFontSize),
+            value: NSFont.boldSystemFont(ofSize: OpenDialogPanel.rowFont.pointSize),
             range: NSRange(matchRange, in: filename)
         )
         return result
@@ -310,6 +340,7 @@ final class OpenDialogPanel: NSPanel, NSTableViewDataSource, NSTableViewDelegate
             ? OpenDialogPanel.filterPlaceholder
             : state.filterString
 
+        updateColumnWidth()
         tableView.reloadData()
 
         if let index = state.selectionIndex {
