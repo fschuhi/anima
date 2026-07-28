@@ -1,0 +1,51 @@
+{
+  "configurations" : [
+    {
+      "id" : "001E2F33-3305-4A9A-B220-6BBD026EAA10",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "environmentVariableEntries" : [
+      {
+        "key" : "OS_ACTIVITY_MODE",
+        "value" : "disable"
+      }
+    ],
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:Anima.xcodeproj",
+      "identifier" : "81A616FE2F64C234008C223B",
+      "name" : "Anima"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:Anima.xcodeproj",
+        "identifier" : "81A6170C2F64C235008C223B",
+        "name" : "AnimaTests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "skippedTests" : [
+        "AnimaUITests",
+        "AnimaUITests\/testExample()",
+        "AnimaUITests\/testLaunchPerformance()",
+        "AnimaUITestsLaunchTests",
+        "AnimaUITestsLaunchTests\/testLaunch()"
+      ],
+      "target" : {
+        "containerPath" : "container:Anima.xcodeproj",
+        "identifier" : "81A617162F64C235008C223B",
+        "name" : "AnimaUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

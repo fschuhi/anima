@@ -24,6 +24,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		817A40FA3019350B00F5BFE1 /* Anima.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = Anima.xctestplan; sourceTree = "<group>"; };
 		81A616FF2F64C234008C223B /* Anima.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Anima.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		81A6170D2F64C235008C223B /* AnimaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AnimaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		81A617172F64C235008C223B /* AnimaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AnimaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -75,6 +76,7 @@
 		81A616F62F64C234008C223B = {
 			isa = PBXGroup;
 			children = (
+				817A40FA3019350B00F5BFE1 /* Anima.xctestplan */,
 				81A617012F64C234008C223B /* Anima */,
 				81A617102F64C235008C223B /* AnimaTests */,
 				81A6171A2F64C235008C223B /* AnimaUITests */,

@@ -78,6 +78,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // frame between launches.
     private let mainWindowFrameAutosaveName = "AnimaMainWindow"
 
+    // UserDefaults key holding the open dialog's PDF collection search
+    // path. Seeded via `make set-pdf-collection-path`; falls back to a
+    // hardcoded default in resolvedCollectionSearchPath() if unset.
+    private static let pdfCollectionSearchPathKey = "AnimaPDFCollectionSearchPath"
+
     @IBOutlet var window: NSWindow!
 
     var mainViewController: MainViewController!
@@ -542,6 +547,59 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         return nil
+    }
+
+    // MARK: - Open Dialog
+
+    /// File > Open... (Cmd+O). Presents a modeless keyboard launcher over
+    /// the configured PDF collection. Specified in
+    /// docs/OPEN_DIALOG_DESIGN.md.
+    @IBAction func openDocument(_ sender: Any?) {
+        guard NSApp.modalWindow == nil else {
+            NSSound.beep()
+            Swift.print("⚠️ Open dialog declined while a modal dialog is active")
+            return
+        }
+
+        let searchPath = resolvedCollectionSearchPath()
+
+        switch PDFCollectionScanner.scan(directory: searchPath) {
+        case .pathNotFound(let path):
+            showOpenDialogAlert(
+                title: "PDF collection folder not found",
+                message: "The configured folder does not exist:\n\n\(path)"
+            )
+
+        case .noFilesFound(let path):
+            showOpenDialogAlert(
+                title: "No PDFs found",
+                message: "The configured folder contains no PDF files:\n\n\(path)"
+            )
+
+        case .success(let filenames):
+            OpenDialogPanel.showModal(filenames: filenames) { [weak self] filename in
+                guard let self = self else { return }
+                let url = URL(fileURLWithPath: searchPath).appendingPathComponent(filename)
+                self.loadDocument(url: url)
+            }
+        }
+    }
+
+    /// Reads the configured search path from UserDefaults, falling back to
+    /// the design doc's default, and expands `~` before use.
+    private func resolvedCollectionSearchPath() -> String {
+        let defaultPath = "~/Obsidian/Papers/Collection/PDFs"
+        let stored = UserDefaults.standard.string(forKey: AppDelegate.pdfCollectionSearchPathKey) ?? defaultPath
+        return NSString(string: stored).expandingTildeInPath
+    }
+
+    private func showOpenDialogAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = title
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     // MARK: - Lifecycle

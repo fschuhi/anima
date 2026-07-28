@@ -27,8 +27,7 @@ APP_NAME = Anima.app
 BUNDLE_ID = com.fschuhi.Anima
 
 # --- Phony targets ---
-.PHONY: all setup build run clean format showtree gentree filesdump help test test-verbose print-app-path open-app open-pdf ls-anima
-
+.PHONY: all setup build run clean format showtree gentree filesdump help test test-verbose print-app-path open-app open-pdf ls-anima set-pdf-collection-path
 # Default target
 all: setup
 
@@ -108,6 +107,9 @@ open-pdf: ## Open the dev PDF with the current Xcode-built app
 
 ls-anima: ## Show Launch Services registrations for Anima
 	@/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -dump | grep -A 6 -B 6 "$(BUNDLE_ID)" || true
+
+set-pdf-collection-path: ## Seed the open-dialog search path (defaults write)
+	defaults write $(BUNDLE_ID) AnimaPDFCollectionSearchPath "~/Obsidian/Papers/Collection/PDFs"
 
 # --- Utility Targets ---
 
