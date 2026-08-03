@@ -1,20 +1,11 @@
-# History
+# anima -- History
 
-(Note: "I" in the following paragraphs refers to the user, "you" to you as the AI model.)
+(Note: "I" in the following paragraphs refer to the user, "you" to you as the AI model.)
 
-## Charter
-
-The resolved-work record: *what* shipped, *when*. This file answers exactly one question -- "has X been done already, and in which session?" -- and nothing else. It lives in the repo but **outside the per-session filesdump**: it is uploaded only at the end of a session, at the moment the conversation is longest, the context budget tightest, and the remaining work most judgement-heavy. Every word here is paid for at that most expensive moment, so this file is deliberately the tersest artefact in the project.
-
-## Entry rules
-
-- One bullet per resolved item: date + what shipped. One line preferred, two lines maximum.
-- No rationale, no alternatives-considered, no design narrative. Durable contracts and their "why" belong in `README.md` or `TARGET_ARCHITECTURE.md`; open work in `TODO.md`; direction in `GOALS.md`. An entry may *end* with a pointer to where the reasoning lives; it may never *contain* the reasoning.
-- If an entry resists compression because its reasoning exists nowhere else, the wrong file is being edited: move the reasoning to its owning artefact first, then record the one-liner here.
-- Superseded or no-longer-relevant entries are deleted, not annotated. Git history preserves everything; this file describes the past only as far as it still serves the present.
-- **Ownership:** I maintain this file myself, transcribing entries from the struck-through handover notes in `TODO.md` (or from a one-liner drafted together in chat when a session runs from another artefact). You draft those notes in HISTORY-ready form -- dated, one line, no rationale -- but you never edit this file directly.
-
-See "Workflow for the Whole Session (CRITICAL)" in `LLM_INSTRUCTIONS.md` for when this file is updated. For forward work see `TODO.md`; for direction `GOALS.md`; for the architecture as it stands `README.md`.
+- The resolved-work record: what was built and when (note date, or have the points in roughly reverse-chronological order).
+- This is the trophy case -- kept in the repo, **out of the per-session filesdump** (so it no longer rides along every session).
+- For *forward* work see `TODO.md`; for direction see `GOALS.md`; for the architecture as it stands see `README.md`.
+- See "Workflow for the Whole Session (CRITICAL)" in `LLM_INSTRUCTIONS.md` for the interplay between `TODO.md` and this file.
 
 ---
 
