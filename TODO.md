@@ -38,6 +38,8 @@
 
 - ~~**Implement the open dialog per `docs/OPEN_DIALOG_DESIGN.md`.** Modeless filter/selection state machine as a plain testable type first, then the panel as a `JumpStationPanel` sibling, then the `openDocument(_:)` entry point and the `make` target seeding the `UserDefaults` search path.~~ Done 2026-07-28 -- `Cmd+O` opens the collection launcher end to end, sorted by most-recently-touched PDF. See `HISTORY.md` for the two implementation bugs found along the way.
 
+- **Open a PDF by pasting a filename or a `pdf_id`.** I often select and copy a filename in Excel, or using Total Commander. The pasted filename can be converted by Anima to a `pdf_id`, which is then opened from the pdf registry.
+
 - **Open a PDF by dropping it onto the reader window.** Dock-icon drops already arrive through `application(_:open:)`; this item concerns registering the reader window as a drag destination.
 
 - **Backchannel to the Obsidian bibnote (open via CLI).** From the currently displayed PDF, resolve its `pdf_id` and have Obsidian open the matching bibnote directly, instead of a manual lookup. _Needs investigation:_ a keybinding (`Cmd+P` is already X-Ray toggle -- needs a different key or a decision to repurpose it); whether the lookup runs through a new `pdf-annotations` CLI direction (path/hash -> bibnote) or Anima calls Obsidian directly; and the failure case for a PDF with no `pdf_id` (likely beep-and-log, consistent with the app's other resolve guards).
