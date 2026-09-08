@@ -10,7 +10,7 @@
 
 **Where we are:** `docs/OPEN_DIALOG_DESIGN.md` implemented and working end-to-end (2026-07-28) -- `Cmd+O` opens the collection launcher; all new unit tests pass. Two bugs found and fixed along the way are recorded in `HISTORY.md`.
 
-**What's next:** No approved design pending. Candidates for the next strategy discussion are in `TODO.md`'s Opening PDFs section: pasting a filename, a backchannel opening the current PDF's Obsidian bibnote, plus `OPEN_DIALOG_DESIGN.md`'s deferred items (multiple search paths, settings UI).
+**What's next:** No approved design pending. Candidates for the next strategy discussion are in `TODO.md`'s Opening PDFs section: fix Spotlight problem, retain seqarch, pasting a filename, a backchannel opening the current PDF's Obsidian bibnote, plus `OPEN_DIALOG_DESIGN.md`'s deferred items (multiple search paths, settings UI).
 
 ---
 

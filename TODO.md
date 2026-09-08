@@ -38,6 +38,10 @@
 
 - ~~**Implement the open dialog per `docs/OPEN_DIALOG_DESIGN.md`.** Modeless filter/selection state machine as a plain testable type first, then the panel as a `JumpStationPanel` sibling, then the `openDocument(_:)` entry point and the `make` target seeding the `UserDefaults` search path.~~ Done 2026-07-28 -- `Cmd+O` opens the collection launcher end to end, sorted by most-recently-touched PDF. See `HISTORY.md` for the two implementation bugs found along the way.
 
+- **Go immediately to open dialog when called from Spotlight.** The default `(Albini 2013)` opens when I call Anima from Spotlight. Consider going immediately to the open dialog and exiting Anima when no file is selected.
+
+- **Retain search across invocations of the open dialog.** It's easy to clear the search string with `Esc`, so retain the search string (and thus the files shown) across invocations. This helps e.g. to quickly open different PDFs from the same author.
+
 - **Open a PDF by pasting a filename or a `pdf_id`.** I often select and copy a filename in Excel, or using Total Commander. The pasted filename can be converted by Anima to a `pdf_id`, which is then opened from the pdf registry.
 
 - **Open a PDF by dropping it onto the reader window.** Dock-icon drops already arrive through `application(_:open:)`; this item concerns registering the reader window as a drag destination.

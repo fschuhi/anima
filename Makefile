@@ -27,7 +27,7 @@ APP_NAME = Anima.app
 BUNDLE_ID = com.fschuhi.Anima
 
 # --- Phony targets ---
-.PHONY: all setup build run clean format showtree gentree filesdump help test test-verbose print-app-path open-app open-pdf ls-anima set-pdf-collection-path
+.PHONY: all setup build run clean format showtree gentree filesdump filesdump-detailed filesdump-compact help test test-verbose print-app-path open-app open-pdf ls-anima set-pdf-collection-path
 # Default target
 all: setup
 
@@ -125,12 +125,17 @@ gentree: ## Save tree structure to tmp/project_tree.txt
 	@tree -I "node_modules|dist|build|.git|.idea|.vscode|.venv|__pycache__|tmp|cache|*egg-info|DerivedData|xcuserdata" > tmp/project_tree.txt
 	@echo "Project tree saved to tmp/project_tree.txt"
 
-filesdump: gentree ## Create context dump for LLMs
+filesdump: gentree ## Create context dump for LLMs (manifest.lst)
 	@echo "--- Generating filesdump ---"
 	$(ACTIVATE) && python tools/concat_files.py manifest.lst > tmp/filesdump.txt
 	@echo "Filesdump created at tmp/filesdump.txt"
 
-filesdump-compact: gentree ## Create context dump for LLMs
+filesdump-detailed: gentree ## Create context dump for LLMs with per-file size details (manifest.lst)
+	@echo "--- Generating filesdump ---"
+	$(ACTIVATE) && python tools/concat_files.py --detailed --sort manifest.lst > tmp/filesdump.txt
+	@echo "Filesdump created at tmp/filesdump.txt"
+
+filesdump-compact: gentree ## Create context dump for LLMs (manifest-compact.lst)
 	@echo "--- Generating filesdump ---"
 	$(ACTIVATE) && python tools/concat_files.py manifest-compact.lst > tmp/filesdump-compact.txt
 	@echo "Filesdump created at tmp/filesdump-compact.txt"
