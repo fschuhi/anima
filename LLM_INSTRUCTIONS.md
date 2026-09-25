@@ -9,12 +9,14 @@
 **STOP: Read `CRITICAL_RULES.md` FIRST if it's attached.** Quick Reference:
 
 Rule 1: No unsolicited files
-Rule 2: Always generate drop-in replacements
+Rule 2: Always generate drop-in replacements (or verified patches for `make patch`)
 Rule 3: Workflow is Discuss -> Approve -> Implement
 Rule 4: Step-by-step development
 Rule 5: Tests are the spec
 Rule 6: Respectful communication
-Rule 7: Inventory first when reviewing code or artefacts
+Rule 8: Stay inside the `filesdump.txt`; tools check claims, never make progress
+Rule 9: `manifest.lst` is mine alone
+Rule 10: Milestones are reached together
 
 **If `CRITICAL_RULES.md` conflicts with anything below, `CRITICAL_RULES.md` wins.**
 
@@ -66,16 +68,27 @@ For this project, I require (or at least request) strict conversation compartmen
 
 ## Code & Text Output Standards
 
-### ✅ Whole Files, no Snippets, no Patches (CRITICAL)
+### ✅ Whole Files or Checked Patches, no Snippets (CRITICAL)
 
-See `CRITICAL_RULES.md` Rule 2: Always generate drop-in replacements.
+See `CRITICAL_RULES.md` Rule 2: drop-in replacements, or checked patches where the project has `make patch`.
+
+### Patches for `make patch`
+
+`make patch` applies every `*.patch` in the repo root with `git apply` and then moves them to `tmp/applied-patches/`.
+
+- **One patch per step**, covering all changed existing files of that step. New files come as complete files next to it.
+- **File name:** `YYYY-MM-DD-topic.patch`, with the session date, e.g. `2026-09-22-clear-screen.patch`. The date keeps names unique in `tmp/applied-patches/`, which then reads like a log.
+- **Base:** generate the patch with `git diff` against the named base commit, and check it with `git apply --check` before delivering. State the base commit in the message.
+- **Line endings:** keep them exactly as stored. Files marked `-text` in `.gitattributes` (e.g. VBA `.bas` files) are stored with CRLF, and the patch must keep CRLF on every line of their hunks.
+- **Delivery:** as a file, like any other file (see "Files Go In Artefacts, Not The Dialogue").
+- **Never** for `CRITICAL_RULES.md`, `LLM_INSTRUCTIONS.md` or `FIRST_PROMPT.md`; see Rule 2.
 
 ### Protocol to Prevent Breaking Fenced Content
 
 **PROTOCOL TRIGGER:** This protocol applies whenever the file content you are about to output contains one or more triple-backtick sequences anywhere within it, regardless of file type. This is common for `.md` files (which might contain fenced code examples) but can also occur in `.py`, `.json`, or any other file with embedded fenced content (e.g., a docstring or string literal containing a Markdown example).
 
 **Step 1 -- Determine your output mode:**
-- If you are able to generate a file as a separate artefact/canvas/document object outside the main chat dialog (distinct from the conversational text area), do so normally. Nothing further in this section applies to you.
+- If you are able to generate a file as a separate artefact/canvas/document object outside the main chat dialog (distinct from the conversational text area), do so normally, see also below. Nothing further in this section applies to you.
 - If you have no such artefact mechanism, and can only return file content as text within the chat dialog itself, proceed to Step 2.
 
 **Step 2 -- Four-backtick wrapping (chat-only models):**
@@ -85,6 +98,10 @@ See `CRITICAL_RULES.md` Rule 2: Always generate drop-in replacements.
 ````markdown
 <file content here, which may itself freely contain standard triple-backtick fences>
 ````
+
+### Files Go In Artefacts, Not The Dialogue
+
+Whenever the interface offers a separate object outside the chat text (artefact, canvas, document) for file output, use it -- every time, regardless of file size or whether it contains nested code fences. Fall back to inline chat text (four-backtick wrapping if needed) only when no such mechanism exists this session.
 
 ### Line Breaks in Prose Documents
 
@@ -104,6 +121,11 @@ See `CRITICAL_RULES.md` Rule 2: Always generate drop-in replacements.
 - Out of scope is material that a language, a tool, or the eye requires verbatim: code and commands themselves, and display material such as directory trees, tables, and diagrams, where arrows and box-drawing characters serve alignment or annotation.
 - Verbatim quotes from existing files keep their original characters.
 - Do not sweep an existing file's typography while editing it. Comment text you write or rewrite is ASCII; lines you are not otherwise touching stay exactly as they are. A one-off typography pass is its own approved task, never a side effect of another change.
+
+### Project Artefacts: Strictly No Inline Citations
+
+- Never emit synthetic inline source markers or search citations (such as ``, `[source: ...]`, or numeric brackets `[1]`, `[2]`) in any generated file, patch, code snippet, docstring, commit message, or markdown artefact.
+- Project files are version-controlled engineering documents; inline model attribution tags corrupt the source and must be completely omitted.
 
 ### Test Counts: "All Green", Never a Number
 
@@ -299,7 +321,7 @@ When I express confusion, frustration, uncertainty, or overwhelm:
 - Never tell me to "calm down," "take a breath," or similar phrases which I could (mis-)interpret as condescending or patronizing
 - Address the technical issue, not my state of mind
 
-**Milestone transitions:** When I express that an approved step is exciting, meaningful, or important to my real use of the project, acknowledge that significance in one or two specific, grounded sentences before implementation, test instructions, or any caution, flag, or scope concern. Do not use generic cheerleading. Connect the recognition to the actual project behavior or capability being unlocked.
+**Milestone transitions:** See `CRITICAL_RULES.md` Rule 10. Milestones are reached together, and recognition comes before implementation, tests, and caution. It moved into the critical rules because it is not a matter of tone: it decides who runs the step.
 
 ---
 
